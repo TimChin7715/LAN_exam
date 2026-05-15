@@ -53,8 +53,13 @@ Plans:
 
 Plans:
 
-- [ ] 02-01: 题目数据模型与导入管道（解析、校验、持久化）
-- [ ] 02-02: 单选与判断题导入与预览 UI
+**Wave 1**
+- [x] 02-01: 题目数据模型与导入管道（解析、校验、持久化）
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [x] 02-02: 单选与判断题导入与预览 UI
+
+**Wave 3** *(blocked on Wave 2 completion)*
 - [ ] 02-03: 多选题导入、计分规则固定实现与预览
 
 ### Phase 3: 名单与学生入场
@@ -101,6 +106,6 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. 基础服务与教师认证 | 0/3 | Not started | - |
-| 2. 题库导入 | 0/3 | Not started | - |
+| 2. 题库导入 | 2/3 | In progress | 02-01, 02-02 |
 | 3. 名单与学生入场 | 0/2 | Not started | - |
 | 4. 考试、提交与导出 | 0/3 | Not started | - |
