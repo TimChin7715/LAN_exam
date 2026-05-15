@@ -31,7 +31,7 @@ docker compose up --build
 | --- | --- |
 | 种子用户名 | `teacher_admin`（常量，见 `prisma/seed.ts`） |
 | 首登改密 | 种子账号 `mustChangePassword=true`；登录后须在 **01-03 认证计划** 中强制改密 |
-| `DATABASE_URL` | Compose 内 `app` 使用主机名 `db`；本机 `pnpm` 开发使用 `127.0.0.1:5432`（见 `.env.example`） |
+| `DATABASE_URL` | Compose 内 `app` 使用主机名 `db`；本机 `pnpm` 开发使用 `127.0.0.1:5434`（见 `.env.example`） |
 
 验证数据库就绪：
 
@@ -41,7 +41,7 @@ docker compose logs app
 # 或进入 db 容器：docker compose exec db psql -U lan_exam -d lan_exam -c '\dt'
 ```
 
-Postgres 默认**仅绑定 127.0.0.1:5432** 到宿主机，避免将数据库暴露到 `0.0.0.0`；应用通过 Docker 内部网络访问 `db:5432`。
+Postgres 默认**仅绑定 127.0.0.1:5434** 到宿主机（映射容器内 5432），避免与 Windows 保留端口及本机已有 Postgres 冲突；应用通过 Docker 内部网络访问 `db:5432`。
 
 ## 一键启动（开发/验收）
 
@@ -52,8 +52,8 @@ docker compose up --build
 验收：
 
 ```bash
-# 健康检查（端口以 compose 映射为准，默认 3001）
-curl -s http://127.0.0.1:3001/health
+# 健康检查（端口以 compose 映射为准，默认 3101）
+curl -s http://127.0.0.1:3101/health
 # 期望: {"status":"ok"}
 ```
 
@@ -63,12 +63,12 @@ curl -s http://127.0.0.1:3001/health
 
 ### 步骤
 
-1. 在 `docker-compose.yml` 或环境变量中确认 `HOST=0.0.0.0`、`PORT=3001`（默认已配置）。
+1. 在 `docker-compose.yml` 或环境变量中确认 `HOST=0.0.0.0`、`PORT=3101`（默认已配置）。
 2. 启动：`docker compose up -d --build`
-3. **Windows 防火墙**：入站规则放行 TCP `3001`（及后续 Web 端口，若单独暴露）。
-   - `wf.msc` → 入站规则 → 新建规则 → 端口 → TCP 3001 → 允许连接 → 域/专用配置文件勾选。
-4. 在**局域网另一台机器**浏览器访问：`http://<服务器IP>:3001/health`，应返回 JSON `status: ok`。
-5. 正式 Web 前端上线后，同样放行对应端口（默认开发 Web `5173`，生产以 compose 为准）。
+3. **Windows 防火墙**：入站规则放行 TCP `3101`（及后续 Web 端口，若单独暴露）。
+   - `wf.msc` → 入站规则 → 新建规则 → 端口 → TCP 3101 → 允许连接 → 域/专用配置文件勾选。
+4. 在**局域网另一台机器**浏览器访问：`http://<服务器IP>:3101/health`，应返回 JSON `status: ok`。
+5. 正式 Web 前端上线后，同样放行对应端口（默认开发 Web `5180`，生产以 compose 为准）。
 
 ### 健康检查与回滚
 
@@ -93,7 +93,7 @@ curl -s http://127.0.0.1:3001/health
 ### 步骤
 
 1. 将应用绑定到 **loopback**：设置 `HOST=127.0.0.1`（仅本机可连 API 端口）。
-2. 启动 Compose 后，API 在 `127.0.0.1:3001` 可用。
+2. 启动 Compose 后，API 在 `127.0.0.1:3101` 可用。
 3. **Nginx 示例**（片段）：
 
 ```nginx
@@ -105,7 +105,7 @@ server {
     ssl_certificate_key /etc/nginx/certs/exam.key;
 
     location /api/ {
-        proxy_pass http://127.0.0.1:3001/;
+        proxy_pass http://127.0.0.1:3101/;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
     }
@@ -118,12 +118,12 @@ server {
 }
 ```
 
-4. **IIS**：使用 URL Rewrite + ARR 将 `/api` 转发到 `http://127.0.0.1:3001`，静态站点指向 Web 构建产物目录。
+4. **IIS**：使用 URL Rewrite + ARR 将 `/api` 转发到 `http://127.0.0.1:3101`，静态站点指向 Web 构建产物目录。
 5. 学员访问：`https://exam.school.local/`（由代理提供 TLS）。
 
 ### 健康检查与回滚
 
-- 代理层可对 `http://127.0.0.1:3001/health` 做主动探测。
+- 代理层可对 `http://127.0.0.1:3101/health` 做主动探测。
 - 回滚：切换 Nginx `proxy_pass` 至旧容器端口，或 `docker compose` 切回上一镜像；代理配置变更前备份 `sites-enabled`。
 
 ## 生产镜像说明
@@ -131,6 +131,18 @@ server {
 - 多阶段 `Dockerfile`：构建 `@lan-exam/web` 与 `@lan-exam/server`，运行入口为 `node apps/server/dist/index.js`。
 - 开发可用 `tsx watch`；**生产不使用 tsx**，仅 `node` 运行编译产物。
 - 构建使用锁定的 `pnpm-lock.yaml`；发布前建议 `pnpm audit` 并处理高危项。
+
+## 题库导入
+
+管理端 **题库**（`/admin/questions`）依赖服务端 **exceljs** 解析 `.xlsx`（见 `apps/server` 依赖与 `POST /api/admin/questions/import`）。
+
+| 项 | 说明 |
+| --- | --- |
+| 权威模板 | 仓库 `docs/templates/题库导入模板.xlsx`（与「下载官方模板」接口同源） |
+| 建议首次验收 | 使用仓库模板中合法样例行（或复制模板后删除【示例】行）做一次 smoke 导入，确认三种题型均可列表查看 |
+| 多选计分 | 入库时 `multiScoringRule=ALL_OR_NOTHING`（全对满分否则 0 分）；详见 `.planning/phases/02-qbank-import/02-ACCEPTANCE.md` |
+
+部署后需已执行含 `Question` / `QuestionImportBatch` 的 Prisma 迁移（Phase 2 迁移 `20260516120000_qbank_questions`）。
 
 ## 常见问题
 
