@@ -1,0 +1,31 @@
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: lan_exam
+      POSTGRES_PASSWORD: lan_exam_dev
+      POSTGRES_DB: lan_exam
+    ports:
+      - '5432:5432'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U lan_exam -d lan_exam']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  app:
+    build: .
+    ports:
+      - '3001:3001'
+    environment:
+      PORT: '3001'
+      HOST: '0.0.0.0'
+      DATABASE_URL: postgresql://lan_exam:lan_exam_dev@db:5432/lan_exam
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
