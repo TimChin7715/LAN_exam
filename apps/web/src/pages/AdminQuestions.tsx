@@ -6,17 +6,11 @@ import { toast } from 'sonner';
 import { ImportDropzone } from '@/components/admin/qbank/ImportDropzone';
 import { ImportErrorTable } from '@/components/admin/qbank/ImportErrorTable';
 import { ImportResultSummary } from '@/components/admin/qbank/ImportResultSummary';
+import { QuestionDetailDialog } from '@/components/admin/qbank/QuestionDetailDialog';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import {
   Select,
   SelectContent,
@@ -36,7 +30,6 @@ import {
 import {
   fetchQuestionDetail,
   fetchQuestions,
-  formatAnswerKeys,
   questionTypeLabel,
   truncateStem,
   type ImportFailure,
@@ -292,69 +285,12 @@ export default function AdminQuestions() {
         </CardContent>
       </Card>
 
-      <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
-        <DialogContent className="max-h-[80vh] max-w-lg overflow-y-auto">
-          {detailLoading || !detail ? (
-            <div className="flex justify-center py-8">
-              <Spinner className="size-6" />
-            </div>
-          ) : (
-            <>
-              <DialogHeader>
-                <DialogTitle className="flex flex-wrap items-center gap-2 text-left">
-                  <Badge variant="secondary">{questionTypeLabel(detail.type)}</Badge>
-                  <span className="line-clamp-2 text-base font-semibold">
-                    {truncateStem(detail.stem, 40)}
-                  </span>
-                </DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4 text-base">
-                <p className="whitespace-pre-wrap">{detail.stem}</p>
-                <ul className="space-y-2">
-                  {[...detail.options]
-                    .sort((a, b) => a.key.localeCompare(b.key))
-                    .map((opt) => {
-                      const isAnswer = detail.answerKeys
-                        .split(',')
-                        .map((k) => k.trim())
-                        .includes(opt.key);
-                      return (
-                        <li
-                          key={opt.key}
-                          className={isAnswer ? 'font-semibold text-primary' : undefined}
-                        >
-                          {opt.key}. {opt.text}
-                        </li>
-                      );
-                    })}
-                </ul>
-                <p className="text-sm font-semibold">
-                  正确答案：{formatAnswerKeys(detail.answerKeys)}
-                </p>
-                <p className="text-muted-foreground">
-                  解析：{detail.explanation?.trim() ? detail.explanation : '—'}
-                </p>
-                {detail.knowledgePoints?.trim() ? (
-                  <p>知识点：{detail.knowledgePoints}</p>
-                ) : null}
-                <p className="text-sm font-semibold text-muted-foreground">
-                  分值 {detail.points} · 难度 {detail.difficulty}
-                </p>
-                {detail.type === 'MULTI' ? (
-                  <p className="text-sm text-muted-foreground">
-                    计分规则：全对得满分，否则不得分
-                  </p>
-                ) : null}
-              </div>
-              <DialogFooter>
-                <Button type="button" onClick={() => setDetailOpen(false)}>
-                  关闭
-                </Button>
-              </DialogFooter>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
+      <QuestionDetailDialog
+        open={detailOpen}
+        onOpenChange={setDetailOpen}
+        detail={detail}
+        loading={detailLoading}
+      />
     </div>
   );
 }
