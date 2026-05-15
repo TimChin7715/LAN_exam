@@ -27,6 +27,9 @@ export function ImportResultSummary({
             <p>跳过示例行 {result.skippedCount} 条</p>
           ) : null}
           <p className="text-muted-foreground">来源文件：{fileName}</p>
+          <p className="text-muted-foreground">
+            多选题已按「全对满分，否则 0 分」规则入库。
+          </p>
         </CardContent>
       </Card>
 

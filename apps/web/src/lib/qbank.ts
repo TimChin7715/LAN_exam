@@ -155,6 +155,7 @@ export async function fetchQuestions(params: {
   page: number;
   pageSize?: number;
   type?: QuestionType;
+  batchId?: string;
 }): Promise<{
   items: QuestionListItem[];
   total: number;
@@ -166,6 +167,7 @@ export async function fetchQuestions(params: {
     pageSize: String(params.pageSize ?? 20),
   });
   if (params.type) search.set('type', params.type);
+  if (params.batchId) search.set('batchId', params.batchId);
 
   const data = await apiFetch<{
     ok: boolean;

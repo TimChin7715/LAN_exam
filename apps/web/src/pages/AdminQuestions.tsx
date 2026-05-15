@@ -54,20 +54,31 @@ export default function AdminQuestions() {
   const [page, setPage] = useState(1);
   const [pageSize] = useState(20);
   const [typeFilter, setTypeFilter] = useState<QuestionType | 'ALL'>('ALL');
+  const [batchFilter, setBatchFilter] = useState<'ALL' | 'LAST'>('ALL');
+  const [lastBatchId, setLastBatchId] = useState<string | null>(null);
   const [loadingList, setLoadingList] = useState(true);
   const [listError, setListError] = useState<string | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [detail, setDetail] = useState<QuestionDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
 
-  const loadList = useCallback(async (targetPage = page) => {
+  const loadList = useCallback(async (
+    targetPage = page,
+    overrides?: { batchFilter?: 'ALL' | 'LAST'; lastBatchId?: string | null },
+  ) => {
     setLoadingList(true);
     setListError(null);
+    const activeBatchFilter = overrides?.batchFilter ?? batchFilter;
+    const activeLastBatchId = overrides?.lastBatchId ?? lastBatchId;
     try {
       const data = await fetchQuestions({
         page: targetPage,
         pageSize,
         type: typeFilter === 'ALL' ? undefined : typeFilter,
+        batchId:
+          activeBatchFilter === 'LAST' && activeLastBatchId
+            ? activeLastBatchId
+            : undefined,
       });
       setItems(data.items);
       setTotal(data.total);
@@ -77,7 +88,7 @@ export default function AdminQuestions() {
     } finally {
       setLoadingList(false);
     }
-  }, [page, pageSize, typeFilter]);
+  }, [page, pageSize, typeFilter, batchFilter, lastBatchId]);
 
   useEffect(() => {
     void loadList(page);
@@ -88,8 +99,11 @@ export default function AdminQuestions() {
   function handleImportSuccess(result: ImportSuccess) {
     setImportFailure(null);
     setImportSuccess({ ...result, fileName: result.fileName });
+    setLastBatchId(result.batchId);
+    setBatchFilter('LAST');
     toast.success(`已成功导入 ${result.importedCount} 道题目。`);
-    void loadList(1);
+    setPage(1);
+    void loadList(1, { batchFilter: 'LAST', lastBatchId: result.batchId });
   }
 
   function handleImportFailure(result: ImportFailure) {
@@ -156,23 +170,42 @@ export default function AdminQuestions() {
       <Card ref={listRef}>
         <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <CardTitle className="text-sm font-semibold">题目列表</CardTitle>
-          <Select
-            value={typeFilter}
-            onValueChange={(v) => {
-              setTypeFilter(v as QuestionType | 'ALL');
-              setPage(1);
-            }}
-          >
-            <SelectTrigger className="w-full sm:w-40" aria-label="题型筛选">
-              <SelectValue placeholder="题型" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ALL">全部题型</SelectItem>
-              <SelectItem value="SINGLE">单选</SelectItem>
-              <SelectItem value="MULTI">多选</SelectItem>
-              <SelectItem value="JUDGE">判断</SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+            <Select
+              value={typeFilter}
+              onValueChange={(v) => {
+                setTypeFilter(v as QuestionType | 'ALL');
+                setPage(1);
+              }}
+            >
+              <SelectTrigger className="w-full sm:w-40" aria-label="题型筛选">
+                <SelectValue placeholder="题型" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">全部题型</SelectItem>
+                <SelectItem value="SINGLE">单选</SelectItem>
+                <SelectItem value="MULTI">多选</SelectItem>
+                <SelectItem value="JUDGE">判断</SelectItem>
+              </SelectContent>
+            </Select>
+            {lastBatchId ? (
+              <Select
+                value={batchFilter}
+                onValueChange={(v) => {
+                  setBatchFilter(v as 'ALL' | 'LAST');
+                  setPage(1);
+                }}
+              >
+                <SelectTrigger className="w-full sm:w-44" aria-label="导入批次筛选">
+                  <SelectValue placeholder="批次" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">全部批次</SelectItem>
+                  <SelectItem value="LAST">本批导入</SelectItem>
+                </SelectContent>
+              </Select>
+            ) : null}
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           {listError ? (
