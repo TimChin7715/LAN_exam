@@ -1,0 +1,14 @@
+{
+  "name": "lan-exam",
+  "private": true,
+  "packageManager": "pnpm@9.15.9",
+  "scripts": {
+    "dev:server": "pnpm --filter @lan-exam/server dev",
+    "dev:web": "pnpm --filter @lan-exam/web dev",
+    "dev": "pnpm run --parallel dev:server dev:web",
+    "build": "pnpm -r build"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3"
+  }
+}
