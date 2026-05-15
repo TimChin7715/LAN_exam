@@ -11,7 +11,7 @@
 
 ### 认证与授权
 
-- [ ] **AUTH-01**: 教师使用受保护凭据登录管理端；未登录用户无法访问题目与成绩等管理功能
+- [x] **AUTH-01**: 教师使用受保护凭据登录管理端；未登录用户无法访问题目与成绩等管理功能
 - [ ] **AUTH-02**: 学生输入姓名与身份证号后，系统与已导入名单逐字段匹配，仅全部一致时允许进入待参加的考试
 
 ### 题库
@@ -60,7 +60,7 @@
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | INFRA-01 | Phase 1 | Pending |
-| AUTH-01 | Phase 1 | Pending |
+| AUTH-01 | Phase 1 | Complete |
 | QBANK-01 | Phase 2 | Pending |
 | QBANK-02 | Phase 2 | Pending |
 | QBANK-03 | Phase 2 | Pending |
