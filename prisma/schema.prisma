@@ -9,11 +9,66 @@ datasource db {
 
 /// D-01: Multiple equal teachers; no role table in v1 — extend here for future RBAC.
 model Teacher {
-  id                 String   @id @default(cuid())
-  username           String   @unique
-  passwordHash       String
-  displayName        String
-  mustChangePassword Boolean  @default(true)
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  id                     String                @id @default(cuid())
+  username               String                @unique
+  passwordHash           String
+  displayName            String
+  mustChangePassword     Boolean               @default(true)
+  createdAt              DateTime              @default(now())
+  updatedAt              DateTime              @updatedAt
+  questionImportBatches  QuestionImportBatch[]
+}
+
+enum QuestionType {
+  SINGLE
+  MULTI
+  JUDGE
+}
+
+enum MultiScoringRule {
+  ALL_OR_NOTHING
+}
+
+model QuestionImportBatch {
+  id            String     @id @default(cuid())
+  teacherId     String
+  teacher       Teacher    @relation(fields: [teacherId], references: [id])
+  fileName      String
+  totalRows     Int
+  importedCount Int
+  skippedCount  Int        @default(0)
+  createdAt     DateTime   @default(now())
+  questions     Question[]
+
+  @@index([teacherId])
+}
+
+model Question {
+  id               String              @id @default(cuid())
+  batchId          String
+  batch            QuestionImportBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  type             QuestionType
+  stem             String
+  answerKeys       String
+  points           Int                 @default(1)
+  difficulty       Int                 @default(1)
+  explanation      String?
+  knowledgePoints  String?
+  multiScoringRule MultiScoringRule?
+  createdAt        DateTime            @default(now())
+  options          QuestionOption[]
+
+  @@index([batchId])
+  @@index([type])
+}
+
+model QuestionOption {
+  id         String   @id @default(cuid())
+  questionId String
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  key        String
+  text       String
+  sortOrder  Int
+
+  @@unique([questionId, key])
 }
