@@ -14,12 +14,14 @@ function previewQuestion(q: {
   stem: string;
   answerKeys: string;
   points: number;
+  options: Array<{ key: string; text: string }>;
 }) {
   return {
     type: q.type,
     stem: q.stem.length > 80 ? `${q.stem.slice(0, 80)}…` : q.stem,
     answerKeys: q.answerKeys,
     points: q.points,
+    options: q.options.map((o) => ({ key: o.key, text: o.text })),
   };
 }
 
