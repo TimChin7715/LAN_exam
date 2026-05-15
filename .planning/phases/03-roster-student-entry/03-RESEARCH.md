@@ -451,18 +451,13 @@ app.post('/api/admin/roster/import', {
 | A4 | 教师列表默认脱敏 | Pattern 5 | 与 ROST-01「检索确认」冲突时可改为全号 |
 | A5 | `SESSION_MAX_AGE` 24h 可继续用于学生 | Pattern 3 | CONTEXT 建议 8h 时需 env 统一 |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **学生登录 URL：`/` vs `/exam/login`**
-   - What we know: CONTEXT 建议二选一；当前 `/` 为占位。
-   - Recommendation: **`/exam/login` 为主**，`/` redirect 到 login 或 waiting（已登录时）— 与 `/admin` 对称。
+1. **学生登录 URL：`/` vs `/exam/login`** — **RESOLVED:** `03-02-PLAN.md` 采用 `/exam/login` 为主入口，`/` 重定向至 login（未登录）或 waiting（已登录学生 session）。
 
-2. **格式错误 400 文案是否算「泄露」**
-   - What we know: ROADMAP 针对姓名/证号 **组合** 不区分；格式错误不暴露名单存在。
-   - Recommendation: 保留 400「身份证号格式不正确」；组合失败 401 统一文案。
+2. **格式错误 400 文案是否算「泄露」** — **RESOLVED:** 格式非法返回 400「身份证号格式不正确」（不查库、不暗示名单存在）；姓名+证号组合失败返回 401 统一文案「姓名或身份证号不正确，请检查后重试。」（`03-02-PLAN.md` Task 1）。
 
-3. **跨批次重复是否拒绝导入**
-   - Recommendation: **是** — 预检 + `@@unique`；行级错误「该姓名与身份证号已存在于名单中」。
+3. **跨批次重复是否拒绝导入** — **RESOLVED:** **拒绝** — `03-01-PLAN.md` Task 1 预检 + `@@unique([fullName, nationalId])`；行级错误「该姓名与身份证号已存在于名单中」。
 
 ## Environment Availability
 

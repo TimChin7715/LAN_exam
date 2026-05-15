@@ -77,8 +77,11 @@ Plans:
 
 Plans:
 
-- [ ] 03-01: 名单数据模型、导入与检索
-- [ ] 03-02: 学生端登录页与强绑定校验 API
+**Wave 1**
+- [ ] 03-01-PLAN.md — 名单导入与检索垂直切片（Prisma + Excel 管道 + `/admin/roster` UI）
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [ ] 03-02-PLAN.md — 学生验证、独立 `student_sid` 会话、登录/准备页与路由守卫
 
 ### Phase 4: 考试、提交与导出
 **Goal:** 教师为考试关联题目与参考名单，学生完成作答并提交；教师导出成绩汇总与答题明细。  
