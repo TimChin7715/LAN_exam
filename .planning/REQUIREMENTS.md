@@ -17,7 +17,7 @@
 ### 题库
 
 - [x] **QBANK-01**: 教师能批量导入单选题（题干、选项、正确答案、分值或默认分值策略）
-- [ ] **QBANK-02**: 教师能批量导入多选题（含部分分策略或统一计分规则，规则在实现中固定并写入验收说明）
+- [x] **QBANK-02**: 教师能批量导入多选题（含部分分策略或统一计分规则，规则在实现中固定并写入验收说明）
 - [x] **QBANK-03**: 教师能批量导入判断题（题干、正确判断、分值）
 
 ### 名单
@@ -62,7 +62,7 @@
 | INFRA-01 | Phase 1 | Pending |
 | AUTH-01 | Phase 1 | Complete |
 | QBANK-01 | Phase 2 | Complete |
-| QBANK-02 | Phase 2 | Pending |
+| QBANK-02 | Phase 2 | Complete |
 | QBANK-03 | Phase 2 | Complete |
 | ROST-01 | Phase 3 | Pending |
 | AUTH-02 | Phase 3 | Pending |

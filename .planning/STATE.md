@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 02-02-PLAN.md
-last_updated: "2026-05-16T14:40:00.000Z"
-last_activity: 2026-05-16 -- Completed 02-02 qbank import UI
+stopped_at: Completed 02-03-PLAN.md
+last_updated: "2026-05-16T15:30:00.000Z"
+last_activity: 2026-05-16 -- Completed 02-03 multi-select scoring UI and acceptance
 progress:
   total_phases: 4
   completed_phases: 1
   total_plans: 6
-  completed_plans: 4
-  percent: 67
+  completed_plans: 5
+  percent: 83
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-05-15)
 ## Current Position
 
 Phase: 02 (qbank-import) — EXECUTING
-Plan: 2 of 3
-Status: Executing Phase 02
-Last activity: 2026-05-16 -- Completed 02-02 qbank import UI
+Plan: 3 of 3
+Status: Phase 02 plans complete — ready for verify
+Last activity: 2026-05-16 -- Completed 02-03 multi-select scoring UI and acceptance
 
-Progress: [███████░░░] 67%
+Progress: [████████░░] 83%
 
 ## Performance Metrics
 
@@ -56,6 +56,7 @@ Progress: [███████░░░] 67%
 - 01-02: 种子用户 `teacher_admin`；口令仅 `SEED_ADMIN_PASSWORD`；Compose entrypoint 先 migrate/seed 再启服。
 - 01-03: Session cookie `sid` + connect-pg-simple；Vite proxy 保留 `/api` 前缀；登录失败统一文案。
 - 02-02: Admin qbank UI at `/admin/questions`；import preview API includes options；router.tsx (not App.tsx) for routes。
+- 02-03: QBANK-02 ALL_OR_NOTHING UI + `02-ACCEPTANCE.md`；MULTI dialog shows fixed scoring copy；batch filter for last import。
 
 ### Pending Todos
 
