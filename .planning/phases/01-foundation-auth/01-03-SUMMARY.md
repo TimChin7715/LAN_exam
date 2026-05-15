@@ -74,7 +74,7 @@ completed: 2026-05-15
 1. **Task 1: 会话中间件与认证 API** - `a7b6fa4` (feat)
 2. **Task 2: 管理端 SPA 页面、路由守卫** - `f29c6ac` (feat)
 
-**Plan metadata:** _(pending docs commit)_
+**Plan metadata:** `0a73463` (docs: complete plan)
 
 ## Files Created/Modified
 
