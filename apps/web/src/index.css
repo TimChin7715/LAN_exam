@@ -29,24 +29,24 @@
 
 :root {
   --radius: 0.5rem;
-  --background: oklch(0.985 0.002 247.839);
-  --foreground: oklch(0.21 0.006 285.885);
-  --card: oklch(1 0 0);
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  --card: #ffffff;
   --card-foreground: oklch(0.21 0.006 285.885);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.21 0.006 285.885);
-  --primary: oklch(0.488 0.243 264.376);
-  --primary-foreground: oklch(0.985 0.002 247.839);
+  --primary: #2563eb;
+  --primary-foreground: #f8fafc;
   --secondary: oklch(0.967 0.001 286.375);
   --secondary-foreground: oklch(0.21 0.006 285.885);
   --muted: oklch(0.967 0.001 286.375);
-  --muted-foreground: oklch(0.552 0.016 285.938);
+  --muted-foreground: #64748b;
   --accent: oklch(0.967 0.001 286.375);
   --accent-foreground: oklch(0.21 0.006 285.885);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.92 0.004 286.32);
-  --input: oklch(0.92 0.004 286.32);
-  --ring: oklch(0.488 0.243 264.376);
+  --destructive: #dc2626;
+  --border: #e2e8f0;
+  --input: #e2e8f0;
+  --ring: #2563eb;
 }
 
 .dark {

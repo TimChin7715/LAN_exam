@@ -1,0 +1,10 @@
+/* UI-SPEC color tokens (slate/zinc/blue/red) */
+:root {
+  --page-bg: #f8fafc;
+  --card-bg: #ffffff;
+  --border-subtle: #e2e8f0;
+  --accent-blue: #2563eb;
+  --destructive-red: #dc2626;
+  --muted-text: #64748b;
+  --foreground-strong: #0f172a;
+}
