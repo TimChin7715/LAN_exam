@@ -6,9 +6,21 @@
     "dev:server": "pnpm --filter @lan-exam/server dev",
     "dev:web": "pnpm --filter @lan-exam/web dev",
     "dev": "pnpm run --parallel dev:server dev:web",
-    "build": "pnpm -r build"
+    "build": "pnpm -r build",
+    "postinstall": "prisma generate",
+    "db:migrate": "prisma migrate deploy",
+    "db:seed": "prisma db seed"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.8.2"
   },
   "devDependencies": {
+    "argon2": "^0.43.0",
+    "prisma": "^6.8.2",
+    "tsx": "^4.19.4",
     "typescript": "^5.8.3"
   }
 }
