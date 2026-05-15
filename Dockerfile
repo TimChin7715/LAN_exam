@@ -32,7 +32,8 @@ RUN chmod +x scripts/docker-entrypoint.sh \
   && pnpm install --frozen-lockfile \
   && pnpm exec prisma generate
 COPY --from=build /app/apps/server/dist apps/server/dist
-EXPOSE 3001
-ENV PORT=3001
+COPY docs/templates docs/templates
+EXPOSE 3101
+ENV PORT=3101
 ENV HOST=0.0.0.0
 ENTRYPOINT ["/app/scripts/docker-entrypoint.sh"]
