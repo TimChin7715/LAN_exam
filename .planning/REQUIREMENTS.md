@@ -22,7 +22,7 @@
 
 ### 名单
 
-- [ ] **ROST-01**: 教师能批量导入考试名单列：姓名、身份证号；导入后可在管理端预览或检索以确认
+- [x] **ROST-01**: 教师能批量导入考试名单列：姓名、身份证号；导入后可在管理端预览或检索以确认
 
 ### 考试与作答
 
@@ -64,7 +64,7 @@
 | QBANK-01 | Phase 2 | Complete |
 | QBANK-02 | Phase 2 | Complete |
 | QBANK-03 | Phase 2 | Complete |
-| ROST-01 | Phase 3 | Pending |
+| ROST-01 | Phase 3 | Complete |
 | AUTH-02 | Phase 3 | Pending |
 | EXAM-01 | Phase 4 | Pending |
 | EXAM-02 | Phase 4 | Pending |

@@ -73,12 +73,12 @@ Plans:
 2. 与名单完全一致的学生凭据可通过校验；任一字段不匹配则拒绝并提示
 3. 拒绝原因不泄露其他考生隐私信息（如不提示「证件号对但姓名错」类组合信息，具体文案在实现中统一）
 
-**Plans:** 2 plans
+**Plans:** 1/2 plans executed
 
 Plans:
 
 **Wave 1**
-- [ ] 03-01-PLAN.md — 名单导入与检索垂直切片（Prisma + Excel 管道 + `/admin/roster` UI）
+- [x] 03-01-PLAN.md — 名单导入与检索垂直切片（Prisma + Excel 管道 + `/admin/roster` UI）
 
 **Wave 2** *(blocked on Wave 1 completion)*
 - [ ] 03-02-PLAN.md — 学生验证、独立 `student_sid` 会话、登录/准备页与路由守卫
@@ -110,5 +110,5 @@ Plans:
 |-------|----------------|--------|-----------|
 | 1. 基础服务与教师认证 | 0/3 | Not started | - |
 | 2. 题库导入 | 2/3 | In progress | 02-01, 02-02 |
-| 3. 名单与学生入场 | 0/2 | Not started | - |
+| 3. 名单与学生入场 | 1/2 | In Progress|  |
 | 4. 考试、提交与导出 | 0/3 | Not started | - |
