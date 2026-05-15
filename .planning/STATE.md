@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-05-15)
 Phase: 1 of 4（基础服务与教师认证）  
 Plan: 0 of 3 in current phase  
 Status: Ready to plan  
-Last activity: 2026-05-15 — 新项目初始化（PROJECT / REQUIREMENTS / ROADMAP）
+Last activity: 2026-05-15 — Phase 1 discuss-phase 完成（01-CONTEXT.md）
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -34,7 +34,7 @@ Progress: [░░░░░░░░░░] 0%
 
 ### Decisions
 
-见 PROJECT.md Key Decisions。近期：专用服务器 + Web；学生姓名+身份证强绑定；v1 不追求高级防作弊。
+见 PROJECT.md Key Decisions 与 `.planning/phases/01-foundation-auth/01-CONTEXT.md`。Phase 1 已锁定：多教师平权、种子账号+首登改密、Session+Cookie、Compose 交付、双路径部署文档、`/health`+控制台日志、开发优先 Docker。
 
 ### Pending Todos
 
@@ -53,5 +53,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-05-15  
-Stopped at: 路线图与需求已写入，待 `/gsd-discuss-phase 1`  
-Resume file: None
+Stopped at: Phase 1 上下文已写入，待 `/gsd-plan-phase 1`  
+Resume file: `.planning/phases/01-foundation-auth/01-CONTEXT.md`
