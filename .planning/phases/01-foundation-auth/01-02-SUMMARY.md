@@ -72,7 +72,7 @@ completed: 2026-05-15
 1. **Task 1: Prisma schema、迁移与 Teacher 表** - `99e479d` (feat)
 2. **Task 2: Compose 集成 migrate + seed 与启动顺序** - `432e330` (feat)
 
-**Plan metadata:** (pending final docs commit)
+**Plan metadata:** `716a5cf` (docs: complete plan)
 
 ## Files Created/Modified
 
