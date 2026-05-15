@@ -15,6 +15,34 @@
 - 服务器可访问 Docker Hub（或已配置镜像加速）
 - 记录服务器局域网 IP（例如 `192.168.1.100`）
 
+## 数据库迁移与种子教师
+
+首次部署**必须**设置环境变量 `SEED_ADMIN_PASSWORD`（勿写入 git；参考 `.env.example`）：
+
+```bash
+# PowerShell
+$env:SEED_ADMIN_PASSWORD = "your-strong-temp-password"
+docker compose up --build
+```
+
+容器启动时依次执行 `prisma migrate deploy` → `prisma db seed` → 应用进程。**任一步失败则容器以非 0 退出**，避免「假健康」。
+
+| 项 | 说明 |
+| --- | --- |
+| 种子用户名 | `teacher_admin`（常量，见 `prisma/seed.ts`） |
+| 首登改密 | 种子账号 `mustChangePassword=true`；登录后须在 **01-03 认证计划** 中强制改密 |
+| `DATABASE_URL` | Compose 内 `app` 使用主机名 `db`；本机 `pnpm` 开发使用 `127.0.0.1:5432`（见 `.env.example`） |
+
+验证数据库就绪：
+
+```bash
+docker compose logs db
+docker compose logs app
+# 或进入 db 容器：docker compose exec db psql -U lan_exam -d lan_exam -c '\dt'
+```
+
+Postgres 默认**仅绑定 127.0.0.1:5432** 到宿主机，避免将数据库暴露到 `0.0.0.0`；应用通过 Docker 内部网络访问 `db:5432`。
+
 ## 一键启动（开发/验收）
 
 ```bash
