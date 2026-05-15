@@ -1,10 +1,12 @@
 import { BookOpen, ClipboardList, Users } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { cn } from '@/lib/utils';
 
 const PLACEHOLDER_CARDS = [
-  { title: '题库', icon: BookOpen },
+  { title: '题库', icon: BookOpen, href: '/admin/questions' as const },
   { title: '名单', icon: Users },
   { title: '考试', icon: ClipboardList },
 ] as const;
@@ -28,23 +30,43 @@ export default function AdminDashboard() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-3">
-        {PLACEHOLDER_CARDS.map(({ title, icon: Icon }) => (
-          <Card
-            key={title}
-            className="cursor-not-allowed opacity-60"
-            aria-disabled
-          >
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-semibold">{title}</CardTitle>
-              <Icon className="size-5 text-muted-foreground" aria-hidden />
-            </CardHeader>
-            <CardContent>
-              <span className="text-sm font-semibold text-muted-foreground">
-                即将开放
-              </span>
-            </CardContent>
-          </Card>
-        ))}
+        {PLACEHOLDER_CARDS.map(({ title, icon: Icon, ...rest }) => {
+          const href = 'href' in rest ? rest.href : undefined;
+          const card = (
+            <Card
+              className={cn(
+                href
+                  ? 'transition-colors hover:border-primary/50 focus-within:ring-2 focus-within:ring-ring'
+                  : 'cursor-not-allowed opacity-60',
+              )}
+              {...(!href ? { 'aria-disabled': true } : {})}
+            >
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-semibold">{title}</CardTitle>
+                <Icon className="size-5 text-muted-foreground" aria-hidden />
+              </CardHeader>
+              <CardContent>
+                {href ? (
+                  <span className="text-sm font-semibold text-primary">进入</span>
+                ) : (
+                  <span className="text-sm font-semibold text-muted-foreground">
+                    即将开放
+                  </span>
+                )}
+              </CardContent>
+            </Card>
+          );
+
+          if (href) {
+            return (
+              <Link key={title} to={href} className="rounded-xl outline-none">
+                {card}
+              </Link>
+            );
+          }
+
+          return <div key={title}>{card}</div>;
+        })}
       </div>
     </div>
   );

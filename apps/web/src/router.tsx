@@ -8,6 +8,7 @@ import {
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import AdminChangePassword from '@/pages/AdminChangePassword';
 import AdminDashboard from '@/pages/AdminDashboard';
+import AdminQuestions from '@/pages/AdminQuestions';
 import AdminLogin from '@/pages/AdminLogin';
 import Home from '@/pages/Home';
 
@@ -26,6 +27,7 @@ export function AppRouter() {
             <Route element={<AdminLayout />}>
               <Route index element={<AdminDashboard />} />
               <Route path="dashboard" element={<AdminDashboard />} />
+              <Route path="questions" element={<AdminQuestions />} />
             </Route>
           </Route>
         </Route>
