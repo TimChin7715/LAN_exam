@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils';
 
 const PLACEHOLDER_CARDS = [
   { title: '题库', icon: BookOpen, href: '/admin/questions' as const },
-  { title: '名单', icon: Users },
+  { title: '名单', icon: Users, href: '/admin/roster' as const },
   { title: '考试', icon: ClipboardList },
 ] as const;
 

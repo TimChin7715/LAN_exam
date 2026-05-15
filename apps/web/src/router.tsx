@@ -9,6 +9,7 @@ import { AdminLayout } from '@/components/admin/AdminLayout';
 import AdminChangePassword from '@/pages/AdminChangePassword';
 import AdminDashboard from '@/pages/AdminDashboard';
 import AdminQuestions from '@/pages/AdminQuestions';
+import AdminRoster from '@/pages/AdminRoster';
 import AdminLogin from '@/pages/AdminLogin';
 import Home from '@/pages/Home';
 
@@ -28,6 +29,7 @@ export function AppRouter() {
               <Route index element={<AdminDashboard />} />
               <Route path="dashboard" element={<AdminDashboard />} />
               <Route path="questions" element={<AdminQuestions />} />
+              <Route path="roster" element={<AdminRoster />} />
             </Route>
           </Route>
         </Route>
