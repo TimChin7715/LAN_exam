@@ -1,0 +1,127 @@
+import type { PrismaClient } from '@prisma/client';
+
+import { isValidNationalIdFormat } from './national-id.js';
+import type { ParsedRosterEntry, RawRosterRow, RowError } from './types.js';
+
+function pairKey(fullName: string, nationalId: string): string {
+  return `${fullName}\0${nationalId}`;
+}
+
+function validateRow(row: RawRosterRow): {
+  entry?: ParsedRosterEntry;
+  errors: RowError[];
+} {
+  const errors: RowError[] = [];
+  const fullName = row.fullName.trim();
+  const nationalId = row.nationalId.trim();
+
+  if (!fullName) {
+    errors.push({
+      row: row.rowNumber,
+      column: '姓名',
+      message: '姓名不能为空',
+    });
+  }
+
+  if (!nationalId) {
+    errors.push({
+      row: row.rowNumber,
+      column: '身份证号',
+      message: '身份证号不能为空',
+    });
+  } else if (!isValidNationalIdFormat(nationalId)) {
+    errors.push({
+      row: row.rowNumber,
+      column: '身份证号',
+      message: '身份证号格式不正确',
+    });
+  }
+
+  if (errors.length > 0) {
+    return { errors };
+  }
+
+  return {
+    entry: {
+      rowNumber: row.rowNumber,
+      fullName,
+      nationalId,
+    },
+    errors: [],
+  };
+}
+
+export type ValidateRowsResult = {
+  entries: ParsedRosterEntry[];
+  errors: RowError[];
+};
+
+export async function validateRows(
+  prisma: PrismaClient,
+  rows: RawRosterRow[],
+): Promise<ValidateRowsResult> {
+  const entries: ParsedRosterEntry[] = [];
+  const errors: RowError[] = [];
+  const seenInBatch = new Map<string, number>();
+
+  for (const row of rows) {
+    const result = validateRow(row);
+    if (result.errors.length > 0) {
+      errors.push(...result.errors);
+      continue;
+    }
+    if (!result.entry) continue;
+
+    const key = pairKey(result.entry.fullName, result.entry.nationalId);
+    const priorRow = seenInBatch.get(key);
+    if (priorRow !== undefined) {
+      errors.push({
+        row: result.entry.rowNumber,
+        column: '姓名',
+        message: `与第 ${priorRow} 行重复（姓名与身份证号组合相同）`,
+      });
+      errors.push({
+        row: priorRow,
+        column: '姓名',
+        message: `与第 ${result.entry.rowNumber} 行重复（姓名与身份证号组合相同）`,
+      });
+      continue;
+    }
+    seenInBatch.set(key, result.entry.rowNumber);
+    entries.push(result.entry);
+  }
+
+  if (errors.length > 0 || entries.length === 0) {
+    return { entries, errors };
+  }
+
+  const existing = await prisma.rosterEntry.findMany({
+    where: {
+      OR: entries.map((e) => ({
+        fullName: e.fullName,
+        nationalId: e.nationalId,
+      })),
+    },
+    select: { fullName: true, nationalId: true },
+  });
+
+  const existingKeys = new Set(
+    existing.map((e) => pairKey(e.fullName, e.nationalId)),
+  );
+
+  for (const entry of entries) {
+    if (existingKeys.has(pairKey(entry.fullName, entry.nationalId))) {
+      errors.push({
+        row: entry.rowNumber,
+        column: '身份证号',
+        message: '该姓名与身份证号已存在于名单中',
+      });
+    }
+  }
+
+  if (errors.length > 0) {
+    return { entries: [], errors };
+  }
+
+  return { entries, errors: [] };
+}

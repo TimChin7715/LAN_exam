@@ -7,6 +7,9 @@ import { sessionPlugin } from './plugins/session.js';
 import { registerAdminQuestionsImportRoutes } from './routes/api/admin/questions-import.js';
 import { registerAdminQuestionsListRoutes } from './routes/api/admin/questions-list.js';
 import { registerAdminQuestionsTemplateRoutes } from './routes/api/admin/questions-template.js';
+import { registerAdminRosterImportRoutes } from './routes/api/admin/roster-import.js';
+import { registerAdminRosterListRoutes } from './routes/api/admin/roster-list.js';
+import { registerAdminRosterTemplateRoutes } from './routes/api/admin/roster-template.js';
 import { registerAdminPingRoutes } from './routes/api/admin/ping.js';
 import { registerAuthRoutes } from './routes/api/auth/index.js';
 
@@ -28,6 +31,9 @@ await registerAdminPingRoutes(app);
 await registerAdminQuestionsTemplateRoutes(app);
 await registerAdminQuestionsImportRoutes(app);
 await registerAdminQuestionsListRoutes(app);
+await registerAdminRosterTemplateRoutes(app);
+await registerAdminRosterImportRoutes(app);
+await registerAdminRosterListRoutes(app);
 
 app.get('/health', async () => {
   await prisma.$queryRaw`SELECT 1`;
