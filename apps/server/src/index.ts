@@ -12,6 +12,7 @@ import { registerAdminRosterListRoutes } from './routes/api/admin/roster-list.js
 import { registerAdminRosterTemplateRoutes } from './routes/api/admin/roster-template.js';
 import { registerAdminPingRoutes } from './routes/api/admin/ping.js';
 import { registerAuthRoutes } from './routes/api/auth/index.js';
+import { registerStudentRoutes } from './routes/api/student/index.js';
 
 const PORT = Number(process.env.PORT ?? 3101);
 const HOST = process.env.HOST ?? '0.0.0.0';
@@ -27,6 +28,7 @@ await app.register(multipart, {
   limits: { fileSize: 5 * 1024 * 1024, files: 1 },
 });
 await registerAuthRoutes(app);
+await registerStudentRoutes(app);
 await registerAdminPingRoutes(app);
 await registerAdminQuestionsTemplateRoutes(app);
 await registerAdminQuestionsImportRoutes(app);
