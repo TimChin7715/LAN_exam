@@ -4,6 +4,8 @@
 **Domain:** Excel roster import, Prisma roster models, dual student/teacher sessions, Chinese national ID validation, student SPA routes  
 **Confidence:** HIGH（栈、Phase 1–2 模式、GB 11643 校验算法）；MEDIUM（双 session 挂载细节、规划建议项）
 
+> **Superseded (2026-05-17):** 下文关于 **`student_sid` 双 Cookie / 链式中间件** 的研究结论已被 **`03-CONTEXT.md` D-05 修订** 取代（单 `sid` + 字段隔离 + `saveSession`）。本文件保留作历史调研记录；**实现与规划以 CONTEXT 为准**。
+
 ## Summary
 
 Phase 3 在既有 **Fastify + Prisma + PostgreSQL + ExcelJS + React** 栈上新增 **名单域** 与 **学生入场域**：教师通过官方 `.xlsx` 导入「姓名 + 18 位身份证号」；管理端检索确认（ROST-01）；学生在独立入口提交相同两字段，**trim 后逐字符完全一致** 且通过 **格式+校验码** 校验后建立 **独立 `student_sid` Cookie 会话**，进入准备页（AUTH-02）。当前 `prisma/schema.prisma` **无** 名单模型；`session.d.ts` 仅有 `teacherId`；学生端 `Home.tsx` 仍为占位。

@@ -23,7 +23,8 @@
 
 ### 学生会话与准备页（已讨论）
 
-- **D-05:** 校验通过后建立 **独立学生 Session**，与教师 Session **分离**（教师 Cookie `sid` 不变；学生使用独立 Cookie 名，建议 `student_sid`）；同样 **HttpOnly Cookie + PostgreSQL session 存储**（对齐 Phase 1 `connect-pg-simple` 模式）。
+- **D-05:** 校验通过后建立学生会话，使 `studentRosterEntryId` + `studentName` 进入 **同一 `sid` Cookie 对应的 PG session 行**（与 Phase 1 教师 `teacherId` 字段并存；**不**再使用链式双 Cookie `student_sid` — 见下方修订）。
+- **D-05（修订 2026-05-17）：** 曾按规划实现 `sid` + `student_sid` 双中间件，导致 session **未可靠写入 PostgreSQL**、教师管理端 **401 闪退回登录**。现改为 **单一 `sid` + 字段隔离**：教师登录时清除 `studentRosterEntryId`/`studentName`；学生 `verify` 后 **`await saveSession()`**；无教师态时 `regenerate` 学生会话。学生端与 `auth/me` 等使用前端 **`skipAuthRedirect`**，学生 401 不触发教师「登录已过期」toast/跳转。监考同浏览器试测时可在同一 `sid` 内同时保留 `teacherId` 与学生字段（`establishStudentSession` 在已有教师态时跳过 regenerate）。
 - **D-06:** 准备页展示：**完整姓名 + 完整身份证号** + 固定文案 **「请等待监考教师开始考试」**（用户明确要求全号展示；机房内网可接受，须在 UI 上避免非必要二次传播）。
 - **D-07:** Session 内保存 **`rosterEntryId`（名单记录主键）+ 姓名**；**不** 将身份证号写入 session；准备页所需全号由 **已认证学生 API** 按 `rosterEntryId` 从库读取后返回。
 - **D-08:** 准备页提供 **「退出」**；销毁学生 session 后回到学生登录页；刷新准备页 **保持登录** 直至用户退出或 session 过期（默认 TTL 由规划与 Phase 1 session 配置对齐，建议与教师 session 同级如 8h，除非校方要求更短）。
@@ -98,7 +99,7 @@ No external ADRs — roster and student auth contract defined by planning files 
 ## Specific Ideas
 
 - 用户明确选择：身份证 **全号明文**、比对 **仅 trim**、**强格式校验**；准备页 **完整展示姓名与身份证号**（非脱敏）。
-- 学生 Session 与教师分离；可退出；session 不存证件号，由 API 读出展示。
+- 学生与教师 **同 Cookie 名、不同 session 字段**（非 `student_sid` 双 Cookie）；可退出；session 不存证件号，由 API 读出展示。
 
 </specifics>
 

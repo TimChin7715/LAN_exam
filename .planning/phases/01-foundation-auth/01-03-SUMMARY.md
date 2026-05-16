@@ -124,6 +124,10 @@ completed: 2026-05-15
 - [x] `pnpm --filter @lan-exam/web build` exit 0
 - [x] No `忘记密码` in `apps/web` user-visible strings
 
+## Post-ship revisions (2026-05-17)
+
+See `01-CONTEXT.md` D-09, D-10: `saveSession` after login; `skipAuthRedirect` on auth APIs; `mustChangePassword` → 403; `AuthContext` hydrate-once; dev ports aligned via root `.env` and `pnpm dev`/`dev:web`.
+
 ---
 *Phase: 01-foundation-auth*
 *Completed: 2026-05-15*

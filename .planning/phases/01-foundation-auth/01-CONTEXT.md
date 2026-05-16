@@ -23,6 +23,11 @@
 - **D-07:** v1 可观测性最小集：**HTTP 健康检查端点**（如 `/health` 或等价路径）+ **控制台日志**（结构化与否由实现阶段决定）。
 - **D-08:** 开发与 CI 侧 **优先以 Docker 对齐** 生产行为，降低「本机能跑、考场不能跑」的差异。
 
+### 修订（2026-05-17 — 开发启动与教师会话稳定性）
+
+- **D-09:** 根目录 `.env` 统一 **`API_PORT`（默认 3101）** 与 **`WEB_PORT`（默认 5180）**；`apps/web` Vite 从 monorepo 根 `loadEnv`，代理目标与 `apps/server` 的 `getApiPort()` 一致。`pnpm dev` 与 `pnpm dev:web` **均并行启动 API + Web**；仅前端用 `pnpm dev:web-only`，且 Vite 启动时检测 `/health`，API 未就绪时在控制台提示（避免「只起 Web」导致登录/验证报无法连接）。
+- **D-10:** 教师会话写入 PostgreSQL 须在变更 `teacherId` 后 **`await saveSession(session)`**（`resave: false` 时不会自动落库）。前端 `GET /api/auth/me`、`POST /api/auth/login|logout|change-password` 使用 **`skipAuthRedirect`**，避免 hydrate/登录流程的 401 触发全局「登录已过期」跳转。`mustChangePassword` 守卫返回 **403** + `PASSWORD_CHANGE_REQUIRED`（**非 401**）。`AuthContext` 仅在**首次** hydrate 显示全屏 checking，后续 `refresh` 不闪回未登录态。
+
 ### Planner discretion（讨论未覆盖项）
 
 - **HTTPS/TLS 是否在 Phase 1 强制：** 用户未选择讨论灰区 1；规划/实现时可按 ASVS/校方要求在 **反向代理终结 TLS** 或 **内网 HTTP + 网络隔离** 中择一，但须在部署文档与威胁建模中显式记录假设。

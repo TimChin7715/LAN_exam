@@ -17,7 +17,7 @@ created: 2026-05-16
 
 | Boundary | Description | Data Crossing |
 |----------|-------------|---------------|
-| 学生浏览器 → `/api/student/exam/*` | 不可信 body；`rosterEntryId` 仅来自 `student_sid` | 作答草稿、examId |
+| 学生浏览器 → `/api/student/exam/*` | 不可信 body；`rosterEntryId` 仅来自 `sid` session 的 `studentRosterEntryId` | 作答草稿、examId |
 | 学生 → 试卷 JSON | 不得包含 `answerKeys` | 题目 stem/options、已选答案 |
 | 教师浏览器 → `/api/admin/exams/*` | 须 `requireAdminSession`；考试 `teacherId` 归属校验 | 成绩、导出、提交明细 |
 | POST submit | 计分仅服务端；忽略客户端 totalScore | Submission + Answer 行 |

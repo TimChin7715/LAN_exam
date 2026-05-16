@@ -65,7 +65,7 @@
 
 **Key Characteristics:**
 - **Explicit route registration:** Each feature exports `register*Routes(app)`; `index.ts` imports and registers them in a fixed order.
-- **Session-first security:** No JWT; `express-session` on `request.raw.session` with HTTP-only cookie; teacher and student identities can share one session cookie (proctor testing).
+- **Session-first security:** No JWT; single HTTP-only cookie `sid` backed by PostgreSQL (`connect-pg-simple`); `teacherId` and `studentRosterEntryId` are **fields on the same session** (not separate `student_sid` cookie — dual middleware removed 2026-05-17). Explicit `saveSession()` after login/verify; auth hydration uses `skipAuthRedirect`.
 - **Zod at the edge:** Request bodies/queries validated in route files; domain layer throws typed errors (`ExamTransitionError`, `ExamAccessError`, etc.).
 - **Batch-oriented content:** Questions and rosters are imported as immutable batches; exams reference batch IDs and snapshot questions via `ExamQuestion`.
 
@@ -147,9 +147,9 @@
 ## Key Abstractions
 
 **Unified session (`sid`):**
-- Purpose: One cookie for teacher and/or student context
-- Examples: `apps/server/src/types/session.d.ts`, `apps/server/src/lib/session.ts`
-- Pattern: Extend `express-session` `SessionData` with `teacherId`, `studentRosterEntryId`, `studentName`; access via `getRequestSession(request)`
+- Purpose: One cookie + one PG row for teacher and/or student context (replaced unreliable dual `student_sid` middleware, 2026-05-17)
+- Examples: `apps/server/src/types/session.d.ts`, `apps/server/src/lib/session.ts`, `apps/server/src/lib/reply.ts`
+- Pattern: `teacherId`, `studentRosterEntryId`, `studentName` on same `SessionData`; `getRequestSession(request)`; `await saveSession()` after mutations; guards use `replyUnauthorized` + `isReplyFinished`
 
 **Import batch:**
 - Purpose: Versioned snapshot of imported questions or roster rows

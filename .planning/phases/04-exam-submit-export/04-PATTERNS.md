@@ -101,7 +101,7 @@ Mirror for `Exam` (FK to `questionBatchId` / `rosterBatchId`), `ExamQuestion`, `
 export function getSessionRosterEntryId(
   request: FastifyRequest,
 ): string | undefined {
-  return getStudentSession(request)?.studentRosterEntryId;
+  return getRequestSession(request)?.studentRosterEntryId;
 }
 ```
 

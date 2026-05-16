@@ -47,7 +47,7 @@
 - `.planning/phases/01-foundation-auth/01-CONTEXT.md` — 教师 Session、Cookie、管理端路由
 - `.planning/phases/02-qbank-import/02-CONTEXT.md` — 题库导入、模板、管理端模式
 - `.planning/phases/02-qbank-import/02-ACCEPTANCE.md` — **QBANK-02**、`MultiScoringRule.ALL_OR_NOTHING` 计分契约（Phase 4 服务端阅卷 MUST 一致）
-- `.planning/phases/03-roster-student-entry/03-CONTEXT.md` — 学生 `student_sid`、`studentRosterEntryId`、准备页行为
+- `.planning/phases/03-roster-student-entry/03-CONTEXT.md` — 学生 `studentRosterEntryId`（单 `sid` 字段，见 D-05 修订）、准备页行为
 - `.planning/phases/03-roster-student-entry/03-ACCEPTANCE.md` — AUTH-02、Phase 4 消费 `studentRosterEntryId`、名单内校验说明
 
 ### Deployment

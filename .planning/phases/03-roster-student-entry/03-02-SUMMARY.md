@@ -90,3 +90,14 @@ completed: 2026-05-16
 - FOUND: 374ab5c
 
 **Self-Check: PASSED**
+
+## Post-ship revisions (2026-05-17)
+
+**Supersedes portions of this summary** — see `03-CONTEXT.md` D-05 revision.
+
+| Issue | Root cause | Fix |
+|-------|------------|-----|
+| 开发环境反复「登录不了」 | 仅起 Web、根目录端口与 Vite 代理不一致；`auth/me` 401 触发全局踢登 | D-09：`pnpm dev`/`dev:web` 并行 API+Web；根 `.env` `API_PORT`/`WEB_PORT`；`apiHealthCheckPlugin` |
+| 教师端闪退回登录 | 双 `student_sid` 链式中间件 session 未可靠落库；所有 401 走教师过期 handler | D-05/D-10：单 `sid` 字段隔离 + `saveSession`；`skipAuthRedirect`；改密 403；`AuthContext` 仅首次 checking |
+
+Original delivery (2026-05-16) used `student_sid` dual middleware — **removed** in favor of unified `sid` + explicit persistence.

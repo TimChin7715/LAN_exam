@@ -180,7 +180,7 @@ created: 2026-05-16
 | `checking` | 校验学生 session | 全屏居中 `Spinner` +「正在验证考生身份…」 |
 | `unauthenticated` | 访问 `/exam/waiting` 无 session | 重定向 `/exam/login` |
 | `authenticated` | 访问 `/exam/login` 已有 session | 重定向 `/exam/waiting` |
-| `sessionExpired` | 学生 API 401 | Toast「登录已过期，请重新验证身份。」→ `/exam/login` |
+| `sessionExpired` | 学生 API 401（`studentApi.*` 使用 `skipAuthRedirect`，由 `StudentRoute` 处理） | Toast「登录已过期，请重新验证身份。」→ `/exam/login` |
 
 **与教师守卫隔离：** 学生路由 **不** 包裹 `AdminRoute`；教师 cookie 与学生 cookie 互不影响。
 

@@ -92,11 +92,12 @@
 - Current mitigation: Throws in production when secret missing or short.
 - Recommendations: Fail fast in staging too; document `SESSION_SECRET` in `.env.example` (already listed) and deployment checklist.
 
-**Shared browser session for teacher + student:**
-- Risk: `establishStudentSession` skips `regenerate` when a teacher session exists (“proctor testing”), so one cookie can hold both `teacherId` and `studentRosterEntryId`.
-- Files: `apps/server/src/lib/student-auth.ts`
-- Current mitigation: Login clears student fields (`apps/server/src/routes/api/auth/login.ts`).
-- Recommendations: Document that proctors should use a separate browser/profile for student dry-runs; optional flag to always regenerate student session.
+**Shared `sid` cookie for teacher + student (by design after 2026-05-17):**
+- Risk: One PG session row may hold both `teacherId` and `studentRosterEntryId` when proctor tests student flow in the same browser.
+- Files: `apps/server/src/lib/student-auth.ts`, `apps/server/src/plugins/session.ts`
+- Current mitigation: Teacher login clears student fields; `await saveSession()` after login/verify; student APIs use `skipAuthRedirect` so student 401 does not toast-expire the teacher admin UI; `auth/me` uses `skipAuthRedirect`.
+- Superseded: Dual-cookie `student_sid` chain (removed — caused unreliable PG writes and admin logout flakes). See `.planning/phases/03-roster-student-entry/03-CONTEXT.md` D-05 revision.
+- Recommendations: For production proctoring, still prefer separate browser profiles when possible.
 
 **Student verify brute-force surface:**
 - Risk: `POST /api/student/verify` accepts name + 18-digit ID; rate limit defaults to 20/min (`STUDENT_VERIFY_RATE_LIMIT_MAX`).

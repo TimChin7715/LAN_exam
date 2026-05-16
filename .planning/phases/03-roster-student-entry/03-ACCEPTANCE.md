@@ -1,7 +1,7 @@
 # Phase 3 验收说明 — 名单与学生入场
 
 **阶段：** 03-roster-student-entry  
-**更新：** 2026-05-16  
+**更新：** 2026-05-17（D-05 会话模型修订）  
 **读者：** 教师验收、Phase 4 组卷与考试实现
 
 ---
@@ -33,7 +33,7 @@
 | D-01 | trim 后精确匹配 `fullName` + `nationalId` |
 | D-03 | 未匹配 → 401 统一文案，无字段级提示 |
 | D-04 | 格式非法 → 400「身份证号格式不正确」，不查库 |
-| D-05 | 独立 Cookie `student_sid`，与教师 `sid` 并存 |
+| D-05 | 单一 `sid` Cookie；`studentRosterEntryId` 与 `teacherId` 字段隔离；verify/login 后 `saveSession`（**非** `student_sid` 双 Cookie） |
 | D-06 | 准备页展示完整姓名与 18 位证号 +「请等待监考教师开始考试」 |
 | D-07 | Session 仅存 `studentRosterEntryId`（及姓名快照），不存证号 |
 | D-08 | 退出仅销毁学生 session；刷新准备页保持登录 |

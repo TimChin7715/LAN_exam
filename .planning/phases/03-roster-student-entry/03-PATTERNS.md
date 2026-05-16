@@ -4,6 +4,8 @@
 **Files analyzed:** 32 new/modified  
 **Analogs found:** 28 / 32
 
+> **⚠ 会话模型（2026-05-17，权威）：** 实现为 **单一 `sid` Cookie** + PG 行内 `teacherId` / `studentRosterEntryId` 字段隔离；`await saveSession()` 在 login/verify 后落库；**勿**再实现下文中的链式 `student_sid` 双中间件。详见 `03-CONTEXT.md` D-05 修订、`01-CONTEXT.md` D-09/D-10。
+
 ## File Classification
 
 | New/Modified File | Role | Data Flow | Closest Analog | Match Quality |
@@ -240,7 +242,7 @@ export function getSessionTeacherId(request: FastifyRequest): string | undefined
 }
 ```
 
-**Student equivalents:** `getStudentSession(request)`, `getSessionRosterEntryId`, `regenerateStudentSession` — mirror `login.ts` `regenerateSession` but target `studentSession` only.
+**Student equivalents:** `getSessionRosterEntryId(request)` → `getRequestSession(request)?.studentRosterEntryId`; `establishStudentSession` / `regenerateStudentSession` / `destroyStudentSession` mutate the **same** `sid` session row (clear student fields on teacher login).
 
 **Session getter** (`session.ts` lines 6-10):
 
@@ -274,7 +276,7 @@ app.use(
 );
 ```
 
-**Extend:** chain second `session({ name: 'student_sid', ... })`; save student store on `request.raw.studentSession`; restore `req.session` to teacher after student middleware (see RESEARCH Pattern 3). Reuse same `PgSession` store instance.
+**Current (2026-05-17):** single `session({ name: 'sid', store, resave: false, saveUninitialized: false })`; student fields on same `SessionData`. ~~**Obsolete plan:** chain `student_sid`~~ — removed (unreliable PG persistence).
 
 ---
 
@@ -473,7 +475,7 @@ app.post('/api/auth/logout', async (request, reply) => {
 });
 ```
 
-Use `getStudentSession` + destroy only student session.
+Use `destroyStudentSession` — deletes `studentRosterEntryId` / `studentName` on unified session and `saveSession` (does not destroy teacher `teacherId`).
 
 ---
 
@@ -751,7 +753,7 @@ const response = await fetch(path, {
 });
 ```
 
-Student calls use same `credentials: 'include'` for `student_sid` cookie.
+Student calls use `credentials: 'include'` for the same `sid` cookie; use `skipAuthRedirect: true` on `studentApi.*` so 401 does not trigger teacher session-expired handler (`apps/web/src/lib/student.ts`).
 
 ### Import ALL_OR_NOTHING response
 

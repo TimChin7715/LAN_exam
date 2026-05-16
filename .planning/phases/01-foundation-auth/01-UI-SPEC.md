@@ -102,7 +102,7 @@ created: 2026-05-15
 | `unauthenticated` | 访问 `/admin/*`（除 login）无有效 Session | 重定向 `/admin/login?redirect={path}`；登录成功后跳回 `redirect` 或 `/admin` |
 | `mustChangePassword` | Session 有效但首登未改密 | 重定向 `/admin/change-password`；改密成功后跳 `/admin` |
 | `authenticated` | 正常访问 | 渲染目标页 |
-| `sessionExpired` | API 返回 401 | Toast 文案见 Copywriting → 清 Session → 跳转 login |
+| `sessionExpired` | 管理端 API 返回 401（`auth/me` 等 hydrate 调用除外，见 D-10 `skipAuthRedirect`） | Toast 文案见 Copywriting → 清 Session → 跳转 login |
 | `forbidden` | API 返回 403（本阶段少见） | 内联 Alert：「无权访问此功能」 |
 
 **学生端根路径 `/`：** 单段居中 Body 文案「局域网考试系统 — 学生端即将开放」，无按钮、无导航至 `/admin`（教师从书签/文档获知管理端 URL）。

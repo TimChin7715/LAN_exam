@@ -36,7 +36,7 @@ human_verification:
 | 1 | 导入后可按姓名/证号检索 (ROST-01 / SC1) | ✓ VERIFIED | `roster-list.ts`, `AdminRoster.tsx`, `03-01-SUMMARY.md` |
 | 2 | 名单内精确凭据通过校验 (AUTH-02 / SC2) | ◐ HUMAN | `verify.ts` `findFirst` exact match + `regenerateStudentSession` |
 | 3 | 失败不泄露组合信息 (SC3) | ✓ VERIFIED | `STUDENT_AUTH_ERROR_MESSAGE` single message; format errors separate 400 |
-| 4 | Dual `student_sid` / `sid` | ✓ VERIFIED | `session.ts` chained middleware; `student-auth.ts` |
+| 4 | Student session isolated from teacher (D-05) | ◐ REVISED | 2026-05-17: single `sid` + field isolation + `saveSession` (dual `student_sid` removed — see `03-CONTEXT.md`) |
 | 5 | Waiting page full identity (D-06) | ✓ VERIFIED | `StudentWaiting.tsx` + `GET /api/student/me` |
 | 6 | Student logout only destroys student session | ✓ VERIFIED | `logout.ts` `destroyStudentSession` |
 | 7 | Build passes | ✓ VERIFIED | `pnpm build` exit 0 post Wave 2 |
