@@ -18,6 +18,7 @@ model Teacher {
   updatedAt              DateTime              @updatedAt
   questionImportBatches  QuestionImportBatch[]
   rosterImportBatches    RosterImportBatch[]
+  exams                  Exam[]
 }
 
 enum QuestionType {
@@ -40,6 +41,7 @@ model QuestionImportBatch {
   skippedCount  Int        @default(0)
   createdAt     DateTime   @default(now())
   questions     Question[]
+  exams         Exam[]
 
   @@index([teacherId])
 }
@@ -58,6 +60,7 @@ model Question {
   multiScoringRule MultiScoringRule?
   createdAt        DateTime            @default(now())
   options          QuestionOption[]
+  examQuestions    ExamQuestion[]
 
   @@index([batchId])
   @@index([type])
@@ -84,6 +87,7 @@ model RosterImportBatch {
   skippedCount  Int           @default(0)
   createdAt     DateTime      @default(now())
   entries       RosterEntry[]
+  exams         Exam[]
 
   @@index([teacherId])
 }
@@ -95,8 +99,95 @@ model RosterEntry {
   fullName    String
   nationalId  String
   createdAt   DateTime          @default(now())
+  submissions Submission[]
+  answerDrafts AnswerDraft[]
 
   @@unique([fullName, nationalId])
   @@index([fullName])
   @@index([nationalId])
+}
+
+enum ExamStatus {
+  DRAFT
+  IN_PROGRESS
+  ENDED
+}
+
+model Exam {
+  id              String            @id @default(cuid())
+  title           String
+  status          ExamStatus        @default(DRAFT)
+  teacherId       String
+  teacher         Teacher           @relation(fields: [teacherId], references: [id])
+  questionBatchId String
+  questionBatch   QuestionImportBatch @relation(fields: [questionBatchId], references: [id])
+  rosterBatchId   String
+  rosterBatch     RosterImportBatch @relation(fields: [rosterBatchId], references: [id])
+  startedAt       DateTime?
+  endedAt         DateTime?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  questions       ExamQuestion[]
+  submissions     Submission[]
+  answerDrafts    AnswerDraft[]
+
+  @@index([status])
+  @@index([rosterBatchId])
+  @@index([questionBatchId])
+}
+
+model ExamQuestion {
+  id         String   @id @default(cuid())
+  examId     String
+  exam       Exam     @relation(fields: [examId], references: [id], onDelete: Cascade)
+  questionId String
+  question   Question @relation(fields: [questionId], references: [id])
+  sortOrder  Int
+  answers    Answer[]
+  answerDrafts AnswerDraft[]
+
+  @@unique([examId, questionId])
+  @@index([examId, sortOrder])
+}
+
+model Submission {
+  id            String      @id @default(cuid())
+  examId        String
+  exam          Exam        @relation(fields: [examId], references: [id], onDelete: Cascade)
+  rosterEntryId String
+  rosterEntry   RosterEntry @relation(fields: [rosterEntryId], references: [id])
+  totalScore    Int
+  submittedAt   DateTime    @default(now())
+  answers       Answer[]
+
+  @@unique([examId, rosterEntryId])
+  @@index([examId])
+}
+
+model Answer {
+  id             String       @id @default(cuid())
+  submissionId   String
+  submission     Submission   @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  examQuestionId String
+  examQuestion   ExamQuestion @relation(fields: [examQuestionId], references: [id])
+  selectedKeys   String
+  isCorrect      Boolean
+  pointsAwarded  Int
+
+  @@unique([submissionId, examQuestionId])
+}
+
+model AnswerDraft {
+  id             String       @id @default(cuid())
+  examId         String
+  exam           Exam         @relation(fields: [examId], references: [id], onDelete: Cascade)
+  rosterEntryId  String
+  rosterEntry    RosterEntry  @relation(fields: [rosterEntryId], references: [id], onDelete: Cascade)
+  examQuestionId String
+  examQuestion   ExamQuestion @relation(fields: [examQuestionId], references: [id], onDelete: Cascade)
+  selectedKeys   String
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([examId, rosterEntryId, examQuestionId])
+  @@index([examId, rosterEntryId])
 }
