@@ -2,11 +2,12 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: 考试情况导出细化
-status: planning
-last_updated: "2026-05-16T18:37:46.975Z"
-last_activity: 2026-05-16
+status: Defining requirements
+stopped_at: Phase 5 context gathered
+last_updated: "2026-05-16T18:50:41.754Z"
+last_activity: 2026-05-16 — Milestone v1.1 started
 progress:
-  total_phases: 0
+  total_phases: 1
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -24,10 +25,10 @@ See: .planning/PROJECT.md (updated 2026-05-17) · `.planning/DECISIONS-INDEX.md`
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 5 — 导出汇总逐题得分
 Plan: —
-Status: Defining requirements
-Last activity: 2026-05-16 — Milestone v1.1 started
+Status: Context gathered — ready for plan-phase
+Last activity: 2026-05-17 — Phase 5 discuss-phase complete
 
 ## Performance Metrics
 
@@ -84,9 +85,9 @@ Items acknowledged and deferred at milestone close on 2026-05-17:
 
 ## Session Continuity
 
-Last session: 2026-05-16T01:21:03.392Z
-Stopped at: Milestone v1.0 plans complete; post-ship auth/dev fixes documented
-Resume file: `.planning/STATE.md` — use `/gsd-verify-work 2|3` for pending HUMAN-UAT
+Last session: 2026-05-16T18:50:41.750Z
+Stopped at: Phase 5 context gathered
+Resume file: .planning/phases/05-export-summary-per-question/05-CONTEXT.md
 
 ## Operator Next Steps
 
