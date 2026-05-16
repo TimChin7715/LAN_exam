@@ -52,5 +52,12 @@ export function StudentRoute() {
     return <Navigate to="/exam/waiting" replace />;
   }
 
+  if (
+    status === 'unauthenticated' &&
+    location.pathname.startsWith('/exam/take')
+  ) {
+    return <Navigate to="/exam/login" replace />;
+  }
+
   return <Outlet />;
 }

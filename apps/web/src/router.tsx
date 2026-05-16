@@ -10,7 +10,10 @@ import AdminChangePassword from '@/pages/AdminChangePassword';
 import AdminDashboard from '@/pages/AdminDashboard';
 import AdminQuestions from '@/pages/AdminQuestions';
 import AdminRoster from '@/pages/AdminRoster';
+import AdminExams from '@/pages/AdminExams';
+import AdminExamDetail from '@/pages/AdminExamDetail';
 import { StudentRoute } from '@/components/auth/StudentRoute';
+import StudentExamTake from '@/pages/StudentExamTake';
 import AdminLogin from '@/pages/AdminLogin';
 import Home from '@/pages/Home';
 import StudentLogin from '@/pages/StudentLogin';
@@ -25,6 +28,7 @@ export function AppRouter() {
         <Route path="/exam" element={<StudentRoute />}>
           <Route path="login" element={<StudentLogin />} />
           <Route path="waiting" element={<StudentWaiting />} />
+          <Route path="take" element={<StudentExamTake />} />
         </Route>
 
         <Route path="/admin" element={<AdminRoute />}>
@@ -38,6 +42,8 @@ export function AppRouter() {
               <Route path="dashboard" element={<AdminDashboard />} />
               <Route path="questions" element={<AdminQuestions />} />
               <Route path="roster" element={<AdminRoster />} />
+              <Route path="exams" element={<AdminExams />} />
+              <Route path="exams/:examId" element={<AdminExamDetail />} />
             </Route>
           </Route>
         </Route>
