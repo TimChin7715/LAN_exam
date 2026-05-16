@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: executing
-stopped_at: Phase 4 context gathered
-last_updated: "2026-05-16T14:21:06.413Z"
-last_activity: 2026-05-16
+status: Awaiting next milestone
+stopped_at: Milestone v1.0 plans complete; post-ship auth/dev fixes documented
+last_updated: "2026-05-16T18:21:03.279Z"
+last_activity: 2026-05-16 — Milestone v1.0 completed and archived
 progress:
   total_phases: 4
   completed_phases: 4
@@ -18,19 +18,17 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-05-15)
+See: .planning/PROJECT.md (updated 2026-05-17) · `.planning/DECISIONS-INDEX.md` (auth/session revisions)
 
 **Core value:** 在局域网内，学员能按名单强绑定身份完成考试，教师能可靠地导入题目与名单并导出成绩与答题明细。  
-**Current focus:** Phase 04 — exam-submit-export
+**Current focus:** Planning next milestone — `/gsd-new-milestone`
 
 ## Current Position
 
-Phase: 04
-Plan: Not started
-Status: Executing Phase 04
-Last activity: 2026-05-16
-
-Progress: [██████████] 100% plans
+Phase: Milestone v1.0 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-05-16 — Milestone v1.0 completed and archived
 
 ## Performance Metrics
 
@@ -61,6 +59,9 @@ Progress: [██████████] 100% plans
 - 02-03: QBANK-02 ALL_OR_NOTHING UI + `02-ACCEPTANCE.md`；MULTI dialog shows fixed scoring copy；batch filter for last import。
 - 03-01: Roster import ALL_OR_NOTHING with cross-DB duplicate precheck; `/admin/roster` UI masks nationalId in list.
 - 04-discuss: 考试三态（草稿/进行中/已结束）；教师显式开始与结束；准备页短轮询后自动进答题（见 `04-CONTEXT.md`）。
+- **2026-05-17 修订 D-09:** 根 `.env` `API_PORT`/`WEB_PORT`；`pnpm dev`/`dev:web` 并行 API+Web；Vite `apiHealthCheckPlugin`；`getApiPort()`。
+- **2026-05-17 修订 D-10:** 登录后 `saveSession`；`auth/me|login|logout|change-password` 使用 `skipAuthRedirect`；改密守卫 403 `PASSWORD_CHANGE_REQUIRED`；`AuthContext` 仅首次 hydrate 全屏 checking。
+- **2026-05-17 修订 D-05:** 废止 `student_sid` 双 Cookie；单 `sid` 内 `teacherId` 与 `studentRosterEntryId` 字段隔离 + 显式 `saveSession`；学生 API `skipAuthRedirect`。
 
 ### Pending Todos
 
@@ -72,12 +73,22 @@ None yet.
 
 ## Deferred Items
 
+Items acknowledged and deferred at milestone close on 2026-05-17:
+
 | Category | Item | Status | Deferred At |
 |----------|------|--------|-------------|
-| *(none)* | | | |
+| uat | Phase 02 HUMAN-UAT (3 pending scenarios) | partial | 2026-05-17 |
+| uat | Phase 03 HUMAN-UAT (4 pending scenarios) | partial | 2026-05-17 |
+| verification | Phase 01 VERIFICATION gaps_found | open | 2026-05-17 |
+| verification | Phase 02 VERIFICATION human_needed | open | 2026-05-17 |
+| verification | Phase 03 VERIFICATION human_needed | open | 2026-05-17 |
 
 ## Session Continuity
 
 Last session: 2026-05-16T01:21:03.392Z
-Stopped at: Phase 4 context gathered
-Resume file: .planning/phases/04-exam-submit-export/04-CONTEXT.md
+Stopped at: Milestone v1.0 plans complete; post-ship auth/dev fixes documented
+Resume file: `.planning/STATE.md` — use `/gsd-verify-work 2|3` for pending HUMAN-UAT
+
+## Operator Next Steps
+
+- Start the next milestone with /gsd-new-milestone

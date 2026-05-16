@@ -2,74 +2,81 @@
 
 ## What This Is
 
-面向机房/教室场景的 **Web 局域网考试系统**：在 **专用服务器** 上长期运行服务，教师通过浏览器维护题库与考生名单并导出成绩；学员通过浏览器登录并完成考试。目标是用 **局域网闭环** 替代依赖广域网的考试方式，从环境上减少远程代考、外网搜题等作弊路径。第一版 **不追求** 复杂防作弊能力，以「可用 + 可审计导出」为主。
+面向机房/教室场景的 **Web 局域网考试系统**：在专用服务器上运行 Fastify + React 服务，教师通过浏览器导入题库与名单、编排考试并导出成绩；学员通过浏览器以姓名+身份证强绑定身份完成考试。v1.0 形成「部署 → 题库 → 名单 → 考试 → 导出」完整闭环，不追求高级防作弊。
 
 ## Core Value
 
 **在局域网内，学员能按名单强绑定身份完成考试，教师能可靠地导入题目与名单并导出成绩与答题明细。**
 
+## Current State (v1.0 shipped 2026-05-17)
+
+- **Stack:** pnpm monorepo — `@lan-exam/server` (Fastify 5, Prisma, PostgreSQL, express-session + connect-pg-simple), `@lan-exam/web` (Vite, React, shadcn)
+- **Deploy:** Docker Compose 优先；`docs/DEPLOY.md` 双路径（直连 / 反向代理）
+- **Dev:** 根 `.env` `API_PORT=3101`, `WEB_PORT=5180`；`pnpm dev` 并行 API+Web
+- **Auth:** 单 `sid` Cookie；教师 `teacherId` 与学生 `studentRosterEntryId` 字段隔离；`saveSession` 显式落库
+- **Delivered:** 三种客观题导入、名单导入、学生验证入场、考试三态、提交计分、xlsx 双表导出（证号脱敏）
+
 ## Requirements
 
-### Validated
+### Validated (v1.0)
 
-(None yet — ship to validate)
+- ✓ 专用服务器部署 Web 服务，局域网内可访问 — v1.0 (INFRA-01)
+- ✓ 教师端：导入单选、多选、判断题 — v1.0 (QBANK-01～03)
+- ✓ 教师端：导入考试名单（姓名、身份证号）— v1.0 (ROST-01)
+- ✓ 学员端：姓名 + 身份证强绑定校验后进入考试 — v1.0 (AUTH-02)
+- ✓ 学员端：按考试完成答题与提交 — v1.0 (EXAM-01, EXAM-02)
+- ✓ 教师端：导出成绩汇总与答题明细 — v1.0 (EXPR-01, EXPR-02)
+- ✓ 教师登录与会话管理 — v1.0 (AUTH-01)
 
-### Active
+### Active (next milestone)
 
-- [ ] 专用服务器部署 Web 服务，局域网内可访问
-- [ ] 教师端：导入单选、多选、判断题及答案结构
-- [ ] 教师端：导入考试名单（姓名、身份证号）
-- [ ] 教师端：导出成绩与答题情况（可审计的明细）
-- [ ] 学员端：通过 **姓名 + 身份证号** 与名单 **强绑定** 校验后进入并完成考试
-- [ ] 学员端：按教师配置的试卷/考试完成答题与提交
+- [ ] 补完 Phase 2/3 人工 UAT 清单（见 STATE.md Deferred Items）
+- [ ] 生产环境 SESSION_SECRET、备份与日志保留策略文档化
+- [ ] （可选）SEC-01～03 防作弊增强 — 见 v2 需求
 
 ### Out of Scope
 
-- **公网 SaaS 化部署与多端租户** — 明确为机房内网场景，不做多租户云服务模型
-- **高级防作弊**（实时监考视频、屏幕录制、行为 AI 分析、人脸活体等）— v1 明确不追求；后续里程碑单独立项
-- **除三种题型外的题型**（填空、简答、编程题等）— v1 不包含，避免阅卷复杂度
-- **原生移动 App** — v1 仅 Web；移动端浏览器「尽力兼容」不作为必须交付
+- **公网 SaaS 化部署与多端租户** — 机房内网场景
+- **高级防作弊**（监考视频、屏幕录制、行为 AI 等）— v2 里程碑
+- **填空/简答/编程题** — v1 仅客观题
+- **原生移动 App** — v1 Web only
 
 ## Context
 
-- **动机**：广域网考试中作弊手段多、环境难控；局域网可将考试流量与数据留在可控边界内。
-- **用户角色**：监考/命题教师（管理端）；考生（考试端）。
-- **身份强绑定**：登录校验字段需与导入名单一致；**身份证全号 vs 后若干位**、存储是否哈希、导出脱敏策略在实现阶段与校方合规要求对齐后确定。
-- **技术形态**：浏览器访问同一服务；前后端技术栈在 Phase 1 规划中选定（未锁定）。
-
-## Constraints
-
-- **网络**：考试业务流量应限制在局域网；服务器部署位置与访问控制由校方环境决定。
-- **合规与隐私**：身份证号属敏感个人信息；导出与日志保留周期需符合组织政策（在需求细化与验收中明确）。
-- **并发与规模**：v1 以「单考场/单批次」可行为目标；极端并发数字在部署方案中再验证。
+- **动机：** 局域网闭环，减少广域网作弊面
+- **用户：** 监考/命题教师（`/admin`）；考生（`/exam`）
+- **合规：** 证号明文存库（内网假设）；导出 xlsx 脱敏；保留周期由校方政策决定
+- **规模：** v1 单考场/单批次可行为目标
 
 ## Key Decisions
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| 专用服务器部署 | 稳定服务入口、便于统一备份与权限管理 | — Pending |
-| 学员强绑定（姓名 + 身份证） | 用户明确要求，降低代答入口 | — Pending |
-| v1 不追求高级防作弊 | 用户明确取舍，缩短首版交付路径 | — Pending |
-| Web 形态 | 用户选择，降低客户端分发成本 | — Pending |
+| 专用服务器 + Compose 交付 | 机房可复现部署 | ✓ Good — v1.0 |
+| 学员强绑定（姓名 + 身份证） | 降低代答 | ✓ Good — v1.0 |
+| v1 不追求高级防作弊 | 缩短首版路径 | ✓ Good — 保持 Out of Scope |
+| Web 形态 | 免客户端分发 | ✓ Good — v1.0 |
+| 单 `sid` 字段隔离（非双 Cookie） | 双 session 中间件不可靠 | ✓ Good — 2026-05-17 修订 |
+| `saveSession` + 401/403 分流 | 教师端闪退、假登录 | ✓ Good — D-09/D-10 |
+| QBANK-02 多选 ALL_OR_NOTHING | 阅卷简单 | ✓ Good — v1.0 |
+| 考试三态 + 教师显式开始/结束 | 考场流程 | ✓ Good — v1.0 |
+
+## Next Milestone Goals
+
+- 关闭延期 UAT/验证项或明确接受为已知限制
+- 防作弊与体验增强（SEC/UX v2）按校方优先级选型
+- 并发与多考场压测（若校方有指标）
 
 ## Evolution
 
 This document evolves at phase transitions and milestone boundaries.
 
-**After each phase transition** (via `/gsd-transition`):
-
-1. Requirements invalidated? → Move to Out of Scope with reason
-2. Requirements validated? → Move to Validated with phase reference
-3. New requirements emerged? → Add to Active
-4. Decisions to log? → Add to Key Decisions
-5. "What This Is" still accurate? → Update if drifted
-
 **After each milestone** (via `/gsd-complete-milestone`):
 
 1. Full review of all sections
-2. Core Value check — still the right priority?
-3. Audit Out of Scope — reasons still valid?
+2. Core Value check
+3. Audit Out of Scope
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-15 after initialization*
+*Last updated: 2026-05-17 after v1.0 milestone shipped*
