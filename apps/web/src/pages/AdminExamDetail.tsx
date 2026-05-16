@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Download } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { QuestionPreviewCards } from '@/components/admin/qbank/QuestionPreviewCards';
@@ -28,6 +28,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import {
+  downloadExamExport,
   endExam,
   examStatusLabel,
   fetchExamSubmissions,
@@ -46,6 +47,7 @@ export default function AdminExamDetail() {
   const [submissions, setSubmissions] = useState<SubmissionListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const load = useCallback(async () => {
     if (!examId) return;
@@ -79,6 +81,19 @@ export default function AdminExamDetail() {
       handleExamApiError(err, '开始考试失败。');
     } finally {
       setActionLoading(false);
+    }
+  }
+
+  async function handleExport() {
+    if (!examId || !exam) return;
+    setExporting(true);
+    try {
+      await downloadExamExport(examId, exam.title);
+      toast.success('导出已开始下载。');
+    } catch (err) {
+      handleExamApiError(err, '导出失败。');
+    } finally {
+      setExporting(false);
     }
   }
 
@@ -154,6 +169,16 @@ export default function AdminExamDetail() {
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
+            ) : null}
+            {exam.status === 'IN_PROGRESS' || exam.status === 'ENDED' ? (
+              <Button
+                variant="outline"
+                disabled={exporting}
+                onClick={() => void handleExport()}
+              >
+                <Download className="size-4" aria-hidden />
+                {exporting ? '导出中…' : '导出成绩与明细'}
+              </Button>
             ) : null}
             {exam.status === 'IN_PROGRESS' ? (
               <AlertDialog>

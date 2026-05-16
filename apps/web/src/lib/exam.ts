@@ -129,6 +129,31 @@ export async function fetchExamSubmissions(
   return data.items;
 }
 
+export async function downloadExamExport(examId: string, title: string): Promise<void> {
+  const response = await fetch(
+    `/api/admin/exams/${encodeURIComponent(examId)}/export`,
+    { credentials: 'include' },
+  );
+
+  if (response.status === 401) {
+    toast.error('登录已过期，请重新登录。');
+    throw new ApiError('Unauthorized', 401);
+  }
+
+  if (!response.ok) {
+    toast.error('导出失败，请稍后重试。');
+    throw new ApiError('Export failed', response.status);
+  }
+
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = `${title.replace(/[\\/:*?"<>|]/g, '_')}-成绩导出.xlsx`;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
 export function handleExamApiError(err: unknown, fallback: string): void {
   if (err instanceof ApiError) {
     toast.error(err.message || fallback);
