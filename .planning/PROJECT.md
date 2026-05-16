@@ -8,6 +8,16 @@
 
 **在局域网内，学员能按名单强绑定身份完成考试，教师能可靠地导入题目与名单并导出成绩与答题明细。**
 
+## Current Milestone: v1.1 考试情况导出细化
+
+**Goal:** 在 v1.0 双表 xlsx 导出基础上，于「成绩汇总」表为每位考生增加各题得分列，便于教师一览每人逐题得分。
+
+**Target features:**
+- 「成绩汇总」保留姓名、脱敏证号、总分、是否提交、提交时间
+- 汇总表在固定列之后追加「第1题」…「第N题」得分列（N = 当次考试题目数）
+- 已提交考生显示各题 `pointsAwarded`；未提交考生各题列为「—」
+- 「答题明细」工作表保持 v1.0 长表格式不变
+
 ## Current State (v1.0 shipped 2026-05-17)
 
 - **Stack:** pnpm monorepo — `@lan-exam/server` (Fastify 5, Prisma, PostgreSQL, express-session + connect-pg-simple), `@lan-exam/web` (Vite, React, shadcn)
@@ -28,7 +38,11 @@
 - ✓ 教师端：导出成绩汇总与答题明细 — v1.0 (EXPR-01, EXPR-02)
 - ✓ 教师登录与会话管理 — v1.0 (AUTH-01)
 
-### Active (next milestone)
+### Active (v1.1)
+
+- [ ] **EXPR-03**: 导出「成绩汇总」含每道题得分列（宽表，对齐校方 `test1-成绩导出.xlsx` 用法）
+
+### Deferred (post–v1.1 / ops)
 
 - [ ] 补完 Phase 2/3 人工 UAT 清单（见 STATE.md Deferred Items）
 - [ ] 生产环境 SESSION_SECRET、备份与日志保留策略文档化
@@ -63,9 +77,11 @@
 
 ## Next Milestone Goals
 
+_(v1.1 in progress — see Current Milestone above.)_
+
+**After v1.1:**
 - 关闭延期 UAT/验证项或明确接受为已知限制
 - 防作弊与体验增强（SEC/UX v2）按校方优先级选型
-- 并发与多考场压测（若校方有指标）
 
 ## Evolution
 
@@ -79,4 +95,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-17 after v1.0 milestone shipped*
+*Last updated: 2026-05-17 — milestone v1.1 started (导出汇总表逐题得分列)*

@@ -20,4 +20,10 @@
 - Server-side scoring on submit, one-time submit with 409, teacher end exam, admin submission list, and full student/admin exam UI.
 - ExcelJS dual-sheet export: 成绩汇总 + 答题明细, masked IDs, unsubmitted rows in summary.
 
+## v1.1 考试情况导出细化 (In progress: 2026-05-17)
+
+**Scope:** 「成绩汇总」表追加第1题～第N题得分列；保留「答题明细」长表。
+
+**Requirements:** EXPR-03, EXPR-04 → Phase 5
+
 ---

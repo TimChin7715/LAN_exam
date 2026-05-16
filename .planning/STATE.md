@@ -1,17 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
-milestone_name: milestone
-status: Awaiting next milestone
-stopped_at: Milestone v1.0 plans complete; post-ship auth/dev fixes documented
-last_updated: "2026-05-16T18:21:03.279Z"
-last_activity: 2026-05-16 — Milestone v1.0 completed and archived
+milestone: v1.1
+milestone_name: 考试情况导出细化
+status: planning
+last_updated: "2026-05-16T18:37:46.975Z"
+last_activity: 2026-05-16
 progress:
-  total_phases: 4
-  completed_phases: 4
-  total_plans: 11
-  completed_plans: 11
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -21,14 +20,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-17) · `.planning/DECISIONS-INDEX.md` (auth/session revisions)
 
 **Core value:** 在局域网内，学员能按名单强绑定身份完成考试，教师能可靠地导入题目与名单并导出成绩与答题明细。  
-**Current focus:** Planning next milestone — `/gsd-new-milestone`
+**Current focus:** Milestone v1.1 — Phase 5 导出汇总逐题得分
 
 ## Current Position
 
-Phase: Milestone v1.0 complete
+Phase: Not started (defining requirements)
 Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-05-16 — Milestone v1.0 completed and archived
+Status: Defining requirements
+Last activity: 2026-05-16 — Milestone v1.1 started
 
 ## Performance Metrics
 
