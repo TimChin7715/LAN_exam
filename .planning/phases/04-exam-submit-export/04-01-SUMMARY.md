@@ -82,7 +82,7 @@ completed: 2026-05-16
 2. **Task 2: Prisma migrate 应用考试 schema** - `e2f2e82` (chore)
 3. **Task 3: 考试 Admin/Student API 与学生准备页轮询** - `bffc23e` (feat)
 
-**Plan metadata:** pending (docs commit with SUMMARY)
+**Plan metadata:** `4a7862a` (docs: complete plan)
 
 ## Files Created/Modified
 
