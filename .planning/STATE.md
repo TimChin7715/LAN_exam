@@ -64,7 +64,7 @@ Progress: [██████████] 100% plans
 
 ### Pending Todos
 
-1. **Add back link to AdminExams page** — `.planning/todos/pending/2026-05-16-add-back-link-to-adminexams-page.md` (ui)
+None yet.
 
 ### Blockers/Concerns
 
