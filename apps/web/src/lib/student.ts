@@ -5,6 +5,10 @@ export type StudentProfile = {
   nationalId: string;
 };
 
+export type StudentExamStatus =
+  | { status: 'none' }
+  | { status: 'IN_PROGRESS'; examId: string; title: string };
+
 export const STUDENT_AUTH_ERROR_MESSAGE =
   '姓名或身份证号不正确，请检查后重试。';
 
@@ -20,6 +24,11 @@ export const studentApi = {
 
   me: () =>
     apiFetch<StudentProfile>('/api/student/me', { skipAuthRedirect: true }),
+
+  examStatus: () =>
+    apiFetch<StudentExamStatus>('/api/student/exam/status', {
+      skipAuthRedirect: true,
+    }),
 
   logout: () =>
     apiFetch<{ ok: true }>('/api/student/logout', {

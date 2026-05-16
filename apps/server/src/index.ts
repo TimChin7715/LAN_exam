@@ -10,6 +10,9 @@ import { registerAdminQuestionsTemplateRoutes } from './routes/api/admin/questio
 import { registerAdminRosterImportRoutes } from './routes/api/admin/roster-import.js';
 import { registerAdminRosterListRoutes } from './routes/api/admin/roster-list.js';
 import { registerAdminRosterTemplateRoutes } from './routes/api/admin/roster-template.js';
+import { registerAdminExamBatchesRoutes } from './routes/api/admin/exam-batches.js';
+import { registerAdminExamsCrudRoutes } from './routes/api/admin/exams-crud.js';
+import { registerAdminExamsLifecycleRoutes } from './routes/api/admin/exams-lifecycle.js';
 import { registerAdminPingRoutes } from './routes/api/admin/ping.js';
 import { registerAuthRoutes } from './routes/api/auth/index.js';
 import { registerStudentRoutes } from './routes/api/student/index.js';
@@ -36,6 +39,9 @@ await registerAdminQuestionsListRoutes(app);
 await registerAdminRosterTemplateRoutes(app);
 await registerAdminRosterImportRoutes(app);
 await registerAdminRosterListRoutes(app);
+await registerAdminExamBatchesRoutes(app);
+await registerAdminExamsCrudRoutes(app);
+await registerAdminExamsLifecycleRoutes(app);
 
 app.get('/health', async () => {
   await prisma.$queryRaw`SELECT 1`;

@@ -41,6 +41,61 @@ export default function StudentWaiting() {
     };
   }, [navigate]);
 
+  useEffect(() => {
+    if (!profile || loading) return;
+
+    let intervalId: ReturnType<typeof setInterval> | undefined;
+
+    const poll = async () => {
+      if (document.hidden) return;
+      try {
+        const status = await studentApi.examStatus();
+        if (status.status === 'IN_PROGRESS') {
+          navigate(`/exam/take?examId=${encodeURIComponent(status.examId)}`, {
+            replace: true,
+          });
+        }
+      } catch (err) {
+        if (err instanceof ApiError && err.status === 401) {
+          navigate('/exam/login', { replace: true });
+        }
+      }
+    };
+
+    const startPolling = () => {
+      if (intervalId !== undefined) return;
+      void poll();
+      intervalId = setInterval(() => {
+        void poll();
+      }, 4000);
+    };
+
+    const stopPolling = () => {
+      if (intervalId === undefined) return;
+      clearInterval(intervalId);
+      intervalId = undefined;
+    };
+
+    const onVisibility = () => {
+      if (document.hidden) {
+        stopPolling();
+      } else {
+        startPolling();
+      }
+    };
+
+    if (!document.hidden) {
+      startPolling();
+    }
+
+    document.addEventListener('visibilitychange', onVisibility);
+
+    return () => {
+      stopPolling();
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [profile, loading, navigate]);
+
   async function handleLogout() {
     setLoggingOut(true);
     try {
@@ -85,8 +140,8 @@ export default function StudentWaiting() {
               </dd>
             </div>
           </dl>
-          <p className="text-center text-base text-foreground">
-            请等待监考教师开始考试
+          <p className="text-center text-base text-muted-foreground">
+            监考教师开始考试后，本页将自动进入答题界面。
           </p>
           <Button
             type="button"

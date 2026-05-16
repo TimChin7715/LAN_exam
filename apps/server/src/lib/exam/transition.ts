@@ -72,7 +72,7 @@ export async function startExam(
         );
       }
 
-      return tx.exam.update({
+      const updated = await tx.exam.update({
         where: { id: examId },
         data: {
           status: 'IN_PROGRESS',
@@ -84,6 +84,12 @@ export async function startExam(
           startedAt: true,
         },
       });
+
+      return {
+        id: updated.id,
+        status: 'IN_PROGRESS' as const,
+        startedAt: updated.startedAt!,
+      };
     },
     { timeout: 30_000 },
   );
