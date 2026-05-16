@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Human UAT pending (03-HUMAN-UAT.md)
-stopped_at: Phase 4 context gathered
-last_updated: "2026-05-16T01:21:03.397Z"
-last_activity: 2026-05-16 -- execute-phase 03 finished both plans
+status: executing
+stopped_at: Phase 03 plans complete — human verification pending
+last_updated: "2026-05-16T14:30:00.000Z"
+last_activity: 2026-05-16 -- Phase 4 discuss-phase context captured
 progress:
   total_phases: 4
-  completed_phases: 3
+  completed_phases: 2
   total_plans: 8
   completed_plans: 8
-  percent: 75
+  percent: 100
 ---
 
 # Project State
@@ -59,6 +59,7 @@ Progress: [██████████] 100% plans
 - 02-02: Admin qbank UI at `/admin/questions`；import preview API includes options；router.tsx (not App.tsx) for routes。
 - 02-03: QBANK-02 ALL_OR_NOTHING UI + `02-ACCEPTANCE.md`；MULTI dialog shows fixed scoring copy；batch filter for last import。
 - 03-01: Roster import ALL_OR_NOTHING with cross-DB duplicate precheck; `/admin/roster` UI masks nationalId in list.
+- 04-discuss: 考试三态（草稿/进行中/已结束）；教师显式开始与结束；准备页短轮询后自动进答题（见 `04-CONTEXT.md`）。
 
 ### Pending Todos
 
