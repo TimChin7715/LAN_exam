@@ -522,18 +522,13 @@ prisma/migrations/...          # Exam 域
 | A3 | 学生答卷 API **不返回标准答案** 直至提交后（或永不） | Security | 若教师要即时反馈需另议 |
 | A4 | `SESSION_MAX_AGE_MS` 默认 24h 足够覆盖一场考试 | Environment | 超长考试需调 TTL |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **未提交是否在汇总表显示 0 分还是空分？**  
-   - 建议：**空分 + 「未提交」列**  
-   - plan-phase 写入 ACCEPTANCE
+1. **未提交是否在汇总表显示 0 分还是空分？** — **RESOLVED:** 空分（总分列「—」）+ 「是否提交」列 Badge「未提交」。见 `04-ACCEPTANCE.md` EXPR-01。
 
-2. **提交后学生是否可见正确答案？**  
-   - v1 建议：**仅是否得分/对错**（若返回），不展示正确答案字符串，防传阅  
-   - 或提交后只读自己的选项与得分
+2. **提交后学生是否可见正确答案？** — **RESOLVED:** `GET /api/student/exam/submission` 返回每题 `selectedKeys`、`isCorrect`、`pointsAwarded`；**不** 返回 `answerKeys` 或正确答案字符串（防传阅）。学生 UI 只读展示自己的选项与对错/得分。
 
-3. **考试标题是否必填、是否支持多场历史考试列表？**  
-   - 建议：必填 `title`；列表按 `createdAt` 降序；仅一场 `IN_PROGRESS` per batch
+3. **考试标题是否必填、是否支持多场历史考试列表？** — **RESOLVED:** `title` 必填（zod `.min(1)`）；`GET /api/admin/exams` 按 `createdAt desc`；同 `rosterBatchId` 同时仅一场 `IN_PROGRESS`。
 
 ## Environment Availability
 
