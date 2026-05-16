@@ -64,9 +64,9 @@ completed: 2026-05-15
 ## Task Commits
 
 1. **Task 1: 初始化 monorepo 与双应用骨架** - `0ebadcb` (feat)
-2. **Task 2: Docker Compose、镜像与部署双路径文档** - (see git log for hash after commit)
+2. **Task 2: Docker Compose、镜像与部署双路径文档** - `22940d2` (feat)
 
-**Plan metadata:** pending SUMMARY commit
+**Plan metadata:** `docs(01-01): complete plan`
 
 ## Files Created/Modified
 

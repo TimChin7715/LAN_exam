@@ -69,7 +69,7 @@ completed: 2026-05-16
 2. **Task 2: 列表题型筛选与本批多选预览强化** - `ac4d066` (feat)
 3. **Task 3: 阶段验收说明与部署备注** - `2400739` (docs)
 
-**Plan metadata:** pending docs commit
+**Plan metadata:** `809c363` (docs)
 
 ## Files Created/Modified
 

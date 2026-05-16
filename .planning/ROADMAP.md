@@ -99,13 +99,13 @@ Plans:
 Plans:
 
 **Wave 1**
-- [ ] 04-01: 考试实体、组卷、学生拉题与作答保存
+- [x] 04-01: 考试实体、组卷、学生拉题与作答保存
 
 **Wave 2** *(blocked on Wave 1 completion)*
-- [ ] 04-02: 提交、分数计算与防重复提交
+- [x] 04-02: 提交、分数计算与防重复提交
 
 **Wave 3** *(blocked on Wave 2 completion)*
-- [ ] 04-03: 成绩与明细导出（exceljs 双工作表 xlsx + 证号脱敏）
+- [x] 04-03: 成绩与明细导出（exceljs 双工作表 xlsx + 证号脱敏）
 
 ## Progress
 
