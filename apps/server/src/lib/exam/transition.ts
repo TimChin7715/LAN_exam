@@ -95,14 +95,48 @@ export async function startExam(
   );
 }
 
-/** End exam lifecycle — implemented in phase 04-02. */
 export async function endExam(
-  _examId: string,
-  _teacherId: string,
-): Promise<never> {
-  throw new ExamTransitionError(
-    501,
-    'NOT_IMPLEMENTED',
-    '结束考试功能将在后续版本提供',
+  examId: string,
+  teacherId: string,
+): Promise<{ id: string; status: 'ENDED'; endedAt: Date }> {
+  return prisma.$transaction(
+    async (tx) => {
+      const exam = await tx.exam.findUnique({
+        where: { id: examId },
+        select: { id: true, status: true, teacherId: true },
+      });
+
+      if (!exam) {
+        throw new ExamTransitionError(404, 'EXAM_NOT_FOUND', '考试不存在');
+      }
+
+      if (exam.teacherId !== teacherId) {
+        throw new ExamTransitionError(404, 'EXAM_NOT_FOUND', '考试不存在');
+      }
+
+      if (exam.status !== 'IN_PROGRESS') {
+        throw new ExamTransitionError(
+          409,
+          'INVALID_STATUS',
+          '仅进行中的考试可以结束',
+        );
+      }
+
+      const updated = await tx.exam.update({
+        where: { id: examId },
+        data: {
+          status: 'ENDED',
+          endedAt: new Date(),
+        },
+        select: { id: true, status: true, endedAt: true },
+      });
+
+      return {
+        id: updated.id,
+        status: 'ENDED' as const,
+        endedAt: updated.endedAt!,
+      };
+    },
+    { timeout: 30_000 },
   );
 }

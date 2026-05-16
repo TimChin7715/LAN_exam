@@ -188,6 +188,11 @@ export async function registerAdminExamsCrudRoutes(
                   type: true,
                   stem: true,
                   points: true,
+                  answerKeys: true,
+                  options: {
+                    orderBy: { sortOrder: 'asc' },
+                    select: { key: true, text: true, sortOrder: true },
+                  },
                 },
               },
             },
