@@ -2,6 +2,26 @@ import { toast } from 'sonner';
 
 import { ApiError, apiFetch, handleAuthResponse } from '@/lib/api';
 
+export type RosterBatchListItem = {
+  id: string;
+  fileName: string;
+  createdAt: string;
+  itemCount: number;
+};
+
+export type RosterBatchDetail = RosterBatchListItem & {
+  importedCount: number;
+  skippedCount: number;
+  totalRows: number;
+};
+
+export class RosterBatchInUseError extends Error {
+  constructor(public examTitles: string[]) {
+    super('BATCH_IN_USE');
+    this.name = 'RosterBatchInUseError';
+  }
+}
+
 export type ImportRowError = {
   row: number;
   column?: string;
@@ -109,10 +129,57 @@ export async function importRosterFile(
   };
 }
 
+export async function fetchRosterBatches(): Promise<RosterBatchListItem[]> {
+  const data = await apiFetch<{ ok: true; items: RosterBatchListItem[] }>(
+    '/api/admin/roster-batches',
+  );
+  return data.items;
+}
+
+export async function fetchRosterBatch(id: string): Promise<RosterBatchDetail> {
+  const data = await apiFetch<{ ok: true; batch: RosterBatchDetail }>(
+    `/api/admin/roster-batches/${encodeURIComponent(id)}`,
+  );
+  return data.batch;
+}
+
+export async function deleteRosterBatch(id: string): Promise<void> {
+  const response = await fetch(
+    `/api/admin/roster-batches/${encodeURIComponent(id)}`,
+    { method: 'DELETE', credentials: 'include' },
+  );
+
+  const contentType = response.headers.get('content-type') ?? '';
+  const payload = contentType.includes('application/json')
+    ? ((await response.json()) as Record<string, unknown>)
+    : null;
+
+  if (response.status === 401 || response.status === 403) {
+    handleAuthResponse(response.status, payload);
+    throw new ApiError('Unauthorized', response.status);
+  }
+
+  if (response.status === 409 && payload?.code === 'BATCH_IN_USE') {
+    const titles = Array.isArray(payload.examTitles)
+      ? (payload.examTitles as string[])
+      : [];
+    throw new RosterBatchInUseError(titles);
+  }
+
+  if (!response.ok) {
+    const message =
+      typeof payload?.error === 'string'
+        ? payload.error
+        : '无法删除名单，请稍后重试。';
+    throw new ApiError(message, response.status);
+  }
+}
+
 export async function fetchRosterList(params: {
   page: number;
   pageSize?: number;
   query?: string;
+  batchId?: string;
 }): Promise<{
   items: RosterListItem[];
   total: number;
@@ -125,6 +192,7 @@ export async function fetchRosterList(params: {
   });
   const q = params.query?.trim();
   if (q) search.set('query', q);
+  if (params.batchId) search.set('batchId', params.batchId);
 
   const data = await apiFetch<{
     ok: boolean;

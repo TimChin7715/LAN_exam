@@ -4,17 +4,23 @@ import { ApiError, apiFetch, handleAuthResponse } from '@/lib/api';
 
 export type ExamStatus = 'DRAFT' | 'IN_PROGRESS' | 'ENDED';
 
-export type BatchPickerItem = {
-  id: string;
-  fileName: string;
-  createdAt: string;
-  itemCount: number;
-};
+import {
+  fetchQuestionBanks,
+  type QuestionBankListItem,
+} from '@/lib/qbank';
+import {
+  fetchRosterBatches as listRosterBatches,
+  type RosterBatchListItem,
+} from '@/lib/roster';
+
+export type BatchPickerItem = QuestionBankListItem;
 
 export type ExamListItem = {
   id: string;
   title: string;
   status: ExamStatus;
+  scheduledStartAt: string | null;
+  scheduledEndAt: string | null;
   startedAt: string | null;
   endedAt: string | null;
   createdAt: string;
@@ -28,6 +34,8 @@ export type ExamDetail = {
   id: string;
   title: string;
   status: ExamStatus;
+  scheduledStartAt: string | null;
+  scheduledEndAt: string | null;
   startedAt: string | null;
   endedAt: string | null;
   createdAt: string;
@@ -57,6 +65,42 @@ export type SubmissionListItem = {
   submittedAt: string | null;
 };
 
+/** Format ISO datetime for display (local timezone). */
+export function formatExamDateTime(iso: string | null): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+/** `datetime-local` input value from ISO string. */
+export function toDatetimeLocalValue(iso: string): string {
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+/** Default schedule: start in 30 min (rounded), end +2 hours. */
+export function defaultExamSchedule(): { start: string; end: string } {
+  const start = new Date();
+  start.setMinutes(Math.ceil(start.getMinutes() / 15) * 15, 0, 0);
+  start.setMinutes(start.getMinutes() + 30);
+  const end = new Date(start);
+  end.setHours(end.getHours() + 2);
+  return {
+    start: toDatetimeLocalValue(start.toISOString()),
+    end: toDatetimeLocalValue(end.toISOString()),
+  };
+}
+
+export function formatExamScheduleRange(
+  start: string | null,
+  end: string | null,
+): string {
+  if (!start || !end) return '—';
+  return `${formatExamDateTime(start)} — ${formatExamDateTime(end)}`;
+}
+
 export function examStatusLabel(status: ExamStatus): string {
   switch (status) {
     case 'DRAFT':
@@ -79,6 +123,8 @@ export async function createExam(input: {
   title: string;
   questionBatchId: string;
   rosterBatchId: string;
+  scheduledStartAt: string;
+  scheduledEndAt: string;
 }): Promise<string> {
   const data = await apiFetch<{ ok: true; examId: string }>('/api/admin/exams', {
     method: 'POST',
@@ -107,17 +153,11 @@ export async function endExam(id: string): Promise<void> {
 }
 
 export async function fetchQuestionBatches(): Promise<BatchPickerItem[]> {
-  const data = await apiFetch<{ ok: true; items: BatchPickerItem[] }>(
-    '/api/admin/question-batches',
-  );
-  return data.items;
+  return fetchQuestionBanks();
 }
 
-export async function fetchRosterBatches(): Promise<BatchPickerItem[]> {
-  const data = await apiFetch<{ ok: true; items: BatchPickerItem[] }>(
-    '/api/admin/roster-batches',
-  );
-  return data.items;
+export async function fetchRosterBatches(): Promise<RosterBatchListItem[]> {
+  return listRosterBatches();
 }
 
 export async function fetchExamSubmissions(

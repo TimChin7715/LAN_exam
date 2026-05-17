@@ -123,6 +123,8 @@ model Exam {
   questionBatch   QuestionImportBatch @relation(fields: [questionBatchId], references: [id])
   rosterBatchId   String
   rosterBatch     RosterImportBatch @relation(fields: [rosterBatchId], references: [id])
+  scheduledStartAt DateTime?
+  scheduledEndAt   DateTime?
   startedAt       DateTime?
   endedAt         DateTime?
   createdAt       DateTime          @default(now())

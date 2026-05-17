@@ -1,11 +1,16 @@
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import type { ImportSuccess } from '@/lib/roster';
 
 type ImportResultSummaryProps = {
   result: ImportSuccess;
+  onViewBatch?: (batchId: string) => void;
 };
 
-export function ImportResultSummary({ result }: ImportResultSummaryProps) {
+export function ImportResultSummary({
+  result,
+  onViewBatch,
+}: ImportResultSummaryProps) {
   const fileName = result.fileName ?? 'import.xlsx';
 
   return (
@@ -19,6 +24,16 @@ export function ImportResultSummary({ result }: ImportResultSummaryProps) {
           <p>跳过示例行 {result.skippedCount} 条</p>
         ) : null}
         <p className="text-muted-foreground">来源文件：{fileName}</p>
+        {onViewBatch ? (
+          <Button
+            type="button"
+            variant="outline"
+            className="mt-2"
+            onClick={() => onViewBatch(result.batchId)}
+          >
+            查看本名单
+          </Button>
+        ) : null}
       </CardContent>
     </Card>
   );

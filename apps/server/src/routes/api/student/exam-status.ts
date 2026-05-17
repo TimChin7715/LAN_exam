@@ -36,10 +36,25 @@ export async function registerStudentExamStatusRoutes(
         select: {
           id: true,
           title: true,
+          scheduledStartAt: true,
+          scheduledEndAt: true,
         },
       });
 
       if (!exam) {
+        return reply.send({ status: 'none' as const });
+      }
+
+      const now = new Date();
+      if (exam.scheduledStartAt && now < exam.scheduledStartAt) {
+        return reply.send({
+          status: 'waiting' as const,
+          examId: exam.id,
+          title: exam.title,
+          scheduledStartAt: exam.scheduledStartAt,
+        });
+      }
+      if (exam.scheduledEndAt && now > exam.scheduledEndAt) {
         return reply.send({ status: 'none' as const });
       }
 

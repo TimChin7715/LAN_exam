@@ -9,7 +9,9 @@ import { AdminLayout } from '@/components/admin/AdminLayout';
 import AdminChangePassword from '@/pages/AdminChangePassword';
 import AdminDashboard from '@/pages/AdminDashboard';
 import AdminQuestions from '@/pages/AdminQuestions';
+import AdminQuestionBankDetail from '@/pages/AdminQuestionBankDetail';
 import AdminRoster from '@/pages/AdminRoster';
+import AdminRosterBatchDetail from '@/pages/AdminRosterBatchDetail';
 import AdminExams from '@/pages/AdminExams';
 import AdminExamDetail from '@/pages/AdminExamDetail';
 import { StudentRoute } from '@/components/auth/StudentRoute';
@@ -41,7 +43,9 @@ export function AppRouter() {
               <Route index element={<AdminDashboard />} />
               <Route path="dashboard" element={<AdminDashboard />} />
               <Route path="questions" element={<AdminQuestions />} />
+              <Route path="questions/:batchId" element={<AdminQuestionBankDetail />} />
               <Route path="roster" element={<AdminRoster />} />
+              <Route path="roster/:batchId" element={<AdminRosterBatchDetail />} />
               <Route path="exams" element={<AdminExams />} />
               <Route path="exams/:examId" element={<AdminExamDetail />} />
             </Route>

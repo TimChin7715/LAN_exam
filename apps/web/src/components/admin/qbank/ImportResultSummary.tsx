@@ -6,12 +6,12 @@ import { QuestionPreviewCards } from './QuestionPreviewCards';
 
 type ImportResultSummaryProps = {
   result: ImportSuccess;
-  onViewAll?: () => void;
+  onViewBank?: (batchId: string) => void;
 };
 
 export function ImportResultSummary({
   result,
-  onViewAll,
+  onViewBank,
 }: ImportResultSummaryProps) {
   const fileName = result.fileName ?? 'import.xlsx';
 
@@ -37,9 +37,13 @@ export function ImportResultSummary({
         <div className="space-y-3">
           <p className="text-sm font-semibold">本批预览（前 3 题）</p>
           <QuestionPreviewCards questions={result.previewQuestions} compact />
-          {onViewAll ? (
-            <Button type="button" variant="outline" onClick={onViewAll}>
-              查看全部题目
+          {onViewBank ? (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onViewBank(result.batchId)}
+            >
+              查看本题库
             </Button>
           ) : null}
         </div>

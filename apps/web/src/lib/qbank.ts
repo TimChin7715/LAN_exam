@@ -4,6 +4,26 @@ import { ApiError, apiFetch, handleAuthResponse } from '@/lib/api';
 
 export type QuestionType = 'SINGLE' | 'MULTI' | 'JUDGE';
 
+export type QuestionBankListItem = {
+  id: string;
+  fileName: string;
+  createdAt: string;
+  itemCount: number;
+};
+
+export type QuestionBankDetail = QuestionBankListItem & {
+  importedCount: number;
+  skippedCount: number;
+  totalRows: number;
+};
+
+export class QuestionBankInUseError extends Error {
+  constructor(public examTitles: string[]) {
+    super('BATCH_IN_USE');
+    this.name = 'QuestionBankInUseError';
+  }
+}
+
 export type ImportRowError = {
   row: number;
   column?: string;
@@ -162,6 +182,55 @@ export async function importQuestionsFile(
     previewQuestions: (payload.previewQuestions ?? []) as PreviewQuestion[],
     fileName: file.name,
   };
+}
+
+export async function fetchQuestionBanks(): Promise<QuestionBankListItem[]> {
+  const data = await apiFetch<{ ok: true; items: QuestionBankListItem[] }>(
+    '/api/admin/question-batches',
+  );
+  return data.items;
+}
+
+export async function fetchQuestionBank(id: string): Promise<QuestionBankDetail> {
+  const data = await apiFetch<{ ok: true; batch: QuestionBankDetail }>(
+    `/api/admin/question-batches/${encodeURIComponent(id)}`,
+  );
+  return data.batch;
+}
+
+export async function deleteQuestionBank(id: string): Promise<void> {
+  const response = await fetch(
+    `/api/admin/question-batches/${encodeURIComponent(id)}`,
+    { method: 'DELETE', credentials: 'include' },
+  );
+
+  const contentType = response.headers.get('content-type') ?? '';
+  const payload = contentType.includes('application/json')
+    ? ((await response.json()) as Record<string, unknown>)
+    : null;
+
+  if (response.status === 401 || response.status === 403) {
+    handleAuthResponse(response.status, payload);
+    throw new ApiError('Unauthorized', response.status);
+  }
+
+  if (
+    response.status === 409 &&
+    payload?.code === 'BATCH_IN_USE'
+  ) {
+    const titles = Array.isArray(payload.examTitles)
+      ? (payload.examTitles as string[])
+      : [];
+    throw new QuestionBankInUseError(titles);
+  }
+
+  if (!response.ok) {
+    const message =
+      typeof payload?.error === 'string'
+        ? payload.error
+        : '无法删除题库，请稍后重试。';
+    throw new ApiError(message, response.status);
+  }
 }
 
 export async function fetchQuestions(params: {

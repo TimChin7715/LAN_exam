@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 
+import { getSessionTeacherId } from '../../../lib/auth.js';
 import { prisma } from '../../../lib/prisma.js';
 import { requireAdminSession } from '../../../plugins/admin-guard.js';
 
@@ -8,6 +9,7 @@ const listQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
   query: z.string().optional(),
+  batchId: z.string().min(1).optional(),
 });
 
 export async function registerAdminRosterListRoutes(
@@ -25,16 +27,21 @@ export async function registerAdminRosterListRoutes(
         });
       }
 
-      const { page, pageSize, query } = parsed.data;
+      const teacherId = getSessionTeacherId(request)!;
+      const { page, pageSize, query, batchId } = parsed.data;
       const q = query?.trim();
-      const where = q
-        ? {
-            OR: [
-              { fullName: { contains: q } },
-              { nationalId: { contains: q } },
-            ],
-          }
-        : {};
+      const where = {
+        batch: { teacherId },
+        ...(batchId ? { batchId } : {}),
+        ...(q
+          ? {
+              OR: [
+                { fullName: { contains: q } },
+                { nationalId: { contains: q } },
+              ],
+            }
+          : {}),
+      };
 
       const [total, items] = await Promise.all([
         prisma.rosterEntry.count({ where }),

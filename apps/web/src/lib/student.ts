@@ -7,6 +7,12 @@ export type StudentProfile = {
 
 export type StudentExamStatus =
   | { status: 'none' }
+  | {
+      status: 'waiting';
+      examId: string;
+      title: string;
+      scheduledStartAt: string;
+    }
   | { status: 'IN_PROGRESS'; examId: string; title: string };
 
 export const STUDENT_AUTH_ERROR_MESSAGE =

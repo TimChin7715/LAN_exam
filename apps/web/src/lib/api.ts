@@ -17,6 +17,17 @@ export class ApiError extends Error {
   }
 }
 
+/** User-facing message when a list/detail load fails (network vs API error). */
+export function getApiLoadErrorMessage(err: unknown): string {
+  if (err instanceof ApiError) {
+    return err.message;
+  }
+  if (err instanceof TypeError) {
+    return '无法连接考试 API，请在本项目根目录运行 pnpm dev（或另开终端运行 pnpm dev:server）。';
+  }
+  return '无法连接服务器，请检查网络或联系机房管理员。';
+}
+
 let sessionExpiredHandler: (() => void) | null = null;
 let passwordChangeRequiredHandler: (() => void) | null = null;
 

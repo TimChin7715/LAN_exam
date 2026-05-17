@@ -6,11 +6,21 @@ import { materializeExamQuestions } from '../../../lib/exam/materialize-question
 import { prisma } from '../../../lib/prisma.js';
 import { requireAdminSession } from '../../../plugins/admin-guard.js';
 
-const createBodySchema = z.object({
-  title: z.string().trim().min(1).max(200),
-  questionBatchId: z.string().min(1),
-  rosterBatchId: z.string().min(1),
-});
+const createBodySchema = z
+  .object({
+    title: z.string().trim().min(1).max(200),
+    questionBatchId: z.string().min(1),
+    rosterBatchId: z.string().min(1),
+    scheduledStartAt: z.string().datetime(),
+    scheduledEndAt: z.string().datetime(),
+  })
+  .refine(
+    (data) => new Date(data.scheduledEndAt) > new Date(data.scheduledStartAt),
+    {
+      message: '结束时间必须晚于开始时间',
+      path: ['scheduledEndAt'],
+    },
+  );
 
 const patchBodySchema = z
   .object({
@@ -79,6 +89,8 @@ export async function registerAdminExamsCrudRoutes(
           id: true,
           title: true,
           status: true,
+          scheduledStartAt: true,
+          scheduledEndAt: true,
           startedAt: true,
           endedAt: true,
           createdAt: true,
@@ -94,6 +106,8 @@ export async function registerAdminExamsCrudRoutes(
           id: exam.id,
           title: exam.title,
           status: exam.status,
+          scheduledStartAt: exam.scheduledStartAt,
+          scheduledEndAt: exam.scheduledEndAt,
           startedAt: exam.startedAt,
           endedAt: exam.endedAt,
           createdAt: exam.createdAt,
@@ -141,6 +155,8 @@ export async function registerAdminExamsCrudRoutes(
               teacherId,
               questionBatchId: parsed.data.questionBatchId,
               rosterBatchId: parsed.data.rosterBatchId,
+              scheduledStartAt: new Date(parsed.data.scheduledStartAt),
+              scheduledEndAt: new Date(parsed.data.scheduledEndAt),
             },
           });
           await materializeExamQuestions(

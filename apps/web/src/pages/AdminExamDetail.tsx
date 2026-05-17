@@ -32,6 +32,8 @@ import {
   endExam,
   examStatusLabel,
   fetchExamSubmissions,
+  formatExamDateTime,
+  formatExamScheduleRange,
   getExam,
   handleExamApiError,
   startExam,
@@ -148,6 +150,14 @@ export default function AdminExamDetail() {
           <p>题目批次：{exam.questionBatch.fileName}</p>
           <p>名单批次：{exam.rosterBatch.fileName}</p>
           <p>题目数量：{exam.questions.length}</p>
+          <p>
+            计划时间：
+            {formatExamScheduleRange(exam.scheduledStartAt, exam.scheduledEndAt)}
+          </p>
+          {exam.startedAt ? (
+            <p>实际开始：{formatExamDateTime(exam.startedAt)}</p>
+          ) : null}
+          {exam.endedAt ? <p>实际结束：{formatExamDateTime(exam.endedAt)}</p> : null}
           <div className="flex flex-wrap gap-2 pt-2">
             {exam.status === 'DRAFT' ? (
               <AlertDialog>

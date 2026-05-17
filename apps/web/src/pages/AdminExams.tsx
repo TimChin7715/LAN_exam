@@ -34,9 +34,11 @@ import {
 } from '@/components/ui/table';
 import {
   createExam,
+  defaultExamSchedule,
   examStatusLabel,
   fetchQuestionBatches,
   fetchRosterBatches,
+  formatExamScheduleRange,
   handleExamApiError,
   listExams,
   type BatchPickerItem,
@@ -53,6 +55,8 @@ export default function AdminExams() {
   const [rosterBatchId, setRosterBatchId] = useState('');
   const [questionBatches, setQuestionBatches] = useState<BatchPickerItem[]>([]);
   const [rosterBatches, setRosterBatches] = useState<BatchPickerItem[]>([]);
+  const [scheduledStart, setScheduledStart] = useState('');
+  const [scheduledEnd, setScheduledEnd] = useState('');
   const [creating, setCreating] = useState(false);
 
   const load = useCallback(async () => {
@@ -72,6 +76,9 @@ export default function AdminExams() {
 
   useEffect(() => {
     if (!dialogOpen) return;
+    const defaults = defaultExamSchedule();
+    setScheduledStart(defaults.start);
+    setScheduledEnd(defaults.end);
     void (async () => {
       try {
         const [qb, rb] = await Promise.all([
@@ -92,18 +99,36 @@ export default function AdminExams() {
       toast.error('请填写考试名称并选择题目与名单批次。');
       return;
     }
+    if (!scheduledStart || !scheduledEnd) {
+      toast.error('请设定考试开始与结束时间。');
+      return;
+    }
+    const startDate = new Date(scheduledStart);
+    const endDate = new Date(scheduledEnd);
+    if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+      toast.error('考试时间格式无效。');
+      return;
+    }
+    if (endDate <= startDate) {
+      toast.error('结束时间必须晚于开始时间。');
+      return;
+    }
     setCreating(true);
     try {
       const examId = await createExam({
         title: title.trim(),
         questionBatchId,
         rosterBatchId,
+        scheduledStartAt: startDate.toISOString(),
+        scheduledEndAt: endDate.toISOString(),
       });
       toast.success('考试已创建。');
       setDialogOpen(false);
       setTitle('');
       setQuestionBatchId('');
       setRosterBatchId('');
+      setScheduledStart('');
+      setScheduledEnd('');
       void navigate(`/admin/exams/${examId}`);
     } catch (err) {
       handleExamApiError(err, '创建考试失败。');
@@ -173,6 +198,26 @@ export default function AdminExams() {
                     </Select>
                   </div>
                   <div className="grid gap-2">
+                    <Label htmlFor="exam-start">开始时间</Label>
+                    <Input
+                      id="exam-start"
+                      type="datetime-local"
+                      value={scheduledStart}
+                      onChange={(e) => setScheduledStart(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="exam-end">结束时间</Label>
+                    <Input
+                      id="exam-end"
+                      type="datetime-local"
+                      value={scheduledEnd}
+                      onChange={(e) => setScheduledEnd(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div className="grid gap-2">
                     <Label>名单批次</Label>
                     <Select
                       value={rosterBatchId}
@@ -222,6 +267,7 @@ export default function AdminExams() {
               <TableHeader>
                 <TableRow>
                   <TableHead>名称</TableHead>
+                  <TableHead>考试时间</TableHead>
                   <TableHead>状态</TableHead>
                   <TableHead>题目</TableHead>
                   <TableHead>提交</TableHead>
@@ -232,6 +278,12 @@ export default function AdminExams() {
                 {items.map((exam) => (
                   <TableRow key={exam.id}>
                     <TableCell className="font-medium">{exam.title}</TableCell>
+                    <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
+                      {formatExamScheduleRange(
+                        exam.scheduledStartAt,
+                        exam.scheduledEndAt,
+                      )}
+                    </TableCell>
                     <TableCell>
                       <Badge variant="secondary">{examStatusLabel(exam.status)}</Badge>
                     </TableCell>

@@ -27,6 +27,8 @@ export async function assertStudentExamAccess(
       id: true,
       status: true,
       rosterBatchId: true,
+      scheduledStartAt: true,
+      scheduledEndAt: true,
     },
   });
 
@@ -35,6 +37,22 @@ export async function assertStudentExamAccess(
       403,
       'FORBIDDEN',
       '当前无法参加本场考试。',
+    );
+  }
+
+  const now = new Date();
+  if (exam.scheduledStartAt && now < exam.scheduledStartAt) {
+    throw new ExamAccessError(
+      403,
+      'EXAM_NOT_STARTED',
+      '考试尚未开始，请在开考时间后再进入。',
+    );
+  }
+  if (exam.scheduledEndAt && now > exam.scheduledEndAt) {
+    throw new ExamAccessError(
+      409,
+      'EXAM_ENDED',
+      '考试时间已结束，无法继续作答。',
     );
   }
 

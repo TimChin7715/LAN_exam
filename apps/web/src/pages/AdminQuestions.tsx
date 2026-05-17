@@ -1,23 +1,25 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { BookOpen } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
 import { ImportDropzone } from '@/components/admin/qbank/ImportDropzone';
 import { ImportErrorTable } from '@/components/admin/qbank/ImportErrorTable';
 import { ImportResultSummary } from '@/components/admin/qbank/ImportResultSummary';
-import { QuestionDetailDialog } from '@/components/admin/qbank/QuestionDetailDialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
 import {
   Table,
@@ -27,16 +29,14 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { getApiLoadErrorMessage } from '@/lib/api';
 import {
-  fetchQuestionDetail,
-  fetchQuestions,
-  questionTypeLabel,
-  truncateStem,
+  deleteQuestionBank,
+  fetchQuestionBanks,
+  QuestionBankInUseError,
   type ImportFailure,
   type ImportSuccess,
-  type QuestionDetail,
-  type QuestionListItem,
-  type QuestionType,
+  type QuestionBankListItem,
 } from '@/lib/qbank';
 
 function formatImportedAt(iso: string): string {
@@ -46,64 +46,38 @@ function formatImportedAt(iso: string): string {
 }
 
 export default function AdminQuestions() {
+  const navigate = useNavigate();
   const listRef = useRef<HTMLDivElement>(null);
   const [importSuccess, setImportSuccess] = useState<ImportSuccess | null>(null);
   const [importFailure, setImportFailure] = useState<ImportFailure | null>(null);
-  const [items, setItems] = useState<QuestionListItem[]>([]);
-  const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
-  const [pageSize] = useState(20);
-  const [typeFilter, setTypeFilter] = useState<QuestionType | 'ALL'>('ALL');
-  const [batchFilter, setBatchFilter] = useState<'ALL' | 'LAST'>('ALL');
-  const [lastBatchId, setLastBatchId] = useState<string | null>(null);
-  const [loadingList, setLoadingList] = useState(true);
+  const [banks, setBanks] = useState<QuestionBankListItem[]>([]);
+  const [loadingBanks, setLoadingBanks] = useState(true);
   const [listError, setListError] = useState<string | null>(null);
-  const [detailOpen, setDetailOpen] = useState(false);
-  const [detail, setDetail] = useState<QuestionDetail | null>(null);
-  const [detailLoading, setDetailLoading] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  const loadList = useCallback(async (
-    targetPage = page,
-    overrides?: { batchFilter?: 'ALL' | 'LAST'; lastBatchId?: string | null },
-  ) => {
-    setLoadingList(true);
+  const loadBanks = useCallback(async () => {
+    setLoadingBanks(true);
     setListError(null);
-    const activeBatchFilter = overrides?.batchFilter ?? batchFilter;
-    const activeLastBatchId = overrides?.lastBatchId ?? lastBatchId;
     try {
-      const data = await fetchQuestions({
-        page: targetPage,
-        pageSize,
-        type: typeFilter === 'ALL' ? undefined : typeFilter,
-        batchId:
-          activeBatchFilter === 'LAST' && activeLastBatchId
-            ? activeLastBatchId
-            : undefined,
-      });
-      setItems(data.items);
-      setTotal(data.total);
-      setPage(data.page);
-    } catch {
-      setListError('无法连接服务器，请检查网络或联系机房管理员。');
+      const items = await fetchQuestionBanks();
+      setBanks(items);
+    } catch (err) {
+      setListError(getApiLoadErrorMessage(err));
     } finally {
-      setLoadingList(false);
+      setLoadingBanks(false);
     }
-  }, [page, pageSize, typeFilter, batchFilter, lastBatchId]);
+  }, []);
 
   useEffect(() => {
-    void loadList(page);
-  }, [loadList, page]);
-
-  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    void loadBanks();
+  }, [loadBanks]);
 
   function handleImportSuccess(result: ImportSuccess) {
     setImportFailure(null);
     setImportSuccess({ ...result, fileName: result.fileName });
-    setLastBatchId(result.batchId);
-    setBatchFilter('LAST');
     toast.success(`已成功导入 ${result.importedCount} 道题目。`);
-    setPage(1);
-    void loadList(1, { batchFilter: 'LAST', lastBatchId: result.batchId });
+    void loadBanks();
+    listRef.current?.scrollIntoView({ behavior: 'smooth' });
   }
 
   function handleImportFailure(result: ImportFailure) {
@@ -112,22 +86,30 @@ export default function AdminQuestions() {
     toast.error('导入失败，请查看错误说明并修正文件。');
   }
 
-  async function openDetail(id: string) {
-    setDetailOpen(true);
-    setDetailLoading(true);
-    setDetail(null);
-    try {
-      const q = await fetchQuestionDetail(id);
-      setDetail(q);
-    } catch {
-      setDetailOpen(false);
-    } finally {
-      setDetailLoading(false);
-    }
+  function handleViewBank(batchId: string) {
+    navigate(`/admin/questions/${batchId}`);
   }
 
-  function scrollToList() {
-    listRef.current?.scrollIntoView({ behavior: 'smooth' });
+  async function handleDeleteBank(id: string) {
+    setDeletingId(id);
+    try {
+      await deleteQuestionBank(id);
+      toast.success('题库已删除。');
+      void loadBanks();
+    } catch (err) {
+      if (err instanceof QuestionBankInUseError) {
+        const titles = err.examTitles;
+        const hint =
+          titles.length > 0
+            ? `已被考试「${titles.join('」「')}」使用`
+            : '已被考试使用';
+        toast.error(`无法删除：该题库${hint}。`);
+      } else {
+        toast.error('删除失败，请稍后重试。');
+      }
+    } finally {
+      setDeletingId(null);
+    }
   }
 
   return (
@@ -143,7 +125,7 @@ export default function AdminQuestions() {
           题库管理
         </h1>
         <p className="text-base text-muted-foreground">
-          请使用官方 Excel 模板批量导入单选、多选与判断题。导入前可下载模板并按「填写说明」填写。
+          每次上传一个 Excel 文件将生成一个独立题库。请使用官方模板批量导入单选、多选与判断题。
         </p>
       </div>
 
@@ -160,7 +142,10 @@ export default function AdminQuestions() {
       </Card>
 
       {importSuccess ? (
-        <ImportResultSummary result={importSuccess} onViewAll={scrollToList} />
+        <ImportResultSummary
+          result={importSuccess}
+          onViewBank={handleViewBank}
+        />
       ) : null}
 
       {importFailure ? (
@@ -168,44 +153,8 @@ export default function AdminQuestions() {
       ) : null}
 
       <Card ref={listRef}>
-        <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <CardTitle className="text-sm font-semibold">题目列表</CardTitle>
-          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
-            <Select
-              value={typeFilter}
-              onValueChange={(v) => {
-                setTypeFilter(v as QuestionType | 'ALL');
-                setPage(1);
-              }}
-            >
-              <SelectTrigger className="w-full sm:w-40" aria-label="题型筛选">
-                <SelectValue placeholder="题型" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">全部题型</SelectItem>
-                <SelectItem value="SINGLE">单选</SelectItem>
-                <SelectItem value="MULTI">多选</SelectItem>
-                <SelectItem value="JUDGE">判断</SelectItem>
-              </SelectContent>
-            </Select>
-            {lastBatchId ? (
-              <Select
-                value={batchFilter}
-                onValueChange={(v) => {
-                  setBatchFilter(v as 'ALL' | 'LAST');
-                  setPage(1);
-                }}
-              >
-                <SelectTrigger className="w-full sm:w-44" aria-label="导入批次筛选">
-                  <SelectValue placeholder="批次" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ALL">全部批次</SelectItem>
-                  <SelectItem value="LAST">本批导入</SelectItem>
-                </SelectContent>
-              </Select>
-            ) : null}
-          </div>
+        <CardHeader>
+          <CardTitle className="text-sm font-semibold">已上传题库</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           {listError ? (
@@ -216,7 +165,7 @@ export default function AdminQuestions() {
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => void loadList(page)}
+                  onClick={() => void loadBanks()}
                 >
                   重试
                 </Button>
@@ -224,106 +173,90 @@ export default function AdminQuestions() {
             </Alert>
           ) : null}
 
-          {loadingList ? (
+          {loadingBanks ? (
             <div className="flex items-center justify-center gap-2 py-12 text-muted-foreground">
               <Spinner className="size-5" />
-              <span>加载题目列表…</span>
+              <span>加载题库列表…</span>
             </div>
-          ) : items.length === 0 ? (
+          ) : banks.length === 0 ? (
             <div className="flex flex-col items-center gap-3 py-12 text-center">
               <BookOpen className="size-10 text-muted-foreground" aria-hidden />
-              <h3 className="text-xl font-semibold text-foreground">暂无题目</h3>
+              <h3 className="text-xl font-semibold text-foreground">暂无题库</h3>
               <p className="max-w-md text-base text-muted-foreground">
-                请先下载模板并导入 Excel 文件。导入成功后题目将显示在下方列表中。
+                请先下载模板并导入 Excel 文件，每次导入将生成一个题库。
               </p>
             </div>
           ) : (
-            <>
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead scope="col">题型</TableHead>
-                      <TableHead scope="col">题干</TableHead>
-                      <TableHead scope="col">分值</TableHead>
-                      <TableHead scope="col">导入时间</TableHead>
-                      <TableHead scope="col" className="w-20">
-                        操作
-                      </TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {items.map((item) => (
-                      <TableRow
-                        key={item.id}
-                        className="cursor-pointer hover:bg-muted/50"
-                        onClick={() => void openDetail(item.id)}
-                      >
-                        <TableCell>
-                          <Badge variant="secondary">
-                            {questionTypeLabel(item.type)}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="max-w-md">
-                          <span className="line-clamp-2">{truncateStem(item.stem, 60)}</span>
-                        </TableCell>
-                        <TableCell>{item.points}</TableCell>
-                        <TableCell>{formatImportedAt(item.createdAt)}</TableCell>
-                        <TableCell>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead scope="col">文件名</TableHead>
+                    <TableHead scope="col">题目数</TableHead>
+                    <TableHead scope="col">上传时间</TableHead>
+                    <TableHead scope="col" className="w-40">
+                      操作
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {banks.map((bank) => (
+                    <TableRow key={bank.id}>
+                      <TableCell className="max-w-md font-medium">
+                        {bank.fileName}
+                      </TableCell>
+                      <TableCell>{bank.itemCount}</TableCell>
+                      <TableCell>{formatImportedAt(bank.createdAt)}</TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-2">
                           <Button
                             type="button"
                             variant="link"
                             className="min-h-11 px-0"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              void openDetail(item.id);
-                            }}
+                            onClick={() => handleViewBank(bank.id)}
                           >
                             查看
                           </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <p className="text-base text-muted-foreground">
-                  第 {page} / {totalPages} 页，共 {total} 题
-                </p>
-                <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="min-h-11"
-                    disabled={page <= 1}
-                    onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  >
-                    上一页
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="min-h-11"
-                    disabled={page >= totalPages}
-                    onClick={() => setPage((p) => p + 1)}
-                  >
-                    下一页
-                  </Button>
-                </div>
-              </div>
-            </>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                type="button"
+                                variant="link"
+                                className="min-h-11 px-0 text-destructive"
+                                disabled={deletingId === bank.id}
+                              >
+                                删除
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>确认删除题库？</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  将永久删除「{bank.fileName}」及其中的 {bank.itemCount}{' '}
+                                  道题目，此操作不可恢复。已被考试引用的题库无法删除。
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>取消</AlertDialogCancel>
+                                <AlertDialogAction
+                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                  onClick={() => void handleDeleteBank(bank.id)}
+                                >
+                                  删除
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>
-
-      <QuestionDetailDialog
-        open={detailOpen}
-        onOpenChange={setDetailOpen}
-        detail={detail}
-        loading={detailLoading}
-      />
     </div>
   );
 }

@@ -1,15 +1,25 @@
-import { useCallback, useEffect, useState } from 'react';
-import { Users, X } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Users } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
 import { ImportDropzone } from '@/components/admin/roster/ImportDropzone';
 import { ImportErrorTable } from '@/components/admin/roster/ImportErrorTable';
 import { ImportResultSummary } from '@/components/admin/roster/ImportResultSummary';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { Spinner } from '@/components/ui/spinner';
 import {
   Table,
@@ -19,12 +29,14 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { getApiLoadErrorMessage } from '@/lib/api';
 import {
-  fetchRosterList,
-  maskNationalId,
+  deleteRosterBatch,
+  fetchRosterBatches,
+  RosterBatchInUseError,
   type ImportFailure,
   type ImportSuccess,
-  type RosterListItem,
+  type RosterBatchListItem,
 } from '@/lib/roster';
 
 function formatImportedAt(iso: string): string {
@@ -34,53 +46,38 @@ function formatImportedAt(iso: string): string {
 }
 
 export default function AdminRoster() {
+  const navigate = useNavigate();
+  const listRef = useRef<HTMLDivElement>(null);
   const [importSuccess, setImportSuccess] = useState<ImportSuccess | null>(null);
   const [importFailure, setImportFailure] = useState<ImportFailure | null>(null);
-  const [items, setItems] = useState<RosterListItem[]>([]);
-  const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
-  const [pageSize] = useState(20);
-  const [searchInput, setSearchInput] = useState('');
-  const [activeQuery, setActiveQuery] = useState('');
-  const [loadingList, setLoadingList] = useState(true);
+  const [batches, setBatches] = useState<RosterBatchListItem[]>([]);
+  const [loadingBatches, setLoadingBatches] = useState(true);
   const [listError, setListError] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  const loadList = useCallback(
-    async (targetPage = page, query = activeQuery) => {
-      setLoadingList(true);
-      setListError(null);
-      try {
-        const data = await fetchRosterList({
-          page: targetPage,
-          pageSize,
-          query: query || undefined,
-        });
-        setItems(data.items);
-        setTotal(data.total);
-        setPage(data.page);
-      } catch {
-        setListError('无法连接服务器，请检查网络或联系机房管理员。');
-      } finally {
-        setLoadingList(false);
-      }
-    },
-    [page, pageSize, activeQuery],
-  );
+  const loadBatches = useCallback(async () => {
+    setLoadingBatches(true);
+    setListError(null);
+    try {
+      const items = await fetchRosterBatches();
+      setBatches(items);
+    } catch (err) {
+      setListError(getApiLoadErrorMessage(err));
+    } finally {
+      setLoadingBatches(false);
+    }
+  }, []);
 
   useEffect(() => {
-    void loadList(page);
-  }, [loadList, page]);
-
-  const totalPages = Math.max(1, Math.ceil(total / pageSize));
-  const hasQuery = activeQuery.length > 0;
-  const isEmpty = !loadingList && !listError && items.length === 0;
+    void loadBatches();
+  }, [loadBatches]);
 
   function handleImportSuccess(result: ImportSuccess) {
     setImportFailure(null);
     setImportSuccess(result);
     toast.success(`已成功导入 ${result.importedCount} 名考生。`);
-    setPage(1);
-    void loadList(1, activeQuery);
+    void loadBatches();
+    listRef.current?.scrollIntoView({ behavior: 'smooth' });
   }
 
   function handleImportFailure(result: ImportFailure) {
@@ -89,19 +86,30 @@ export default function AdminRoster() {
     toast.error('导入失败，请查看错误说明并修正文件。');
   }
 
-  function handleSearch(e?: React.FormEvent) {
-    e?.preventDefault();
-    const q = searchInput.trim();
-    setActiveQuery(q);
-    setPage(1);
-    void loadList(1, q);
+  function handleViewBatch(batchId: string) {
+    navigate(`/admin/roster/${batchId}`);
   }
 
-  function clearSearch() {
-    setSearchInput('');
-    setActiveQuery('');
-    setPage(1);
-    void loadList(1, '');
+  async function handleDeleteBatch(id: string) {
+    setDeletingId(id);
+    try {
+      await deleteRosterBatch(id);
+      toast.success('名单已删除。');
+      void loadBatches();
+    } catch (err) {
+      if (err instanceof RosterBatchInUseError) {
+        const titles = err.examTitles;
+        const hint =
+          titles.length > 0
+            ? `已被考试「${titles.join('」「')}」使用`
+            : '已被考试使用';
+        toast.error(`无法删除：该名单${hint}。`);
+      } else {
+        toast.error('删除失败，请稍后重试。');
+      }
+    } finally {
+      setDeletingId(null);
+    }
   }
 
   return (
@@ -117,7 +125,7 @@ export default function AdminRoster() {
           名单管理
         </h1>
         <p className="text-base text-muted-foreground">
-          请使用官方 Excel 模板批量导入考生名单。导入前可下载模板，姓名与身份证号须与证件一致（除首尾空格外须完全一致）。
+          每次上传一个 Excel 文件将生成一份独立名单。请使用官方模板批量导入，姓名与身份证号须与证件一致（除首尾空格外须完全一致）。
         </p>
       </div>
 
@@ -133,44 +141,22 @@ export default function AdminRoster() {
         </CardContent>
       </Card>
 
-      {importSuccess ? <ImportResultSummary result={importSuccess} /> : null}
+      {importSuccess ? (
+        <ImportResultSummary
+          result={importSuccess}
+          onViewBatch={handleViewBatch}
+        />
+      ) : null}
 
-      {importFailure ? <ImportErrorTable errors={importFailure.errors} /> : null}
+      {importFailure ? (
+        <ImportErrorTable errors={importFailure.errors} />
+      ) : null}
 
-      <Card>
+      <Card ref={listRef}>
         <CardHeader>
-          <CardTitle className="text-sm font-semibold">名单列表</CardTitle>
+          <CardTitle className="text-sm font-semibold">已上传名单</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <form
-            className="flex flex-col gap-2 sm:flex-row sm:items-center"
-            onSubmit={handleSearch}
-          >
-            <Input
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              placeholder="按姓名或身份证号搜索"
-              className="min-h-11 flex-1"
-              aria-label="搜索名单"
-            />
-            <div className="flex gap-2">
-              <Button type="submit" className="min-h-11">
-                搜索
-              </Button>
-              {searchInput || activeQuery ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="min-h-11"
-                  onClick={clearSearch}
-                >
-                  <X className="size-4 sm:mr-1" aria-hidden />
-                  清空
-                </Button>
-              ) : null}
-            </div>
-          </form>
-
           {listError ? (
             <Alert variant="destructive">
               <AlertDescription className="flex flex-wrap items-center gap-3">
@@ -179,7 +165,7 @@ export default function AdminRoster() {
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => void loadList(page)}
+                  onClick={() => void loadBatches()}
                 >
                   重试
                 </Button>
@@ -187,79 +173,87 @@ export default function AdminRoster() {
             </Alert>
           ) : null}
 
-          {loadingList ? (
+          {loadingBatches ? (
             <div className="flex items-center justify-center gap-2 py-12 text-muted-foreground">
               <Spinner className="size-5" />
-              <span>加载名单…</span>
+              <span>加载名单列表…</span>
             </div>
-          ) : isEmpty && !hasQuery ? (
+          ) : batches.length === 0 ? (
             <div className="flex flex-col items-center gap-3 py-12 text-center">
               <Users className="size-10 text-muted-foreground" aria-hidden />
               <h3 className="text-xl font-semibold text-foreground">暂无名单</h3>
               <p className="max-w-md text-base text-muted-foreground">
-                请先下载模板并导入 Excel 文件。导入成功后考生将显示在下方列表中。
-              </p>
-            </div>
-          ) : isEmpty && hasQuery ? (
-            <div className="flex flex-col items-center gap-2 py-12 text-center">
-              <h3 className="text-xl font-semibold text-foreground">
-                未找到匹配记录
-              </h3>
-              <p className="text-base text-muted-foreground">
-                请检查姓名或身份证号是否输入正确。
+                请先下载模板并导入 Excel 文件，每次导入将生成一份名单。
               </p>
             </div>
           ) : (
-            <>
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead scope="col">姓名</TableHead>
-                      <TableHead scope="col">身份证号</TableHead>
-                      <TableHead scope="col">导入时间</TableHead>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead scope="col">文件名</TableHead>
+                    <TableHead scope="col">人数</TableHead>
+                    <TableHead scope="col">上传时间</TableHead>
+                    <TableHead scope="col" className="w-40">
+                      操作
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {batches.map((batch) => (
+                    <TableRow key={batch.id}>
+                      <TableCell className="max-w-md font-medium">
+                        {batch.fileName}
+                      </TableCell>
+                      <TableCell>{batch.itemCount}</TableCell>
+                      <TableCell>{formatImportedAt(batch.createdAt)}</TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            type="button"
+                            variant="link"
+                            className="min-h-11 px-0"
+                            onClick={() => handleViewBatch(batch.id)}
+                          >
+                            查看
+                          </Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                type="button"
+                                variant="link"
+                                className="min-h-11 px-0 text-destructive"
+                                disabled={deletingId === batch.id}
+                              >
+                                删除
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>确认删除名单？</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  将永久删除「{batch.fileName}」及其中的 {batch.itemCount}{' '}
+                                  名考生，此操作不可恢复。已被考试引用的名单无法删除。
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>取消</AlertDialogCancel>
+                                <AlertDialogAction
+                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                  onClick={() => void handleDeleteBatch(batch.id)}
+                                >
+                                  删除
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
+                      </TableCell>
                     </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {items.map((item) => (
-                      <TableRow key={item.id}>
-                        <TableCell>{item.fullName}</TableCell>
-                        <TableCell className="font-mono tabular-nums">
-                          {maskNationalId(item.nationalId)}
-                        </TableCell>
-                        <TableCell>{formatImportedAt(item.createdAt)}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <p className="text-base text-muted-foreground">
-                  第 {page} / {totalPages} 页，共 {total} 人
-                </p>
-                <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="min-h-11"
-                    disabled={page <= 1}
-                    onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  >
-                    上一页
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="min-h-11"
-                    disabled={page >= totalPages}
-                    onClick={() => setPage((p) => p + 1)}
-                  >
-                    下一页
-                  </Button>
-                </div>
-              </div>
-            </>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>

@@ -10,6 +10,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import { formatExamDateTime } from '@/lib/exam';
 import { ApiError, studentApi, type StudentProfile } from '@/lib/student';
 
 export default function StudentWaiting() {
@@ -17,6 +18,7 @@ export default function StudentWaiting() {
   const [profile, setProfile] = useState<StudentProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [waitingHint, setWaitingHint] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -51,9 +53,16 @@ export default function StudentWaiting() {
       try {
         const status = await studentApi.examStatus();
         if (status.status === 'IN_PROGRESS') {
+          setWaitingHint(null);
           navigate(`/exam/take?examId=${encodeURIComponent(status.examId)}`, {
             replace: true,
           });
+        } else if (status.status === 'waiting') {
+          setWaitingHint(
+            `考试将于 ${formatExamDateTime(status.scheduledStartAt)} 开始，请稍候。`,
+          );
+        } else {
+          setWaitingHint(null);
         }
       } catch (err) {
         if (err instanceof ApiError && err.status === 401) {
@@ -141,7 +150,8 @@ export default function StudentWaiting() {
             </div>
           </dl>
           <p className="text-center text-base text-muted-foreground">
-            监考教师开始考试后，本页将自动进入答题界面。
+            {waitingHint ??
+              '监考教师开始考试后，本页将在开考时间自动进入答题界面。'}
           </p>
           <Button
             type="button"
