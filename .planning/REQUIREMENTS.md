@@ -7,8 +7,8 @@
 
 ### 导出
 
-- [ ] **EXPR-03**: 教师导出考试 xlsx 时，「成绩汇总」工作表在姓名、脱敏证号、总分、是否提交、提交时间之后，按题号递增追加各题得分列（表头为「第1题」「第2题」…「第N题」，N 为当次考试题目数）；已提交考生显示该题 `pointsAwarded`，未提交考生各题得分为「—」
-- [ ] **EXPR-04**: 导出仍包含 v1.0「答题明细」长表工作表（姓名、证号、题号、题型、所选、正确答案、对错、得分），内容与 v1.0 行为一致
+- [x] **EXPR-03**: 教师导出考试 xlsx 时，「成绩汇总」工作表在姓名、脱敏证号、总分、是否提交、提交时间之后，按题号递增追加各题得分列（表头为「第1题」「第2题」…「第N题」，N 为当次考试题目数）；已提交考生显示该题 `pointsAwarded`，未提交考生各题得分为「—」 — Phase 5
+- [x] **EXPR-04**: 导出仍包含 v1.0「答题明细」长表工作表（姓名、证号、题号、题型、所选、正确答案、对错、得分），内容与 v1.0 行为一致 — Phase 5
 
 ## v2 Requirements
 
@@ -37,8 +37,8 @@ _(Unchanged from v1.0 archive — SEC/UX; not in v1.1 roadmap.)_
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| EXPR-03 | Phase 5 | Pending |
-| EXPR-04 | Phase 5 | Pending |
+| EXPR-03 | Phase 5 | Complete |
+| EXPR-04 | Phase 5 | Complete |
 
 **Coverage:**
 - v1.1 requirements: 2 total

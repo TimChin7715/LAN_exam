@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: 考试情况导出细化
-status: executing
-stopped_at: Phase 5 context gathered
-last_updated: "2026-05-17T07:44:22.600Z"
-last_activity: 2026-05-17 -- Phase 05 planning complete
+status: idle
+stopped_at: Phase 5 complete
+last_updated: "2026-05-17T12:00:00.000Z"
+last_activity: 2026-05-17 -- Phase 05 executed (05-01)
 progress:
   total_phases: 1
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 1
-  completed_plans: 0
-  percent: 0
+  completed_plans: 1
+  percent: 100
 ---
 
 # Project State
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-05-17) · `.planning/DECISIONS-INDEX.md`
 ## Current Position
 
 Phase: 5 — 导出汇总逐题得分
-Plan: —
-Status: Ready to execute
-Last activity: 2026-05-17 -- Phase 05 planning complete
+Plan: 05-01 (complete)
+Status: Phase complete — v1.1 milestone ready to close
+Last activity: 2026-05-17 -- Phase 05 execution complete
 
 ## Performance Metrics
 
@@ -91,4 +91,5 @@ Resume file: .planning/phases/05-export-summary-per-question/05-CONTEXT.md
 
 ## Operator Next Steps
 
-- Start the next milestone with /gsd-new-milestone
+- Optional: replace `fixtures/export/test1-成绩导出.xlsx` with校方样例 (if different from synthetic)
+- Close v1.1 with `/gsd-complete-milestone` or start next milestone with `/gsd-new-milestone`

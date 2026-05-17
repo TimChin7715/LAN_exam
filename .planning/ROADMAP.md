@@ -3,7 +3,7 @@
 ## Milestones
 
 - ✅ **v1.0 局域网考试 MVP** — Phases 1–4（shipped 2026-05-17）
-- 🚧 **v1.1 考试情况导出细化** — Phase 5（in progress）
+- ✅ **v1.1 考试情况导出细化** — Phase 5（shipped 2026-05-17）
 
 ## Phases
 
@@ -28,7 +28,7 @@
 **Plans:** 1 plan
 
 Plans:
-- [ ] 05-01-PLAN.md — Fixture (D-07), wide 成绩汇总 (EXPR-03), export tests (D-08, EXPR-04)
+- [x] 05-01-PLAN.md — Fixture (D-07), wide 成绩汇总 (EXPR-03), export tests (D-08, EXPR-04)
 
 **Success criteria:**
 
@@ -43,7 +43,7 @@ Plans:
 | Phase | Milestone | Plans | Status | Shipped |
 |-------|-----------|-------|--------|---------|
 | 1–4 | v1.0 | 11/11 | Complete | 2026-05-17 |
-| 5. 导出汇总逐题得分 | v1.1 | 0/1 | Planned | — |
+| 5. 导出汇总逐题得分 | v1.1 | 1/1 | Complete | 2026-05-17 |
 
 ---
 *Roadmap updated: 2026-05-17 — milestone v1.1*
