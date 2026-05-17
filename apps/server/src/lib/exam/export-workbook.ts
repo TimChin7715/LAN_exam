@@ -2,7 +2,26 @@ import type { QuestionType } from '@prisma/client';
 import ExcelJS from 'exceljs';
 
 import { prisma } from '../prisma.js';
+import { buildSummaryRowQuestionFields } from './export-summary.js';
 import { maskNationalId } from './mask-national-id.js';
+
+export type SummaryExamQuestion = { id: string; sortOrder: number };
+
+/** Fixed 5 + dynamic 第k题 columns — shared by production and tests. */
+export function buildSummarySheetColumns(examQuestions: SummaryExamQuestion[]) {
+  return [
+    { header: '姓名', key: 'name', width: 16 },
+    { header: '身份证号', key: 'id', width: 22 },
+    { header: '总分', key: 'score', width: 10 },
+    { header: '是否提交', key: 'submitted', width: 12 },
+    { header: '提交时间', key: 'time', width: 20 },
+    ...examQuestions.map((eq) => ({
+      header: `第${eq.sortOrder + 1}题`,
+      key: `q_${eq.id}`,
+      width: 10,
+    })),
+  ];
+}
 
 function questionTypeLabelZh(type: QuestionType): string {
   switch (type) {
@@ -43,6 +62,12 @@ export async function buildExamExportWorkbook(
     throw new Error('EXAM_NOT_FOUND');
   }
 
+  const examQuestions = await prisma.examQuestion.findMany({
+    where: { examId },
+    orderBy: { sortOrder: 'asc' },
+    select: { id: true, sortOrder: true },
+  });
+
   const rosterEntries = await prisma.rosterEntry.findMany({
     where: { batchId: exam.rosterBatchId },
     orderBy: { fullName: 'asc' },
@@ -63,6 +88,7 @@ export async function buildExamExportWorkbook(
               pointsAwarded: true,
               examQuestion: {
                 select: {
+                  id: true,
                   sortOrder: true,
                   question: {
                     select: {
@@ -83,13 +109,7 @@ export async function buildExamExportWorkbook(
   workbook.creator = 'LAN Exam';
 
   const summarySheet = workbook.addWorksheet('成绩汇总');
-  summarySheet.columns = [
-    { header: '姓名', key: 'name', width: 16 },
-    { header: '身份证号', key: 'id', width: 22 },
-    { header: '总分', key: 'score', width: 10 },
-    { header: '是否提交', key: 'submitted', width: 12 },
-    { header: '提交时间', key: 'time', width: 20 },
-  ];
+  summarySheet.columns = buildSummarySheetColumns(examQuestions);
   summarySheet.getRow(1).font = { bold: true };
 
   for (const entry of rosterEntries) {
@@ -100,6 +120,7 @@ export async function buildExamExportWorkbook(
       score: submission ? submission.totalScore : '—',
       submitted: submission ? '已提交' : '未提交',
       time: submission ? formatDateTime(submission.submittedAt) : '',
+      ...buildSummaryRowQuestionFields(examQuestions, submission),
     });
   }
 
