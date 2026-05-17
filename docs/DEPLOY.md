@@ -140,7 +140,7 @@ server {
 | --- | --- |
 | 权威模板 | 仓库 `docs/templates/题库导入模板.xlsx`（与「下载官方模板」接口同源） |
 | 建议首次验收 | 使用仓库模板中合法样例行（或复制模板后删除【示例】行）做一次 smoke 导入，确认三种题型均可列表查看 |
-| 多选计分 | 入库时 `multiScoringRule=ALL_OR_NOTHING`（全对满分否则 0 分）；详见 `.planning/phases/02-qbank-import/02-ACCEPTANCE.md` |
+| 多选计分 | 入库时 `multiScoringRule=ALL_OR_NOTHING`（全对满分否则 0 分） |
 
 部署后需已执行含 `Question` / `QuestionImportBatch` 的 Prisma 迁移（Phase 2 迁移 `20260516120000_qbank_questions`）。
 
