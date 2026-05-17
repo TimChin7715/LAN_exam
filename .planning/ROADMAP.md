@@ -25,7 +25,10 @@
 
 **Requirements:** EXPR-03, EXPR-04
 
-**Plans:** 0/1 (待 `plan-phase`)
+**Plans:** 1 plan
+
+Plans:
+- [ ] 05-01-PLAN.md — Fixture (D-07), wide 成绩汇总 (EXPR-03), export tests (D-08, EXPR-04)
 
 **Success criteria:**
 
@@ -40,7 +43,7 @@
 | Phase | Milestone | Plans | Status | Shipped |
 |-------|-----------|-------|--------|---------|
 | 1–4 | v1.0 | 11/11 | Complete | 2026-05-17 |
-| 5. 导出汇总逐题得分 | v1.1 | 0/1 | Not started | — |
+| 5. 导出汇总逐题得分 | v1.1 | 0/1 | Planned | — |
 
 ---
 *Roadmap updated: 2026-05-17 — milestone v1.1*

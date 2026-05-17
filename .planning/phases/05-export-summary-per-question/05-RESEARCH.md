@@ -366,16 +366,11 @@ export function perQuestionScoresForSummary(
 
 **Note:** 若 fixture 与实现表头不一致，以 CONTEXT D-01 为准（「第k题」），fixture 测试记录差异供人工确认。
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Fixture 文件来源与脱敏**
-   - What we know: 路径锁定为 `fixtures/export/test1-成绩导出.xlsx`；当前仓库 **无** 此文件。
-   - What's unclear: 样例是否含真实 PII。
-   - Recommendation: Wave 0 入库前确认证号已脱敏或合成；仅结构/列序进 CI，不全文快照二进制。
+1. **Fixture 文件来源与脱敏** — **RESOLVED:** `05-01-PLAN.md` Task 1 (human checkpoint) commits `fixtures/export/test1-成绩导出.xlsx` at exact path; operator redacts plaintext 18-digit IDs before commit; CI uses header-only smoke (D-07), not binary snapshots.
 
-2. **Planner: 纯函数文件是否单独 `export-summary.ts`**
-   - What we know: `TESTING.md` 鼓励提取纯逻辑。
-   - Recommendation: 若 `export-workbook.test.ts` 超过 ~150 行，拆 `export-summary.ts`；否则同文件 `export` 纯函数即可。
+2. **Planner: 纯函数文件是否单独 `export-summary.ts`** — **RESOLVED:** Yes — `05-01-PLAN.md` Task 2 creates `export-summary.ts` with `perQuestionScoresForSummary` and `buildSummaryRowQuestionFields`; `export-workbook.ts` imports these helpers.
 
 ## Environment Availability
 
