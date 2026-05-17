@@ -1,6 +1,6 @@
 import { toast } from 'sonner';
 
-import { ApiError, apiFetch } from '@/lib/api';
+import { ApiError, apiFetch, handleAuthResponse } from '@/lib/api';
 
 export type QuestionType = 'SINGLE' | 'MULTI' | 'JUDGE';
 
@@ -73,8 +73,17 @@ export function formatAnswerKeys(answerKeys: string): string {
     .join('、');
 }
 
+/** 展示用题干：去掉导入/测试数据中误写入的内部枚举标记 */
+export function formatStemForDisplay(stem: string): string {
+  return stem
+    .trim()
+    .replace(/[（(]\s*ALL_OR_NOTHING\s*[）)]/g, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
 export function truncateStem(stem: string, max = 60): string {
-  const trimmed = stem.trim();
+  const trimmed = formatStemForDisplay(stem);
   if (trimmed.length <= max) return trimmed;
   return `${trimmed.slice(0, max)}…`;
 }
@@ -84,9 +93,13 @@ export async function downloadQuestionTemplate(): Promise<void> {
     credentials: 'include',
   });
 
-  if (response.status === 401) {
-    toast.error('登录已过期，请重新登录。');
-    throw new ApiError('Unauthorized', 401);
+  if (response.status === 401 || response.status === 403) {
+    const ct = response.headers.get('content-type') ?? '';
+    const payload = ct.includes('application/json')
+      ? ((await response.json()) as Record<string, unknown>)
+      : null;
+    handleAuthResponse(response.status, payload);
+    throw new ApiError('Unauthorized', response.status);
   }
 
   if (!response.ok) {
@@ -117,9 +130,9 @@ export async function importQuestionsFile(
 
   const payload = (await response.json()) as Record<string, unknown>;
 
-  if (response.status === 401) {
-    toast.error('登录已过期，请重新登录。');
-    throw new ApiError('Unauthorized', 401);
+  if (response.status === 401 || response.status === 403) {
+    handleAuthResponse(response.status, payload);
+    throw new ApiError('Unauthorized', response.status);
   }
 
   if (
@@ -196,9 +209,6 @@ export function validateXlsxFile(file: File): string | null {
   const name = file.name.toLowerCase();
   if (!name.endsWith('.xlsx')) {
     return '请选择 .xlsx 格式的 Excel 文件。';
-  }
-  if (file.size > 5_242_880) {
-    return '文件超过 5MB，请拆分或减少题目后重试。';
   }
   return null;
 }

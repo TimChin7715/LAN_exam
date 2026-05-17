@@ -9,8 +9,21 @@ export function getRequestSession(
   return request.raw.session;
 }
 
+/** @deprecated Alias for unified session — student and teacher share `sid`. */
 export function getStudentSession(
   request: FastifyRequest,
 ): AppSession | undefined {
-  return request.raw.studentSession;
+  return getRequestSession(request);
+}
+
+export function saveSession(appSession: AppSession): Promise<void> {
+  return new Promise((resolve, reject) => {
+    appSession.save((err) => {
+      if (err) {
+        reject(err);
+        return;
+      }
+      resolve();
+    });
+  });
 }

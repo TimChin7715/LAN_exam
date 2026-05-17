@@ -3,11 +3,13 @@
   "private": true,
   "packageManager": "pnpm@9.15.9",
   "scripts": {
+    "dev": "pnpm --parallel --filter @lan-exam/server --filter @lan-exam/web dev",
     "dev:server": "pnpm --filter @lan-exam/server dev",
-    "dev:web": "pnpm --filter @lan-exam/web dev",
-    "dev": "pnpm run --parallel dev:server dev:web",
+    "dev:web": "pnpm dev",
+    "dev:web-only": "pnpm --filter @lan-exam/web dev",
     "build": "pnpm -r build",
     "postinstall": "prisma generate",
+    "db:up": "docker compose up -d db",
     "db:migrate": "prisma migrate deploy",
     "db:seed": "prisma db seed"
   },

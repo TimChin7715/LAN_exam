@@ -122,16 +122,24 @@ export function ImportDropzone({
         onDragLeave={() => setDragOver(false)}
         onDrop={onDrop}
         className={`flex min-h-40 cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed p-6 transition-colors ${
-          dragOver ? 'border-primary bg-muted/30' : 'border-border'
+          file
+            ? 'border-primary/50 bg-muted/20'
+            : dragOver
+              ? 'border-primary bg-muted/30'
+              : 'border-border'
         } ${importing ? 'pointer-events-none opacity-60' : ''}`}
       >
-        <Upload className="size-8 text-muted-foreground" aria-hidden />
+        <Upload
+          className={`size-8 ${file ? 'text-primary' : 'text-muted-foreground'}`}
+          aria-hidden
+        />
         <p className="text-base text-foreground">
-          {file ? file.name : '点击或拖拽上传 Excel 文件'}
+          {file ? '已上传文件' : '点击或拖拽上传 Excel 文件'}
         </p>
-        <p className="text-sm text-muted-foreground">
-          仅支持 .xlsx，单文件不超过 5MB
-        </p>
+        {file ? (
+          <p className="text-sm font-medium text-foreground">{file.name}</p>
+        ) : null}
+        <p className="text-sm text-muted-foreground">仅支持 .xlsx</p>
         {file ? (
           <Button
             type="button"

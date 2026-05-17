@@ -40,10 +40,7 @@ export async function registerAdminQuestionsImportRoutes(
       },
     },
     async (request, reply) => {
-      const teacherId = getSessionTeacherId(request);
-      if (!teacherId) {
-        return reply.status(401).send({ error: 'Unauthorized' });
-      }
+      const teacherId = getSessionTeacherId(request)!;
 
       const data = await request.file();
       if (!data) {

@@ -21,7 +21,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Spinner } from '@/components/ui/spinner';
-import { questionTypeLabel } from '@/lib/qbank';
+import { formatStemForDisplay, questionTypeLabel } from '@/lib/qbank';
 import {
   ApiError,
   STUDENT_ALREADY_SUBMITTED_MESSAGE,
@@ -233,7 +233,9 @@ export default function StudentExamTake() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <p className="text-base text-foreground">{item.stem}</p>
+              <p className="text-base text-foreground">
+                {formatStemForDisplay(item.stem)}
+              </p>
 
               {item.type === 'MULTI' ? (
                 <div className="space-y-3">

@@ -7,6 +7,7 @@ import {
   INVALID_CREDENTIALS_CODE,
 } from '../../../lib/errors.js';
 import { prisma } from '../../../lib/prisma.js';
+import { getRequestSession, saveSession } from '../../../lib/session.js';
 
 const loginBodySchema = z.object({
   username: z.string().trim().min(1).max(64),
@@ -17,7 +18,7 @@ function regenerateSession(
   request: import('fastify').FastifyRequest,
 ): Promise<void> {
   return new Promise((resolve, reject) => {
-    const session = request.session;
+    const session = getRequestSession(request);
     if (!session) {
       reject(new Error('Session middleware not available'));
       return;
@@ -79,7 +80,14 @@ export async function registerAuthLoginRoutes(
       }
 
       await regenerateSession(request);
-      request.session.teacherId = teacher.id;
+      const session = getRequestSession(request);
+      if (!session) {
+        throw new Error('Session middleware not available');
+      }
+      session.teacherId = teacher.id;
+      delete session.studentRosterEntryId;
+      delete session.studentName;
+      await saveSession(session);
 
       request.log.info(
         {

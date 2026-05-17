@@ -13,6 +13,7 @@ export function StudentRoute() {
 
   useEffect(() => {
     let cancelled = false;
+    setStatus('checking');
     (async () => {
       try {
         await studentApi.me();

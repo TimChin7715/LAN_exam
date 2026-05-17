@@ -4,10 +4,10 @@
 
 | 包 | 路径 | 说明 |
 | --- | --- | --- |
-| `@lan-exam/server` | `apps/server` | Fastify API（默认端口 **3001**） |
-| `@lan-exam/web` | `apps/web` | Vite + React + TypeScript（默认端口 **5173**） |
+| `@lan-exam/server` | `apps/server` | Fastify API（默认端口 **3101**） |
+| `@lan-exam/web` | `apps/web` | Vite + React + TypeScript（默认端口 **5180**） |
 
-前端开发时通过 Vite 将 `/api/*` 代理到 API 服务（例如 `/api/health` → `http://127.0.0.1:3001/health`）。
+前端开发时通过 Vite 将 `/api/*` 代理到 API 服务（例如 `/api/health` → `http://127.0.0.1:3101/health`）。
 
 ## 本地开发（Docker 优先）
 
@@ -19,7 +19,7 @@ docker compose up --build
 
 启动后：
 
-- 健康检查：`curl -sSf http://127.0.0.1:3001/health`（Compose 映射端口以 `docker-compose.yml` 为准）
+- 健康检查：`curl -sSf http://127.0.0.1:3101/health`（Compose 映射端口以 `docker-compose.yml` 为准）
 - 浏览器访问 Web：见 compose 中 `app` 服务暴露的端口
 
 ## 本地开发（pnpm，可选）
@@ -28,12 +28,18 @@ docker compose up --build
 
 ```bash
 pnpm install
-pnpm dev          # 并行启动 server + web
-# 或分别：pnpm dev:server / pnpm dev:web
+pnpm db:up            # 启动 Postgres（宿主机 127.0.0.1:5434，与 mood-monitor 的 5433 无关）
+pnpm db:migrate       # 首次或 schema 变更后
+pnpm db:seed          # 首次需要种子教师账号时
+pnpm dev              # 推荐：并行启动 API + Web（开发常用）
+pnpm dev:server       # 仅 API（需另开终端跑 Web，或配合 dev:web-only）
+pnpm dev:web-only     # 仅 Web（API 须已在运行，否则会提示无法连接）
 ```
 
-- API：`http://127.0.0.1:3001/health` → `{"status":"ok"}`
-- Web：`http://127.0.0.1:5173`
+> **说明：** `pnpm dev` 不会自动启动数据库。须先 `pnpm db:up`（或 `docker compose up -d db`），并保证 `.env` 中 `DATABASE_URL` 指向 `localhost:5434`（见 `.env.example`）。`pnpm dev:web` 与 `pnpm dev` 相同，会同时启动前后端；仅 `dev:web-only` 时 API 须已在运行。
+
+- API：`http://127.0.0.1:3101/health` → `{"status":"ok"}`
+- Web：`http://127.0.0.1:5180`
 
 构建：
 

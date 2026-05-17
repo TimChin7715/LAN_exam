@@ -2,6 +2,7 @@ import type { FastifyRequest } from 'fastify';
 import type { Teacher } from '@prisma/client';
 
 import { prisma } from './prisma.js';
+import { getRequestSession } from './session.js';
 
 export type SessionUser = Pick<
   Teacher,
@@ -9,8 +10,7 @@ export type SessionUser = Pick<
 >;
 
 export function getSessionTeacherId(request: FastifyRequest): string | undefined {
-  const session = request.session;
-  return session?.teacherId;
+  return getRequestSession(request)?.teacherId;
 }
 
 export async function loadSessionUser(

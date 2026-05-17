@@ -1,6 +1,8 @@
 import type { FastifyReply, FastifyRequest } from 'fastify';
 
 import { getSessionTeacherId, loadSessionUser } from '../lib/auth.js';
+import { isReplyFinished, replyUnauthorized } from '../lib/reply.js';
+import { getRequestSession } from '../lib/session.js';
 
 export async function requireAdminSession(
   request: FastifyRequest,
@@ -8,17 +10,20 @@ export async function requireAdminSession(
 ): Promise<void> {
   const teacherId = getSessionTeacherId(request);
   if (!teacherId) {
-    return reply.status(401).send({ error: 'Unauthorized' });
+    return await replyUnauthorized(reply);
   }
 
   const user = await loadSessionUser(request);
   if (!user) {
-    request.session.destroy(() => {});
-    return reply.status(401).send({ error: 'Unauthorized' });
+    getRequestSession(request)?.destroy(() => {});
+    return await replyUnauthorized(reply);
   }
 
   if (user.mustChangePassword) {
-    return reply.status(401).send({
+    if (isReplyFinished(reply)) {
+      return reply;
+    }
+    return reply.status(403).send({
       error: 'Password change required',
       code: 'PASSWORD_CHANGE_REQUIRED',
     });

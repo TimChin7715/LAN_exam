@@ -1,6 +1,6 @@
 import { toast } from 'sonner';
 
-import { ApiError, apiFetch } from '@/lib/api';
+import { ApiError, apiFetch, handleAuthResponse } from '@/lib/api';
 
 export type ExamStatus = 'DRAFT' | 'IN_PROGRESS' | 'ENDED';
 
@@ -135,9 +135,13 @@ export async function downloadExamExport(examId: string, title: string): Promise
     { credentials: 'include' },
   );
 
-  if (response.status === 401) {
-    toast.error('登录已过期，请重新登录。');
-    throw new ApiError('Unauthorized', 401);
+  if (response.status === 401 || response.status === 403) {
+    const ct = response.headers.get('content-type') ?? '';
+    const payload = ct.includes('application/json')
+      ? ((await response.json()) as Record<string, unknown>)
+      : null;
+    handleAuthResponse(response.status, payload);
+    throw new ApiError('Unauthorized', response.status);
   }
 
   if (!response.ok) {

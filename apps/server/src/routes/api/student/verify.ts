@@ -8,8 +8,7 @@ import {
 } from '../../../lib/errors.js';
 import { prisma } from '../../../lib/prisma.js';
 import { isValidNationalIdFormat } from '../../../lib/roster/national-id.js';
-import { regenerateStudentSession } from '../../../lib/student-auth.js';
-import { getStudentSession } from '../../../lib/session.js';
+import { establishStudentSession } from '../../../lib/student-auth.js';
 
 const verifyBodySchema = z.object({
   fullName: z.string().trim().min(1).max(64),
@@ -62,13 +61,7 @@ export async function registerStudentVerifyRoutes(
         });
       }
 
-      await regenerateStudentSession(request);
-      const studentSession = getStudentSession(request);
-      if (!studentSession) {
-        throw new Error('Student session middleware not available');
-      }
-      studentSession.studentRosterEntryId = entry.id;
-      studentSession.studentName = entry.fullName;
+      await establishStudentSession(request, entry.id, entry.fullName);
 
       request.log.info(
         {

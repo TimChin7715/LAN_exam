@@ -2,6 +2,7 @@ import multipart from '@fastify/multipart';
 import rateLimit from '@fastify/rate-limit';
 import Fastify from 'fastify';
 
+import { getApiPort } from './lib/env.js';
 import { prisma } from './lib/prisma.js';
 import { sessionPlugin } from './plugins/session.js';
 import { registerAdminQuestionsImportRoutes } from './routes/api/admin/questions-import.js';
@@ -19,7 +20,7 @@ import { registerAdminPingRoutes } from './routes/api/admin/ping.js';
 import { registerAuthRoutes } from './routes/api/auth/index.js';
 import { registerStudentRoutes } from './routes/api/student/index.js';
 
-const PORT = Number(process.env.PORT ?? 3101);
+const PORT = getApiPort();
 const HOST = process.env.HOST ?? '0.0.0.0';
 
 const app = Fastify({
@@ -30,7 +31,7 @@ const app = Fastify({
 await app.register(sessionPlugin);
 await app.register(rateLimit, { global: false });
 await app.register(multipart, {
-  limits: { fileSize: 5 * 1024 * 1024, files: 1 },
+  limits: { files: 1 },
 });
 await registerAuthRoutes(app);
 await registerStudentRoutes(app);
@@ -60,7 +61,17 @@ try {
   await prisma.$queryRaw`SELECT 1`;
   await app.listen({ port: PORT, host: HOST });
 } catch (err) {
-  app.log.error(err);
+  const code =
+    err && typeof err === 'object' && 'code' in err
+      ? String((err as NodeJS.ErrnoException).code)
+      : '';
+  if (code === 'EADDRINUSE') {
+    app.log.error(
+      `端口 ${PORT} 已被占用，API 未能启动。请结束占用该端口的进程，或在 .env 中修改 API_PORT 后重试。`,
+    );
+  } else {
+    app.log.error(err);
+  }
   await prisma.$disconnect();
   process.exit(1);
 }

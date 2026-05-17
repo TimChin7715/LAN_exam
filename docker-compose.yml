@@ -5,8 +5,9 @@ services:
       POSTGRES_USER: lan_exam
       POSTGRES_PASSWORD: lan_exam_dev
       POSTGRES_DB: lan_exam
+    # Host 5434 avoids Windows reserved 5432 and other projects on 5433 (e.g. mood-monitor).
     ports:
-      - '127.0.0.1:5432:5432'
+      - '127.0.0.1:5434:5432'
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U lan_exam -d lan_exam']
       interval: 5s
@@ -18,9 +19,10 @@ services:
   app:
     build: .
     ports:
-      - '3001:3001'
+      - '3101:3101'
     environment:
-      PORT: '3001'
+      API_PORT: '3101'
+      PORT: '3101'
       HOST: '0.0.0.0'
       DATABASE_URL: postgresql://lan_exam:lan_exam_dev@db:5432/lan_exam
       SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-}

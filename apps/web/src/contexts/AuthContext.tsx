@@ -4,11 +4,17 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react';
 
-import { authApi, setSessionExpiredHandler, type AuthUser } from '@/lib/api';
+import {
+  authApi,
+  setPasswordChangeRequiredHandler,
+  setSessionExpiredHandler,
+  type AuthUser,
+} from '@/lib/api';
 
 export type AuthStatus =
   | 'checking'
@@ -50,13 +56,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setStatus('unauthenticated');
   }, []);
 
+  const hasHydrated = useRef(false);
+
   const refresh = useCallback(async () => {
-    setStatus('checking');
+    if (!hasHydrated.current) {
+      setStatus('checking');
+    }
     try {
       const me = await authApi.me();
       setUser(me);
     } catch {
       setUser(null);
+    } finally {
+      hasHydrated.current = true;
     }
   }, [setUser]);
 
@@ -71,7 +83,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         window.location.href = '/admin/login';
       }
     });
-    return () => setSessionExpiredHandler(() => {});
+    setPasswordChangeRequiredHandler(() => {
+      setUserState((prev) =>
+        prev ? { ...prev, mustChangePassword: true } : prev,
+      );
+      setStatus('mustChangePassword');
+      if (window.location.pathname !== '/admin/change-password') {
+        window.location.href = '/admin/change-password';
+      }
+    });
+    return () => {
+      setSessionExpiredHandler(() => {});
+      setPasswordChangeRequiredHandler(() => {});
+    };
   }, [clearSession]);
 
   const value = useMemo(

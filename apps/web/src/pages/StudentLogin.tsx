@@ -75,6 +75,15 @@ export default function StudentLogin() {
         setFormError(err.message);
         return;
       }
+      if (
+        err instanceof TypeError ||
+        (err instanceof ApiError && err.status >= 500)
+      ) {
+        setFormError(
+          '无法连接考试服务。请联系监考教师确认系统已完整启动，或稍后刷新重试。',
+        );
+        return;
+      }
       setFormError('无法连接服务器，请检查网络或联系机房管理员。');
     }
   }

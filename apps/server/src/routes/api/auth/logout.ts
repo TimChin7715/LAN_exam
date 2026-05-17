@@ -1,10 +1,12 @@
 import type { FastifyInstance } from 'fastify';
 
+import { getRequestSession } from '../../../lib/session.js';
+
 function destroySession(
   request: import('fastify').FastifyRequest,
 ): Promise<void> {
   return new Promise((resolve, reject) => {
-    const session = request.session;
+    const session = getRequestSession(request);
     if (!session) {
       resolve();
       return;

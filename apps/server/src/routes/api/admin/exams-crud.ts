@@ -70,10 +70,7 @@ export async function registerAdminExamsCrudRoutes(
     '/api/admin/exams',
     { preHandler: requireAdminSession },
     async (request, reply) => {
-      const teacherId = getSessionTeacherId(request);
-      if (!teacherId) {
-        return reply.status(401).send({ error: 'Unauthorized' });
-      }
+      const teacherId = getSessionTeacherId(request)!;
 
       const exams = await prisma.exam.findMany({
         where: { teacherId },
@@ -113,10 +110,7 @@ export async function registerAdminExamsCrudRoutes(
     '/api/admin/exams',
     { preHandler: requireAdminSession },
     async (request, reply) => {
-      const teacherId = getSessionTeacherId(request);
-      if (!teacherId) {
-        return reply.status(401).send({ error: 'Unauthorized' });
-      }
+      const teacherId = getSessionTeacherId(request)!;
 
       const parsed = createBodySchema.safeParse(request.body);
       if (!parsed.success) {
@@ -167,10 +161,7 @@ export async function registerAdminExamsCrudRoutes(
     '/api/admin/exams/:id',
     { preHandler: requireAdminSession },
     async (request, reply) => {
-      const teacherId = getSessionTeacherId(request);
-      if (!teacherId) {
-        return reply.status(401).send({ error: 'Unauthorized' });
-      }
+      const teacherId = getSessionTeacherId(request)!;
 
       const { id } = request.params as { id: string };
 
@@ -216,10 +207,7 @@ export async function registerAdminExamsCrudRoutes(
     '/api/admin/exams/:id',
     { preHandler: requireAdminSession },
     async (request, reply) => {
-      const teacherId = getSessionTeacherId(request);
-      if (!teacherId) {
-        return reply.status(401).send({ error: 'Unauthorized' });
-      }
+      const teacherId = getSessionTeacherId(request)!;
 
       const { id } = request.params as { id: string };
       const parsed = patchBodySchema.safeParse(request.body);

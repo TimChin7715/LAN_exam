@@ -2,6 +2,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import {
   formatAnswerKeys,
+  formatStemForDisplay,
   questionTypeLabel,
   type PreviewQuestion,
 } from '@/lib/qbank';
@@ -63,7 +64,7 @@ function PreviewCard({ q, compact }: { q: PreviewQuestion; compact: boolean }) {
               : 'text-base text-foreground'
           }
         >
-          {q.stem}
+          {formatStemForDisplay(q.stem)}
         </p>
         {q.options && q.options.length > 0 ? (
           <ul className="space-y-1 text-sm text-muted-foreground">

@@ -11,8 +11,8 @@ import {
 import { Spinner } from '@/components/ui/spinner';
 import {
   formatAnswerKeys,
+  formatStemForDisplay,
   questionTypeLabel,
-  truncateStem,
   type QuestionDetail,
 } from '@/lib/qbank';
 
@@ -49,11 +49,9 @@ export function QuestionDetailDialog({
         ) : (
           <>
             <DialogHeader>
-              <DialogTitle className="flex flex-wrap items-center gap-2 text-left">
+              <DialogTitle className="flex items-center gap-2 text-left">
                 <Badge variant="secondary">{questionTypeLabel(detail.type)}</Badge>
-                <span className="line-clamp-2 text-base font-semibold">
-                  {truncateStem(detail.stem, 40)}
-                </span>
+                <span className="text-base font-semibold">题目详情</span>
               </DialogTitle>
             </DialogHeader>
             <DetailBody detail={detail} />
@@ -75,7 +73,7 @@ function DetailBody({ detail }: { detail: QuestionDetail }) {
 
   return (
     <div className="space-y-4 text-base">
-      <p className="whitespace-pre-wrap">{detail.stem}</p>
+      <p className="whitespace-pre-wrap">{formatStemForDisplay(detail.stem)}</p>
       <ul className="space-y-2">
         {[...detail.options]
           .sort((a, b) => a.key.localeCompare(b.key))

@@ -14,10 +14,7 @@ export async function registerAdminExamsLifecycleRoutes(
     '/api/admin/exams/:id/start',
     { preHandler: requireAdminSession },
     async (request, reply) => {
-      const teacherId = getSessionTeacherId(request);
-      if (!teacherId) {
-        return reply.status(401).send({ error: 'Unauthorized' });
-      }
+      const teacherId = getSessionTeacherId(request)!;
 
       const { id } = request.params as { id: string };
 
@@ -48,10 +45,7 @@ export async function registerAdminExamsLifecycleRoutes(
     '/api/admin/exams/:id/end',
     { preHandler: requireAdminSession },
     async (request, reply) => {
-      const teacherId = getSessionTeacherId(request);
-      if (!teacherId) {
-        return reply.status(401).send({ error: 'Unauthorized' });
-      }
+      const teacherId = getSessionTeacherId(request)!;
 
       const { id } = request.params as { id: string };
 

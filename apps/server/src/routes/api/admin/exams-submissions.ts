@@ -11,10 +11,7 @@ export async function registerAdminExamsSubmissionsRoutes(
     '/api/admin/exams/:id/submissions',
     { preHandler: requireAdminSession },
     async (request, reply) => {
-      const teacherId = getSessionTeacherId(request);
-      if (!teacherId) {
-        return reply.status(401).send({ error: 'Unauthorized' });
-      }
+      const teacherId = getSessionTeacherId(request)!;
 
       const { id } = request.params as { id: string };
 
@@ -70,10 +67,7 @@ export async function registerAdminExamsSubmissionsRoutes(
     '/api/admin/exams/:id/submissions/:rosterEntryId',
     { preHandler: requireAdminSession },
     async (request, reply) => {
-      const teacherId = getSessionTeacherId(request);
-      if (!teacherId) {
-        return reply.status(401).send({ error: 'Unauthorized' });
-      }
+      const teacherId = getSessionTeacherId(request)!;
 
       const { id, rosterEntryId } = request.params as {
         id: string;

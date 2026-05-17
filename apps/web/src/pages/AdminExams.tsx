@@ -114,83 +114,93 @@ export default function AdminExams() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-semibold text-foreground">考试管理</h1>
-          <p className="text-base text-muted-foreground">
-            创建考试、关联题目与名单批次，并开始考试。
-          </p>
+      <div className="space-y-2">
+        <Link
+          to="/admin"
+          className="inline-block text-sm font-semibold text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          ← 返回仪表盘
+        </Link>
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h1 className="text-xl font-semibold leading-tight text-foreground">
+              考试管理
+            </h1>
+            <p className="text-base text-muted-foreground">
+              创建考试、关联题目与名单批次，并开始考试。
+            </p>
+          </div>
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="size-4" aria-hidden />
+                新建考试
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <form onSubmit={(e) => void handleCreate(e)}>
+                <DialogHeader>
+                  <DialogTitle>新建考试</DialogTitle>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="exam-title">考试名称</Label>
+                    <Input
+                      id="exam-title"
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value)}
+                      maxLength={200}
+                      required
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>题目批次</Label>
+                    <Select
+                      value={questionBatchId}
+                      onValueChange={setQuestionBatchId}
+                      required
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="选择题目导入批次" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {questionBatches.map((b) => (
+                          <SelectItem key={b.id} value={b.id}>
+                            {b.fileName}（{b.itemCount} 题）
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>名单批次</Label>
+                    <Select
+                      value={rosterBatchId}
+                      onValueChange={setRosterBatchId}
+                      required
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="选择名单导入批次" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {rosterBatches.map((b) => (
+                          <SelectItem key={b.id} value={b.id}>
+                            {b.fileName}（{b.itemCount} 人）
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button type="submit" disabled={creating}>
+                    {creating ? <Spinner className="size-4" /> : '创建'}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="size-4" aria-hidden />
-              新建考试
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <form onSubmit={(e) => void handleCreate(e)}>
-              <DialogHeader>
-                <DialogTitle>新建考试</DialogTitle>
-              </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="exam-title">考试名称</Label>
-                  <Input
-                    id="exam-title"
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    maxLength={200}
-                    required
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label>题目批次</Label>
-                  <Select
-                    value={questionBatchId}
-                    onValueChange={setQuestionBatchId}
-                    required
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="选择题目导入批次" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {questionBatches.map((b) => (
-                        <SelectItem key={b.id} value={b.id}>
-                          {b.fileName}（{b.itemCount} 题）
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid gap-2">
-                  <Label>名单批次</Label>
-                  <Select
-                    value={rosterBatchId}
-                    onValueChange={setRosterBatchId}
-                    required
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="选择名单导入批次" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {rosterBatches.map((b) => (
-                        <SelectItem key={b.id} value={b.id}>
-                          {b.fileName}（{b.itemCount} 人）
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <DialogFooter>
-                <Button type="submit" disabled={creating}>
-                  {creating ? <Spinner className="size-4" /> : '创建'}
-                </Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
       </div>
 
       <Card>

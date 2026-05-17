@@ -11,10 +11,7 @@ export async function registerAdminExamBatchesRoutes(
     '/api/admin/question-batches',
     { preHandler: requireAdminSession },
     async (request, reply) => {
-      const teacherId = getSessionTeacherId(request);
-      if (!teacherId) {
-        return reply.status(401).send({ error: 'Unauthorized' });
-      }
+      const teacherId = getSessionTeacherId(request)!;
 
       const batches = await prisma.questionImportBatch.findMany({
         where: { teacherId },
@@ -43,10 +40,7 @@ export async function registerAdminExamBatchesRoutes(
     '/api/admin/roster-batches',
     { preHandler: requireAdminSession },
     async (request, reply) => {
-      const teacherId = getSessionTeacherId(request);
-      if (!teacherId) {
-        return reply.status(401).send({ error: 'Unauthorized' });
-      }
+      const teacherId = getSessionTeacherId(request)!;
 
       const batches = await prisma.rosterImportBatch.findMany({
         where: { teacherId },

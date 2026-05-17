@@ -3,9 +3,11 @@ import { z } from 'zod';
 
 import { assertStudentExamAccess } from '../../../lib/exam/access.js';
 import { ExamAccessError } from '../../../lib/exam/types.js';
-import { getSessionRosterEntryId } from '../../../lib/student-auth.js';
 import { prisma } from '../../../lib/prisma.js';
-import { requireStudentSession } from '../../../plugins/student-guard.js';
+import {
+  ensureStudentRosterEntryId,
+  requireStudentSession,
+} from '../../../plugins/student-guard.js';
 
 const answerItemSchema = z.object({
   examQuestionId: z.string().min(1),
@@ -32,10 +34,11 @@ export async function registerStudentExamAnswersRoutes(
       },
     },
     async (request, reply) => {
-      const rosterEntryId = getSessionRosterEntryId(request);
-      if (!rosterEntryId) {
-        return reply.status(401).send({ error: 'Unauthorized' });
+      const rosterOrReply = await ensureStudentRosterEntryId(request, reply);
+      if (typeof rosterOrReply !== 'string') {
+        return rosterOrReply;
       }
+      const rosterEntryId = rosterOrReply;
 
       const parsed = putBodySchema.safeParse(request.body);
       if (!parsed.success) {
