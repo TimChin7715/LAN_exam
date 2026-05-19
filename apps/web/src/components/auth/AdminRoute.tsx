@@ -1,6 +1,8 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 
+import { AdminLocalhostOnly } from '@/components/auth/AdminLocalhostOnly';
 import { AuthChecking } from '@/components/auth/AuthChecking';
+import { isAdminAuthDisabled, isLocalAdminHost } from '@/lib/admin-auth';
 import { useAuth } from '@/contexts/AuthContext';
 
 const PUBLIC_ADMIN_PATHS = ['/admin/login'];
@@ -9,6 +11,14 @@ export function AdminRoute() {
   const { status } = useAuth();
   const location = useLocation();
   const isPublic = PUBLIC_ADMIN_PATHS.includes(location.pathname);
+
+  if (!isLocalAdminHost()) {
+    return <AdminLocalhostOnly />;
+  }
+
+  if (isAdminAuthDisabled) {
+    return <Outlet />;
+  }
 
   if (status === 'checking') {
     return <AuthChecking />;
@@ -45,6 +55,10 @@ export function RequireAuthenticatedAdmin() {
   const { status } = useAuth();
   const location = useLocation();
 
+  if (isAdminAuthDisabled) {
+    return <Outlet />;
+  }
+
   if (status === 'checking') {
     return <AuthChecking />;
   }
@@ -63,6 +77,10 @@ export function RequireAuthenticatedAdmin() {
 
 export function RequireChangePassword() {
   const { status } = useAuth();
+
+  if (isAdminAuthDisabled) {
+    return <Navigate to="/admin" replace />;
+  }
 
   if (status === 'checking') {
     return <AuthChecking />;

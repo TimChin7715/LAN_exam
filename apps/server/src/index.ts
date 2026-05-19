@@ -2,8 +2,10 @@ import multipart from '@fastify/multipart';
 import rateLimit from '@fastify/rate-limit';
 import Fastify from 'fastify';
 
-import { getApiPort } from './lib/env.js';
+import { getListenHost, getListenPort, shouldServeWeb } from './lib/env.js';
 import { prisma } from './lib/prisma.js';
+import { registerWebStatic } from './lib/web-static.js';
+import { registerAdminLoopbackGuard } from './plugins/admin-loopback-guard.js';
 import { sessionPlugin } from './plugins/session.js';
 import { registerAdminQuestionsImportRoutes } from './routes/api/admin/questions-import.js';
 import { registerAdminQuestionsListRoutes } from './routes/api/admin/questions-list.js';
@@ -21,8 +23,9 @@ import { registerAdminPingRoutes } from './routes/api/admin/ping.js';
 import { registerAuthRoutes } from './routes/api/auth/index.js';
 import { registerStudentRoutes } from './routes/api/student/index.js';
 
-const PORT = getApiPort();
-const HOST = process.env.HOST ?? '0.0.0.0';
+const PORT = getListenPort();
+const HOST = getListenHost();
+const serveWeb = shouldServeWeb();
 
 const app = Fastify({
   logger: true,
@@ -30,6 +33,7 @@ const app = Fastify({
 });
 
 await app.register(sessionPlugin);
+await registerAdminLoopbackGuard(app);
 await app.register(rateLimit, { global: false });
 await app.register(multipart, {
   limits: { files: 1 },
@@ -55,6 +59,11 @@ app.get('/health', async () => {
   return { status: 'ok' };
 });
 
+if (serveWeb) {
+  await registerWebStatic(app);
+  app.log.info('Serving web static assets from %s', process.env.WEB_DIST_PATH ?? 'apps/web/dist');
+}
+
 app.addHook('onClose', async () => {
   await prisma.$disconnect();
 });
@@ -62,6 +71,11 @@ app.addHook('onClose', async () => {
 try {
   await prisma.$queryRaw`SELECT 1`;
   await app.listen({ port: PORT, host: HOST });
+  app.log.info(
+    serveWeb
+      ? `LAN Exam listening on http://${HOST}:${PORT} (API + web)`
+      : `API listening on http://${HOST}:${PORT}`,
+  );
 } catch (err) {
   const code =
     err && typeof err === 'object' && 'code' in err
@@ -69,7 +83,7 @@ try {
       : '';
   if (code === 'EADDRINUSE') {
     app.log.error(
-      `端口 ${PORT} 已被占用，API 未能启动。请结束占用该端口的进程，或在 .env 中修改 API_PORT 后重试。`,
+      `端口 ${PORT} 已被占用，服务未能启动。请结束占用该端口的进程，或在 .env 中修改 WEB_PORT/API_PORT 后重试。`,
     );
   } else {
     app.log.error(err);

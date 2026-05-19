@@ -17,23 +17,29 @@ FROM deps AS build
 WORKDIR /app
 COPY apps/web apps/web
 COPY apps/server apps/server
+ENV VITE_ADMIN_AUTH_MODE=disabled
 RUN pnpm exec prisma generate \
   && pnpm --filter @lan-exam/web build \
   && pnpm --filter @lan-exam/server build
 
 FROM base AS production
 WORKDIR /app
-ENV NODE_ENV=production
+ENV ADMIN_AUTH_MODE=disabled
+ENV ADMIN_API_LOOPBACK_ONLY=true
+ENV LOCAL_ADMIN_USERNAME=local_exam_admin
+ENV LISTEN_HOST=0.0.0.0
+ENV WEB_PORT=5180
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
 COPY apps/server/package.json apps/server/
 COPY prisma prisma
 COPY scripts/docker-entrypoint.sh scripts/docker-entrypoint.sh
-RUN chmod +x scripts/docker-entrypoint.sh \
+RUN sed -i 's/\r$//' scripts/docker-entrypoint.sh \
+  && chmod +x scripts/docker-entrypoint.sh \
   && pnpm install --frozen-lockfile \
   && pnpm exec prisma generate
+ENV NODE_ENV=production
 COPY --from=build /app/apps/server/dist apps/server/dist
+COPY --from=build /app/apps/web/dist apps/web/dist
 COPY docs/templates docs/templates
-EXPOSE 3101
-ENV PORT=3101
-ENV HOST=0.0.0.0
-ENTRYPOINT ["/app/scripts/docker-entrypoint.sh"]
+EXPOSE 5180
+ENTRYPOINT ["sh", "/app/scripts/docker-entrypoint.sh"]

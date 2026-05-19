@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 
-import { getSessionTeacherId } from '../../../lib/auth.js';
+import { resolveAdminTeacherId } from '../../../lib/admin-context.js';
 import { materializeExamQuestions } from '../../../lib/exam/materialize-questions.js';
 import { prisma } from '../../../lib/prisma.js';
 import { requireAdminSession } from '../../../plugins/admin-guard.js';
@@ -80,7 +80,7 @@ export async function registerAdminExamsCrudRoutes(
     '/api/admin/exams',
     { preHandler: requireAdminSession },
     async (request, reply) => {
-      const teacherId = getSessionTeacherId(request)!;
+      const teacherId = await resolveAdminTeacherId(request);
 
       const exams = await prisma.exam.findMany({
         where: { teacherId },
@@ -124,7 +124,7 @@ export async function registerAdminExamsCrudRoutes(
     '/api/admin/exams',
     { preHandler: requireAdminSession },
     async (request, reply) => {
-      const teacherId = getSessionTeacherId(request)!;
+      const teacherId = await resolveAdminTeacherId(request);
 
       const parsed = createBodySchema.safeParse(request.body);
       if (!parsed.success) {
@@ -177,7 +177,7 @@ export async function registerAdminExamsCrudRoutes(
     '/api/admin/exams/:id',
     { preHandler: requireAdminSession },
     async (request, reply) => {
-      const teacherId = getSessionTeacherId(request)!;
+      const teacherId = await resolveAdminTeacherId(request);
 
       const { id } = request.params as { id: string };
 
@@ -223,7 +223,7 @@ export async function registerAdminExamsCrudRoutes(
     '/api/admin/exams/:id',
     { preHandler: requireAdminSession },
     async (request, reply) => {
-      const teacherId = getSessionTeacherId(request)!;
+      const teacherId = await resolveAdminTeacherId(request);
 
       const { id } = request.params as { id: string };
       const parsed = patchBodySchema.safeParse(request.body);

@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 
-import { getSessionTeacherId } from '../../../lib/auth.js';
+import { resolveAdminTeacherId } from '../../../lib/admin-context.js';
 import { prisma } from '../../../lib/prisma.js';
 import { requireAdminSession } from '../../../plugins/admin-guard.js';
 
@@ -25,7 +25,7 @@ export async function registerAdminRosterBatchesRoutes(
     '/api/admin/roster-batches',
     { preHandler: requireAdminSession },
     async (request, reply) => {
-      const teacherId = getSessionTeacherId(request)!;
+      const teacherId = await resolveAdminTeacherId(request);
 
       const batches = await prisma.rosterImportBatch.findMany({
         where: { teacherId },
@@ -49,7 +49,7 @@ export async function registerAdminRosterBatchesRoutes(
     '/api/admin/roster-batches/:id',
     { preHandler: requireAdminSession },
     async (request, reply) => {
-      const teacherId = getSessionTeacherId(request)!;
+      const teacherId = await resolveAdminTeacherId(request);
       const { id } = request.params as { id: string };
 
       const batch = await prisma.rosterImportBatch.findFirst({
@@ -91,7 +91,7 @@ export async function registerAdminRosterBatchesRoutes(
     '/api/admin/roster-batches/:id',
     { preHandler: requireAdminSession },
     async (request, reply) => {
-      const teacherId = getSessionTeacherId(request)!;
+      const teacherId = await resolveAdminTeacherId(request);
       const { id } = request.params as { id: string };
 
       const batch = await prisma.rosterImportBatch.findFirst({

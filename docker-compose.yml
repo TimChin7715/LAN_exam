@@ -19,13 +19,15 @@ services:
   app:
     build: .
     ports:
-      - '3101:3101'
+      - '5180:5180'
     environment:
-      API_PORT: '3101'
-      PORT: '3101'
-      HOST: '0.0.0.0'
+      ADMIN_AUTH_MODE: disabled
+      ADMIN_API_LOOPBACK_ONLY: 'true'
+      LOCAL_ADMIN_USERNAME: local_exam_admin
+      WEB_PORT: '5180'
+      LISTEN_HOST: '0.0.0.0'
       DATABASE_URL: postgresql://lan_exam:lan_exam_dev@db:5432/lan_exam
-      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-}
+      SESSION_SECRET: ${SESSION_SECRET:-dev-session-secret-min-16-chars}
     depends_on:
       db:
         condition: service_healthy

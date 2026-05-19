@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 
-import { getSessionTeacherId } from '../../../lib/auth.js';
+import { resolveAdminTeacherId } from '../../../lib/admin-context.js';
 import { importQuestions } from '../../../lib/qbank/import-questions.js';
 import { parseWorkbook } from '../../../lib/qbank/parse-workbook.js';
 import { QbankTemplateError } from '../../../lib/qbank/types.js';
@@ -40,7 +40,7 @@ export async function registerAdminQuestionsImportRoutes(
       },
     },
     async (request, reply) => {
-      const teacherId = getSessionTeacherId(request)!;
+      const teacherId = await resolveAdminTeacherId(request);
 
       const data = await request.file();
       if (!data) {

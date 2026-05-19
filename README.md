@@ -1,17 +1,21 @@
 # 局域网考试系统（LAN Exam）
 
-机房/教室场景的 Web 局域网考试系统。本仓库为 **pnpm monorepo**：
+机房/教室场景的 Web 局域网考试系统。
+
+**协作者 / AI 上下文**：[AGENTS.md](./AGENTS.md)（产品决策、认证模型、代码索引）；完整方案见 [docs/PLAN-考官免登录一键部署.md](./docs/PLAN-考官免登录一键部署.md)。
+
+本仓库为 **pnpm monorepo**：
 
 | 包 | 路径 | 说明 |
 | --- | --- | --- |
-| `@lan-exam/server` | `apps/server` | Fastify API（默认端口 **3101**） |
-| `@lan-exam/web` | `apps/web` | Vite + React + TypeScript（默认端口 **5180**） |
+| `@lan-exam/server` | `apps/server` | Fastify API（开发默认 **3101**；生产单进程 **5180**） |
+| `@lan-exam/web` | `apps/web` | Vite + React + TypeScript（开发默认 **5180**） |
 
-前端开发时通过 Vite 将 `/api/*` 代理到 API 服务（例如 `/api/health` → `http://127.0.0.1:3101/health`）。
+开发时 Vite 将 `/api/*` 代理到 API（例如 `/api/health` → `http://127.0.0.1:3101/health`）。生产 / Docker 全栈在 **5180** 由同一 Node 进程托管 API + 静态前端。
 
-## 本地开发（Docker 优先）
+## 本地开发（Docker 可选）
 
-推荐与生产一致的 Docker 环境（见 [docs/DEPLOY.md](./docs/DEPLOY.md)）：
+Compose 全栈（免登录、单端口 5180）见 [docs/DEPLOY.md](./docs/DEPLOY.md)：
 
 ```bash
 docker compose up --build
@@ -19,39 +23,52 @@ docker compose up --build
 
 启动后：
 
-- 健康检查：`curl -sSf http://127.0.0.1:3101/health`（Compose 映射端口以 `docker-compose.yml` 为准）
-- 浏览器访问 Web：见 compose 中 `app` 服务暴露的端口
+- 健康检查：`curl -sSf http://127.0.0.1:5180/health`
+- 本机管理台：`http://127.0.0.1:5180/admin`
 
-## 本地开发（pnpm，可选）
+## 本地开发（pnpm，推荐日常）
 
 需 Node.js 20+ 与 [pnpm](https://pnpm.io/) 9+。
 
 ```bash
 pnpm install
-pnpm db:up            # 启动 Postgres（宿主机 127.0.0.1:5434，与 mood-monitor 的 5433 无关）
-pnpm db:migrate       # 首次或 schema 变更后
-pnpm db:seed          # 首次需要种子教师账号时
-pnpm dev              # 推荐：并行启动 API + Web（开发常用）
-pnpm dev:server       # 仅 API（需另开终端跑 Web，或配合 dev:web-only）
-pnpm dev:web-only     # 仅 Web（API 须已在运行，否则会提示无法连接）
+cp .env.example .env   # Windows: copy .env.example .env
+pnpm db:up             # Postgres 127.0.0.1:5434
+pnpm db:migrate
+pnpm db:seed
+pnpm dev
 ```
 
-> **说明：** `pnpm dev` 不会自动启动数据库。须先 `pnpm db:up`（或 `docker compose up -d db`），并保证 `.env` 中 `DATABASE_URL` 指向 `localhost:5434`（见 `.env.example`）。`pnpm dev:web` 与 `pnpm dev` 相同，会同时启动前后端；仅 `dev:web-only` 时 API 须已在运行。
+**考官认证环境变量（须成对设置）**
 
-- API：`http://127.0.0.1:3101/health` → `{"status":"ok"}`
-- Web：`http://127.0.0.1:5180`
+| 模式 | `.env` |
+| --- | --- |
+| 免登录（默认，与考场一致） | `ADMIN_AUTH_MODE=disabled` 且 `VITE_ADMIN_AUTH_MODE=disabled` |
+| 账号登录（回退） | 两者均为 `session`（或删除 `VITE_*`），并设 `SEED_ADMIN_PASSWORD` 后 `pnpm db:seed` |
 
-构建：
+未设置时代码与 `.env.example` 默认均为 **disabled**；若只改后端不改 `VITE_*`，会出现前端仍显示登录页而后端已免登录的不一致。
+
+> `pnpm dev` 不自动启动数据库。须先 `pnpm db:up`，且 `DATABASE_URL` 指向 `localhost:5434`（见 `.env.example`）。
+
+- API：`http://127.0.0.1:3101/health`
+- Web：`http://127.0.0.1:5180`（管理台 `http://127.0.0.1:5180/admin`）
 
 ```bash
 pnpm build
 ```
 
-## 机房部署
+## 机房部署（考场推荐）
 
-生产/考场部署步骤、双路径网络验收与安全假设见 **[docs/DEPLOY.md](./docs/DEPLOY.md)**（权威文档）。
+**Windows 原生离线安装**（免 Docker、考官本机免登录、学员 LAN 访问）：
+
+- **[docs/DEPLOY-WINDOWS-NATIVE.md](./docs/DEPLOY-WINDOWS-NATIVE.md)** — `LAN-Exam-Setup.exe`、桌面快捷方式、托盘常驻
+- 发版：`.\scripts\windows\package.ps1`（仅在有网构建机执行）
+
+Docker / 反向代理等可选方案见 **[docs/DEPLOY.md](./docs/DEPLOY.md)**。
 
 ## 安全与依赖
 
-- 生产镜像使用锁定的 `pnpm-lock.yaml` 构建；定期执行 `pnpm audit` 并跟进高危项。
-- 默认数据库口令仅用于开发/种子阶段；正式环境须在首登后改密（后续认证计划）。
+- 生产镜像使用锁定的 `pnpm-lock.yaml`；定期 `pnpm audit` 并处理高危项。
+- **机房默认** `ADMIN_AUTH_MODE=disabled`：考官本机免登录；管理 API 仅 loopback。
+- **`session` 模式**（开发回退）：种子账号 `teacher_admin` 首登须改密；勿将弱密码暴露给局域网。
+- 从旧 Docker `teacher_admin` 环境升级到免登录后，管理台数据须 **重新导入**（不自动迁移）。

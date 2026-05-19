@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 
-import { getSessionTeacherId } from '../../../lib/auth.js';
+import { resolveAdminTeacherId } from '../../../lib/admin-context.js';
 import { prisma } from '../../../lib/prisma.js';
 import { requireAdminSession } from '../../../plugins/admin-guard.js';
 
@@ -27,7 +27,7 @@ export async function registerAdminQuestionsListRoutes(
         });
       }
 
-      const teacherId = getSessionTeacherId(request)!;
+      const teacherId = await resolveAdminTeacherId(request);
       const { page, pageSize, type, batchId } = parsed.data;
       const where = {
         batch: { teacherId },
@@ -71,7 +71,7 @@ export async function registerAdminQuestionsListRoutes(
     async (request, reply) => {
       const { id } = request.params as { id: string };
 
-      const teacherId = getSessionTeacherId(request)!;
+      const teacherId = await resolveAdminTeacherId(request);
 
       const question = await prisma.question.findFirst({
         where: { id, batch: { teacherId } },

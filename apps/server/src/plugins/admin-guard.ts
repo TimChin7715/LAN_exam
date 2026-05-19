@@ -1,5 +1,6 @@
 import type { FastifyReply, FastifyRequest } from 'fastify';
 
+import { isAdminAuthDisabled } from '../lib/admin-context.js';
 import { getSessionTeacherId, loadSessionUser } from '../lib/auth.js';
 import { isReplyFinished, replyUnauthorized } from '../lib/reply.js';
 import { getRequestSession } from '../lib/session.js';
@@ -8,6 +9,10 @@ export async function requireAdminSession(
   request: FastifyRequest,
   reply: FastifyReply,
 ): Promise<void> {
+  if (isAdminAuthDisabled()) {
+    return;
+  }
+
   const teacherId = getSessionTeacherId(request);
   if (!teacherId) {
     return await replyUnauthorized(reply);

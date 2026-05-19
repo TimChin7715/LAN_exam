@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from 'react';
 
+import { isAdminAuthDisabled } from '@/lib/admin-auth';
 import {
   authApi,
   setPasswordChangeRequiredHandler,
@@ -32,6 +33,12 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+const DISABLED_ADMIN_USER: AuthUser = {
+  username: 'local_exam_admin',
+  displayName: '考试管理台',
+  mustChangePassword: false,
+};
+
 function statusFromUser(user: AuthUser | null): AuthStatus {
   if (!user) {
     return 'unauthenticated';
@@ -43,8 +50,12 @@ function statusFromUser(user: AuthUser | null): AuthStatus {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [status, setStatus] = useState<AuthStatus>('checking');
-  const [user, setUserState] = useState<AuthUser | null>(null);
+  const [status, setStatus] = useState<AuthStatus>(
+    isAdminAuthDisabled ? 'authenticated' : 'checking',
+  );
+  const [user, setUserState] = useState<AuthUser | null>(
+    isAdminAuthDisabled ? DISABLED_ADMIN_USER : null,
+  );
 
   const setUser = useCallback((next: AuthUser | null) => {
     setUserState(next);
@@ -52,13 +63,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const clearSession = useCallback(() => {
+    if (isAdminAuthDisabled) {
+      setUserState(DISABLED_ADMIN_USER);
+      setStatus('authenticated');
+      return;
+    }
     setUserState(null);
     setStatus('unauthenticated');
   }, []);
 
-  const hasHydrated = useRef(false);
+  const hasHydrated = useRef(isAdminAuthDisabled);
 
   const refresh = useCallback(async () => {
+    if (isAdminAuthDisabled) {
+      setUser(DISABLED_ADMIN_USER);
+      hasHydrated.current = true;
+      return;
+    }
+
     if (!hasHydrated.current) {
       setStatus('checking');
     }
@@ -77,6 +99,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [refresh]);
 
   useEffect(() => {
+    if (isAdminAuthDisabled) {
+      return;
+    }
+
     setSessionExpiredHandler(() => {
       clearSession();
       if (!window.location.pathname.startsWith('/admin/login')) {

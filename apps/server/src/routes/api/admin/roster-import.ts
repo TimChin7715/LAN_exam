@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 
-import { getSessionTeacherId } from '../../../lib/auth.js';
+import { resolveAdminTeacherId } from '../../../lib/admin-context.js';
 import { importRoster } from '../../../lib/roster/import-roster.js';
 import { parseWorkbook } from '../../../lib/roster/parse-workbook.js';
 import { RosterTemplateError } from '../../../lib/roster/types.js';
@@ -24,7 +24,7 @@ export async function registerAdminRosterImportRoutes(
       },
     },
     async (request, reply) => {
-      const teacherId = getSessionTeacherId(request)!;
+      const teacherId = await resolveAdminTeacherId(request);
 
       const data = await request.file();
       if (!data) {

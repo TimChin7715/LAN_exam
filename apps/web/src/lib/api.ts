@@ -1,5 +1,7 @@
 import { toast } from 'sonner';
 
+import { isAdminAuthDisabled } from '@/lib/admin-auth';
+
 export type AuthUser = {
   username: string;
   displayName: string;
@@ -48,6 +50,10 @@ export function handleAuthResponse(
   status: number,
   payload: Record<string, unknown> | null,
 ): void {
+  if (isAdminAuthDisabled) {
+    return;
+  }
+
   const code = responseCode(payload);
   if (status === 403 && code === 'PASSWORD_CHANGE_REQUIRED') {
     passwordChangeRequiredHandler?.();
@@ -82,7 +88,7 @@ export async function apiFetch<T>(
 
   const code = responseCode(payload);
 
-  if (!init?.skipAuthRedirect) {
+  if (!init?.skipAuthRedirect && !isAdminAuthDisabled) {
     if (response.status === 403 && code === 'PASSWORD_CHANGE_REQUIRED') {
       passwordChangeRequiredHandler?.();
       throw new ApiError('请先修改密码。', 403, code);

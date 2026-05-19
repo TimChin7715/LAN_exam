@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 
-import { getSessionTeacherId } from '../../../lib/auth.js';
+import { resolveAdminTeacherId } from '../../../lib/admin-context.js';
 import { prisma } from '../../../lib/prisma.js';
 import { requireAdminSession } from '../../../plugins/admin-guard.js';
 
@@ -11,7 +11,7 @@ export async function registerAdminExamsSubmissionsRoutes(
     '/api/admin/exams/:id/submissions',
     { preHandler: requireAdminSession },
     async (request, reply) => {
-      const teacherId = getSessionTeacherId(request)!;
+      const teacherId = await resolveAdminTeacherId(request);
 
       const { id } = request.params as { id: string };
 
@@ -67,7 +67,7 @@ export async function registerAdminExamsSubmissionsRoutes(
     '/api/admin/exams/:id/submissions/:rosterEntryId',
     { preHandler: requireAdminSession },
     async (request, reply) => {
-      const teacherId = getSessionTeacherId(request)!;
+      const teacherId = await resolveAdminTeacherId(request);
 
       const { id, rosterEntryId } = request.params as {
         id: string;

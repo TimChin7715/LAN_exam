@@ -296,12 +296,13 @@ export default function StudentExamTake() {
 
       {!readOnly ? (
         <div className="fixed inset-x-0 bottom-0 border-t bg-background p-4">
-          <AlertDialog open={submitOpen} onOpenChange={setSubmitOpen}>
-            <AlertDialogTrigger asChild>
-              <Button className="w-full max-w-3xl" size="lg">
-                提交试卷
-              </Button>
-            </AlertDialogTrigger>
+          <div className="mx-auto w-full max-w-3xl">
+            <AlertDialog open={submitOpen} onOpenChange={setSubmitOpen}>
+              <AlertDialogTrigger asChild>
+                <Button className="w-full" size="lg">
+                  提交试卷
+                </Button>
+              </AlertDialogTrigger>
             <AlertDialogContent>
               <AlertDialogHeader>
                 <AlertDialogTitle>确认提交？</AlertDialogTitle>
@@ -320,6 +321,7 @@ export default function StudentExamTake() {
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
+          </div>
         </div>
       ) : null}
     </div>

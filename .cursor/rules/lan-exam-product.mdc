@@ -1,0 +1,33 @@
+---
+description: LAN Exam 产品约束 — 免登录部署、端口、认证与数据隔离
+alwaysApply: true
+---
+
+# LAN Exam 产品约束
+
+完整上下文见仓库根目录 [AGENTS.md](../../AGENTS.md)；完整方案见 [docs/PLAN-考官免登录一键部署.md](../../docs/PLAN-考官免登录一键部署.md)。
+
+## 部署与拓扑
+
+- **考场推荐**：Windows 离线 `LAN-Exam-Setup.exe`，非 Docker。考场 **禁止** 安装/运行时访问外网。
+- **生产单端口 5180**：API + SPA；Postgres **5434 仅本机**。
+- **开发**：API 3101 + Vite 5180 代理，保持分离。
+
+## 考官端（默认 disabled）
+
+- 管理台仅 `http://127.0.0.1:5180/admin`；`ADMIN_AUTH_MODE` 与 `VITE_ADMIN_AUTH_MODE` 须成对（默认均为 `disabled`）。
+- `/api/admin/*` 始终 loopback-only；`disabled` 时 `/api/auth/*` 亦 loopback-only。
+- 数据写入 `local_exam_admin`；**不迁移** `teacher_admin` 历史数据 — 文档与 UI 提示重新导入。
+- 保留 `session` 回退代码，勿删除 `AdminLogin` / `teacher_admin` 种子路径。
+
+## 代码落点
+
+- 考官 ID：`resolveAdminTeacherId()`（`apps/server/src/lib/admin-context.ts`）。
+- 守卫：`admin-guard.ts`、`admin-loopback-guard.ts`；学员：`student-guard.ts`。
+- 前端：`admin-auth.ts`、`AdminRoute.tsx`、`router.tsx`、`AuthContext.tsx`。
+
+## 禁止
+
+- 在考场文档或安装脚本中引导访问微软官网下载依赖。
+- 关闭 `ADMIN_API_LOOPBACK_ONLY` 于机房包。
+- 仅改后端或仅改前端的 `*_AUTH_MODE` 导致登录 UI 与 API 不一致。

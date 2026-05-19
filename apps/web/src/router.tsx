@@ -6,6 +6,7 @@ import {
   RequireChangePassword,
 } from '@/components/auth/AdminRoute';
 import { AdminLayout } from '@/components/admin/AdminLayout';
+import { isAdminAuthDisabled } from '@/lib/admin-auth';
 import AdminChangePassword from '@/pages/AdminChangePassword';
 import AdminDashboard from '@/pages/AdminDashboard';
 import AdminQuestions from '@/pages/AdminQuestions';
@@ -21,6 +22,19 @@ import Home from '@/pages/Home';
 import StudentLogin from '@/pages/StudentLogin';
 import StudentWaiting from '@/pages/StudentWaiting';
 
+const adminAppRoutes = (
+  <Route element={<AdminLayout />}>
+    <Route index element={<AdminDashboard />} />
+    <Route path="dashboard" element={<AdminDashboard />} />
+    <Route path="questions" element={<AdminQuestions />} />
+    <Route path="questions/:batchId" element={<AdminQuestionBankDetail />} />
+    <Route path="roster" element={<AdminRoster />} />
+    <Route path="roster/:batchId" element={<AdminRosterBatchDetail />} />
+    <Route path="exams" element={<AdminExams />} />
+    <Route path="exams/:examId" element={<AdminExamDetail />} />
+  </Route>
+);
+
 export function AppRouter() {
   return (
     <BrowserRouter>
@@ -34,22 +48,17 @@ export function AppRouter() {
         </Route>
 
         <Route path="/admin" element={<AdminRoute />}>
-          <Route path="login" element={<AdminLogin />} />
-          <Route element={<RequireChangePassword />}>
-            <Route path="change-password" element={<AdminChangePassword />} />
-          </Route>
-          <Route element={<RequireAuthenticatedAdmin />}>
-            <Route element={<AdminLayout />}>
-              <Route index element={<AdminDashboard />} />
-              <Route path="dashboard" element={<AdminDashboard />} />
-              <Route path="questions" element={<AdminQuestions />} />
-              <Route path="questions/:batchId" element={<AdminQuestionBankDetail />} />
-              <Route path="roster" element={<AdminRoster />} />
-              <Route path="roster/:batchId" element={<AdminRosterBatchDetail />} />
-              <Route path="exams" element={<AdminExams />} />
-              <Route path="exams/:examId" element={<AdminExamDetail />} />
-            </Route>
-          </Route>
+          {isAdminAuthDisabled ? (
+            adminAppRoutes
+          ) : (
+            <>
+              <Route path="login" element={<AdminLogin />} />
+              <Route element={<RequireChangePassword />}>
+                <Route path="change-password" element={<AdminChangePassword />} />
+              </Route>
+              <Route element={<RequireAuthenticatedAdmin />}>{adminAppRoutes}</Route>
+            </>
+          )}
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />

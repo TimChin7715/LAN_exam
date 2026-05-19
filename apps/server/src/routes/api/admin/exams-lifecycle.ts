@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 
-import { getSessionTeacherId } from '../../../lib/auth.js';
+import { resolveAdminTeacherId } from '../../../lib/admin-context.js';
 import { endExam, startExam } from '../../../lib/exam/transition.js';
 import {
   ExamTransitionError,
@@ -14,7 +14,7 @@ export async function registerAdminExamsLifecycleRoutes(
     '/api/admin/exams/:id/start',
     { preHandler: requireAdminSession },
     async (request, reply) => {
-      const teacherId = getSessionTeacherId(request)!;
+      const teacherId = await resolveAdminTeacherId(request);
 
       const { id } = request.params as { id: string };
 
@@ -45,7 +45,7 @@ export async function registerAdminExamsLifecycleRoutes(
     '/api/admin/exams/:id/end',
     { preHandler: requireAdminSession },
     async (request, reply) => {
-      const teacherId = getSessionTeacherId(request)!;
+      const teacherId = await resolveAdminTeacherId(request);
 
       const { id } = request.params as { id: string };
 
