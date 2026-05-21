@@ -139,7 +139,7 @@ export function ImportDropzone({
         {file ? (
           <p className="text-sm font-medium text-foreground">{file.name}</p>
         ) : null}
-        <p className="text-sm text-muted-foreground">仅支持 .xlsx</p>
+        <p className="text-sm text-muted-foreground">支持 .xls、.xlsx 或 .csv</p>
         {file ? (
           <Button
             type="button"
@@ -157,7 +157,7 @@ export function ImportDropzone({
           ref={inputRef}
           id={inputId}
           type="file"
-          accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+          accept=".xls,.xlsx,.csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
           className="sr-only"
           onChange={(e) => pickFile(e.target.files?.[0] ?? null)}
         />

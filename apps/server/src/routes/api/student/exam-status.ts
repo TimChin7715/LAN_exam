@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 
+import { resolveStudentEndedSummary } from '../../../lib/exam/student-ended-summary.js';
 import { prisma } from '../../../lib/prisma.js';
 import {
   ensureStudentRosterEntryId,
@@ -41,27 +42,52 @@ export async function registerStudentExamStatusRoutes(
         },
       });
 
-      if (!exam) {
+      if (exam) {
+        const now = new Date();
+        if (exam.scheduledStartAt && now < exam.scheduledStartAt) {
+          return reply.send({
+            status: 'waiting' as const,
+            examId: exam.id,
+            title: exam.title,
+            scheduledStartAt: exam.scheduledStartAt.toISOString(),
+          });
+        }
+        if (exam.scheduledEndAt && now > exam.scheduledEndAt) {
+          // Fall through to ENDED lookup below
+        } else {
+          return reply.send({
+            status: 'IN_PROGRESS' as const,
+            examId: exam.id,
+            title: exam.title,
+          });
+        }
+      }
+
+      const endedExam = await prisma.exam.findFirst({
+        where: {
+          rosterBatchId: entry.batchId,
+          status: 'ENDED',
+        },
+        orderBy: { endedAt: 'desc' },
+        select: { id: true },
+      });
+
+      if (!endedExam) {
         return reply.send({ status: 'none' as const });
       }
 
-      const now = new Date();
-      if (exam.scheduledStartAt && now < exam.scheduledStartAt) {
-        return reply.send({
-          status: 'waiting' as const,
-          examId: exam.id,
-          title: exam.title,
-          scheduledStartAt: exam.scheduledStartAt,
-        });
-      }
-      if (exam.scheduledEndAt && now > exam.scheduledEndAt) {
+      const summary = await resolveStudentEndedSummary(
+        rosterEntryId,
+        endedExam.id,
+      );
+
+      if (!summary) {
         return reply.send({ status: 'none' as const });
       }
 
       return reply.send({
-        status: 'IN_PROGRESS' as const,
-        examId: exam.id,
-        title: exam.title,
+        status: 'ENDED' as const,
+        ...summary,
       });
     },
   );

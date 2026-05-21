@@ -1,12 +1,16 @@
-import { Outlet } from 'react-router-dom';
+import { Settings } from 'lucide-react';
+import { Link, Outlet, useLocation } from 'react-router-dom';
 
 import { isAdminAuthDisabled } from '@/lib/admin-auth';
 import { useAuth } from '@/contexts/AuthContext';
 import { authApi } from '@/lib/api';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 export function AdminLayout() {
   const { user, clearSession } = useAuth();
+  const { pathname } = useLocation();
+  const onSettingsPage = pathname === '/admin/settings';
 
   async function handleLogout() {
     if (isAdminAuthDisabled) {
@@ -26,17 +30,33 @@ export function AdminLayout() {
         <span className="text-base font-semibold text-foreground">
           {isAdminAuthDisabled ? '考试管理台' : '局域网考试系统'}
         </span>
-        {!isAdminAuthDisabled ? (
-          <div className="flex items-center gap-3">
-            <span className="flex items-center gap-2 text-sm font-semibold text-foreground">
-              <span className="size-2 rounded-full bg-primary" aria-hidden />
-              {user?.username}
-            </span>
-            <Button type="button" variant="outline" size="sm" onClick={handleLogout}>
-              退出登录
-            </Button>
-          </div>
-        ) : null}
+        <div className="flex items-center gap-3">
+          <Button
+            variant="ghost"
+            size="sm"
+            asChild
+            className={cn(onSettingsPage && 'text-primary')}
+          >
+            <Link
+              to="/admin/settings"
+              aria-current={onSettingsPage ? 'page' : undefined}
+            >
+              <Settings aria-hidden />
+              设置
+            </Link>
+          </Button>
+          {!isAdminAuthDisabled ? (
+            <>
+              <span className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                <span className="size-2 rounded-full bg-primary" aria-hidden />
+                {user?.username}
+              </span>
+              <Button type="button" variant="outline" size="sm" onClick={handleLogout}>
+                退出登录
+              </Button>
+            </>
+          ) : null}
+        </div>
       </header>
       <main className="mx-auto max-w-[960px] px-4 py-8">
         <Outlet />

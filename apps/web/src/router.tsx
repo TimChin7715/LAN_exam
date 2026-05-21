@@ -15,7 +15,10 @@ import AdminRoster from '@/pages/AdminRoster';
 import AdminRosterBatchDetail from '@/pages/AdminRosterBatchDetail';
 import AdminExams from '@/pages/AdminExams';
 import AdminExamDetail from '@/pages/AdminExamDetail';
+import AdminSettings from '@/pages/AdminSettings';
 import { StudentRoute } from '@/components/auth/StudentRoute';
+import StudentExamEnded from '@/pages/StudentExamEnded';
+import StudentExamSubmitted from '@/pages/StudentExamSubmitted';
 import StudentExamTake from '@/pages/StudentExamTake';
 import AdminLogin from '@/pages/AdminLogin';
 import Home from '@/pages/Home';
@@ -32,6 +35,7 @@ const adminAppRoutes = (
     <Route path="roster/:batchId" element={<AdminRosterBatchDetail />} />
     <Route path="exams" element={<AdminExams />} />
     <Route path="exams/:examId" element={<AdminExamDetail />} />
+    <Route path="settings" element={<AdminSettings />} />
   </Route>
 );
 
@@ -45,6 +49,8 @@ export function AppRouter() {
           <Route path="login" element={<StudentLogin />} />
           <Route path="waiting" element={<StudentWaiting />} />
           <Route path="take" element={<StudentExamTake />} />
+          <Route path="submitted" element={<StudentExamSubmitted />} />
+          <Route path="ended" element={<StudentExamEnded />} />
         </Route>
 
         <Route path="/admin" element={<AdminRoute />}>

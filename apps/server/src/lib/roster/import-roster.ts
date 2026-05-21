@@ -33,6 +33,7 @@ export async function importRoster(
           entries: {
             create: entries.map((e) => ({
               fullName: e.fullName,
+              organization: e.organization,
               nationalId: e.nationalId,
             })),
           },

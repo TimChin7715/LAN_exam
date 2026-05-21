@@ -3,11 +3,22 @@ import { toast } from 'sonner';
 import { ApiError, apiFetch, handleAuthResponse } from '@/lib/api';
 
 export type ExamStatus = 'DRAFT' | 'IN_PROGRESS' | 'ENDED';
+export type ExamContentModule = 'OBJECTIVE' | 'FILL' | 'PRACTICAL';
+
+const MODULE_LABELS: Record<ExamContentModule, string> = {
+  OBJECTIVE: '客观题',
+  FILL: '填空题',
+  PRACTICAL: '操作题',
+};
 
 import {
   fetchQuestionBanks,
   type QuestionBankListItem,
 } from '@/lib/qbank';
+import {
+  fetchPracticalBatches,
+  type PracticalBatchListItem,
+} from '@/lib/practical';
 import {
   fetchRosterBatches as listRosterBatches,
   type RosterBatchListItem,
@@ -19,51 +30,99 @@ export type ExamListItem = {
   id: string;
   title: string;
   status: ExamStatus;
+  contentModules: ExamContentModule[];
   scheduledStartAt: string | null;
   scheduledEndAt: string | null;
   startedAt: string | null;
   endedAt: string | null;
   createdAt: string;
-  questionBatchFileName: string;
+  questionBatchFileName: string | null;
+  fillInBatchTitle: string | null;
+  practicalBatchTitle: string | null;
   rosterBatchFileName: string;
   questionCount: number;
   submissionCount: number;
+  practicalSubmissionCount: number;
 };
 
 export type ExamDetail = {
   id: string;
   title: string;
   status: ExamStatus;
+  contentModules: ExamContentModule[];
   scheduledStartAt: string | null;
   scheduledEndAt: string | null;
   startedAt: string | null;
   endedAt: string | null;
   createdAt: string;
-  questionBatch: { id: string; fileName: string; createdAt: string };
+  questionBatch: { id: string; fileName: string; createdAt: string } | null;
+  fillInBatch: {
+    id: string;
+    title: string;
+    wordFileName: string;
+    excelFileName: string;
+    createdAt: string;
+  } | null;
+  practicalBatch: {
+    id: string;
+    title: string;
+    wordFileName: string;
+    excelFileName: string;
+    createdAt: string;
+  } | null;
   rosterBatch: { id: string; fileName: string; createdAt: string };
   questions: {
     id: string;
     sortOrder: number;
     question: {
       id: string;
-      type: 'SINGLE' | 'MULTI' | 'JUDGE';
+      type: 'SINGLE' | 'MULTI' | 'JUDGE' | 'FILL';
       stem: string;
       points: number;
       answerKeys: string;
       options: { key: string; text: string; sortOrder: number }[];
     };
   }[];
-  _count: { submissions: number };
+  _count: { submissions: number; practicalSubmissions: number };
+};
+
+export type SeatBoardItem = {
+  fullName: string;
+  seatLabel: string;
+};
+
+export type ExamSeatBoard = {
+  examId: string;
+  title: string;
+  status: ExamStatus;
+  cols: number;
+  rows: number;
+  items: SeatBoardItem[];
 };
 
 export type SubmissionListItem = {
   rosterEntryId: string;
   fullName: string;
+  organization: string;
   nationalId: string;
   totalScore: number | null;
   submitted: boolean;
   submittedAt: string | null;
+  practicalSubmitted: boolean;
+  practicalSubmittedAt: string | null;
 };
+
+export function examContentModulesLabel(modules: ExamContentModule[]): string {
+  if (modules.length === 0) return '—';
+  return modules.map((m) => MODULE_LABELS[m] ?? m).join(' + ');
+}
+
+export function hasExamModule(
+  modules: ExamContentModule[],
+  module: ExamContentModule,
+): boolean {
+  return modules.includes(module);
+}
 
 /** Format ISO datetime for display (local timezone). */
 export function formatExamDateTime(iso: string | null): string {
@@ -121,7 +180,10 @@ export async function listExams(): Promise<ExamListItem[]> {
 
 export async function createExam(input: {
   title: string;
-  questionBatchId: string;
+  contentModules: ExamContentModule[];
+  questionBatchId?: string;
+  fillInBatchId?: string;
+  practicalBatchId?: string;
   rosterBatchId: string;
   scheduledStartAt: string;
   scheduledEndAt: string;
@@ -138,6 +200,20 @@ export async function getExam(id: string): Promise<ExamDetail> {
     `/api/admin/exams/${encodeURIComponent(id)}`,
   );
   return data.exam;
+}
+
+export async function fetchExamSeats(examId: string): Promise<ExamSeatBoard> {
+  const data = await apiFetch<{ ok: true } & ExamSeatBoard>(
+    `/api/admin/exams/${encodeURIComponent(examId)}/seats`,
+  );
+  return {
+    examId: data.examId,
+    title: data.title,
+    status: data.status,
+    cols: data.cols,
+    rows: data.rows,
+    items: data.items,
+  };
 }
 
 export async function startExam(id: string): Promise<void> {
@@ -158,6 +234,38 @@ export async function fetchQuestionBatches(): Promise<BatchPickerItem[]> {
 
 export async function fetchRosterBatches(): Promise<RosterBatchListItem[]> {
   return listRosterBatches();
+}
+
+export { fetchPracticalBatches };
+export type { PracticalBatchListItem };
+
+export { fetchFillInBatches } from '@/lib/fillin';
+export type { FillInBatchListItem } from '@/lib/fillin';
+
+export async function downloadPracticalAnswer(
+  examId: string,
+  rosterEntryId: string,
+  fileNameHint: string,
+): Promise<void> {
+  const response = await fetch(
+    `/api/admin/exams/${encodeURIComponent(examId)}/submissions/${encodeURIComponent(rosterEntryId)}/practical-answer`,
+    { credentials: 'include' },
+  );
+
+  if (!response.ok) {
+    toast.error('下载操作题答卷失败。');
+    throw new ApiError('Download failed', response.status);
+  }
+
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = fileNameHint.endsWith('.docx')
+    ? fileNameHint
+    : `${fileNameHint}-操作题作答.docx`;
+  anchor.click();
+  URL.revokeObjectURL(url);
 }
 
 export async function fetchExamSubmissions(

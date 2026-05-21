@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Loader2 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
 import { z } from 'zod';
@@ -23,9 +23,11 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import { ExamSeatBoardPanel } from '@/components/exam/ExamSeatBoardPanel';
 import { isValidNationalIdFormat } from '@/lib/national-id';
 import {
   ApiError,
+  fetchStudentConfig,
   STUDENT_AUTH_ERROR_MESSAGE,
   STUDENT_ID_FORMAT_ERROR_MESSAGE,
   studentApi,
@@ -45,6 +47,22 @@ type LoginValues = z.infer<typeof loginSchema>;
 export default function StudentLogin() {
   const navigate = useNavigate();
   const [formError, setFormError] = useState<string | null>(null);
+  const [showSeatBoard, setShowSeatBoard] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const config = await fetchStudentConfig();
+        if (!cancelled) setShowSeatBoard(config.showSeatBoard);
+      } catch {
+        if (!cancelled) setShowSeatBoard(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const form = useForm<LoginValues>({
     resolver: zodResolver(loginSchema),
@@ -89,8 +107,8 @@ export default function StudentLogin() {
   }
 
   return (
-    <div className="flex min-h-svh items-center justify-center bg-background px-4 py-16">
-      <Card className="w-full max-w-[400px]">
+    <div className="flex min-h-svh flex-col items-center justify-center gap-6 bg-background px-4 py-16 lg:flex-row lg:items-start">
+      <Card className="w-full max-w-[400px] shrink-0">
         <CardHeader className="space-y-2 pb-6">
           <CardTitle>考生登录</CardTitle>
           <CardDescription>局域网考试系统 · 请验证身份</CardDescription>
@@ -157,6 +175,7 @@ export default function StudentLogin() {
           </Form>
         </CardContent>
       </Card>
+      {showSeatBoard ? <ExamSeatBoardPanel mode="student" /> : null}
     </div>
   );
 }

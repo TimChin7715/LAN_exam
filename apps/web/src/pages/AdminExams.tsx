@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ClipboardList, Plus } from 'lucide-react';
+
+import { AdminBackToConsoleButton } from '@/components/admin/AdminBackToConsoleButton';
 import { toast } from 'sonner';
 
 import { Badge } from '@/components/ui/badge';
@@ -14,6 +16,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -35,14 +38,20 @@ import {
 import {
   createExam,
   defaultExamSchedule,
+  examContentModulesLabel,
   examStatusLabel,
+  fetchFillInBatches,
+  fetchPracticalBatches,
   fetchQuestionBatches,
   fetchRosterBatches,
   formatExamScheduleRange,
   handleExamApiError,
   listExams,
   type BatchPickerItem,
+  type ExamContentModule,
   type ExamListItem,
+  type FillInBatchListItem,
+  type PracticalBatchListItem,
 } from '@/lib/exam';
 
 export default function AdminExams() {
@@ -51,9 +60,18 @@ export default function AdminExams() {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [title, setTitle] = useState('');
+  const [moduleObjective, setModuleObjective] = useState(true);
+  const [moduleFillIn, setModuleFillIn] = useState(false);
+  const [modulePractical, setModulePractical] = useState(false);
   const [questionBatchId, setQuestionBatchId] = useState('');
+  const [fillInBatchId, setFillInBatchId] = useState('');
+  const [practicalBatchId, setPracticalBatchId] = useState('');
   const [rosterBatchId, setRosterBatchId] = useState('');
   const [questionBatches, setQuestionBatches] = useState<BatchPickerItem[]>([]);
+  const [fillInBatches, setFillInBatches] = useState<FillInBatchListItem[]>([]);
+  const [practicalBatches, setPracticalBatches] = useState<PracticalBatchListItem[]>(
+    [],
+  );
   const [rosterBatches, setRosterBatches] = useState<BatchPickerItem[]>([]);
   const [scheduledStart, setScheduledStart] = useState('');
   const [scheduledEnd, setScheduledEnd] = useState('');
@@ -81,11 +99,15 @@ export default function AdminExams() {
     setScheduledEnd(defaults.end);
     void (async () => {
       try {
-        const [qb, rb] = await Promise.all([
+        const [qb, fb, pb, rb] = await Promise.all([
           fetchQuestionBatches(),
+          fetchFillInBatches(),
+          fetchPracticalBatches(),
           fetchRosterBatches(),
         ]);
         setQuestionBatches(qb);
+        setFillInBatches(fb);
+        setPracticalBatches(pb);
         setRosterBatches(rb);
       } catch (err) {
         handleExamApiError(err, '无法加载批次列表。');
@@ -95,8 +117,28 @@ export default function AdminExams() {
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
-    if (!title.trim() || !questionBatchId || !rosterBatchId) {
-      toast.error('请填写考试名称并选择题目与名单批次。');
+    if (!title.trim() || !rosterBatchId) {
+      toast.error('请填写考试名称并选择名单批次。');
+      return;
+    }
+    const contentModules: ExamContentModule[] = [];
+    if (moduleObjective) contentModules.push('OBJECTIVE');
+    if (moduleFillIn) contentModules.push('FILL');
+    if (modulePractical) contentModules.push('PRACTICAL');
+    if (contentModules.length === 0) {
+      toast.error('请至少选择一种考试内容。');
+      return;
+    }
+    if (moduleObjective && !questionBatchId) {
+      toast.error('请选择客观题题库批次。');
+      return;
+    }
+    if (moduleFillIn && !fillInBatchId) {
+      toast.error('请选择填空题批次。');
+      return;
+    }
+    if (modulePractical && !practicalBatchId) {
+      toast.error('请选择操作题批次。');
       return;
     }
     if (!scheduledStart || !scheduledEnd) {
@@ -117,7 +159,10 @@ export default function AdminExams() {
     try {
       const examId = await createExam({
         title: title.trim(),
-        questionBatchId,
+        contentModules,
+        questionBatchId: moduleObjective ? questionBatchId : undefined,
+        fillInBatchId: moduleFillIn ? fillInBatchId : undefined,
+        practicalBatchId: modulePractical ? practicalBatchId : undefined,
         rosterBatchId,
         scheduledStartAt: startDate.toISOString(),
         scheduledEndAt: endDate.toISOString(),
@@ -125,7 +170,12 @@ export default function AdminExams() {
       toast.success('考试已创建。');
       setDialogOpen(false);
       setTitle('');
+      setModuleObjective(true);
+      setModuleFillIn(false);
+      setModulePractical(false);
       setQuestionBatchId('');
+      setFillInBatchId('');
+      setPracticalBatchId('');
       setRosterBatchId('');
       setScheduledStart('');
       setScheduledEnd('');
@@ -140,20 +190,12 @@ export default function AdminExams() {
   return (
     <div className="space-y-6">
       <div className="space-y-2">
-        <Link
-          to="/admin"
-          className="inline-block text-sm font-semibold text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        >
-          ← 返回仪表盘
-        </Link>
+        <AdminBackToConsoleButton />
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <h1 className="text-xl font-semibold leading-tight text-foreground">
               考试管理
             </h1>
-            <p className="text-base text-muted-foreground">
-              创建考试、关联题目与名单批次，并开始考试。
-            </p>
           </div>
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
@@ -179,24 +221,100 @@ export default function AdminExams() {
                     />
                   </div>
                   <div className="grid gap-2">
-                    <Label>题目批次</Label>
-                    <Select
-                      value={questionBatchId}
-                      onValueChange={setQuestionBatchId}
-                      required
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="选择题目导入批次" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {questionBatches.map((b) => (
-                          <SelectItem key={b.id} value={b.id}>
-                            {b.fileName}（{b.itemCount} 题）
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Label>考试内容（可多选）</Label>
+                    <div className="flex flex-wrap gap-4">
+                      <div className="flex items-center gap-2">
+                        <Checkbox
+                          id="mod-objective"
+                          checked={moduleObjective}
+                          onCheckedChange={(v) => setModuleObjective(v === true)}
+                        />
+                        <Label htmlFor="mod-objective" className="font-normal">
+                          客观题
+                        </Label>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Checkbox
+                          id="mod-fillin"
+                          checked={moduleFillIn}
+                          onCheckedChange={(v) => setModuleFillIn(v === true)}
+                        />
+                        <Label htmlFor="mod-fillin" className="font-normal">
+                          填空题
+                        </Label>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Checkbox
+                          id="mod-practical"
+                          checked={modulePractical}
+                          onCheckedChange={(v) => setModulePractical(v === true)}
+                        />
+                        <Label htmlFor="mod-practical" className="font-normal">
+                          操作题
+                        </Label>
+                      </div>
+                    </div>
                   </div>
+                  {moduleObjective ? (
+                    <div className="grid gap-2">
+                      <Label>客观题批次</Label>
+                      <Select
+                        value={questionBatchId}
+                        onValueChange={setQuestionBatchId}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="选择客观题导入批次" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {questionBatches.map((b) => (
+                            <SelectItem key={b.id} value={b.id}>
+                              {b.fileName}（{b.itemCount} 题）
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  ) : null}
+                  {moduleFillIn ? (
+                    <div className="grid gap-2">
+                      <Label>填空题批次</Label>
+                      <Select
+                        value={fillInBatchId}
+                        onValueChange={setFillInBatchId}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="选择填空题批次" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {fillInBatches.map((b) => (
+                            <SelectItem key={b.id} value={b.id}>
+                              {b.title}（{b.itemCount} 题）
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  ) : null}
+                  {modulePractical ? (
+                    <div className="grid gap-2">
+                      <Label>操作题批次</Label>
+                      <Select
+                        value={practicalBatchId}
+                        onValueChange={setPracticalBatchId}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="选择操作题批次" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {practicalBatches.map((b) => (
+                            <SelectItem key={b.id} value={b.id}>
+                              {b.title}（{b.wordFileName}）
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  ) : null}
                   <div className="grid gap-2">
                     <Label htmlFor="exam-start">开始时间</Label>
                     <Input
@@ -268,6 +386,7 @@ export default function AdminExams() {
                 <TableRow>
                   <TableHead>名称</TableHead>
                   <TableHead>考试时间</TableHead>
+                  <TableHead>内容</TableHead>
                   <TableHead>状态</TableHead>
                   <TableHead>题目</TableHead>
                   <TableHead>提交</TableHead>
@@ -283,6 +402,11 @@ export default function AdminExams() {
                         exam.scheduledStartAt,
                         exam.scheduledEndAt,
                       )}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline">
+                        {examContentModulesLabel(exam.contentModules)}
+                      </Badge>
                     </TableCell>
                     <TableCell>
                       <Badge variant="secondary">{examStatusLabel(exam.status)}</Badge>

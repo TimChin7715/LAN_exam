@@ -1,6 +1,10 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 
+import {
+  requiresPracticalBatch,
+  requiresQuestionSubmission,
+} from '../../../lib/exam/content-mode.js';
 import { prisma } from '../../../lib/prisma.js';
 import {
   ensureStudentRosterEntryId,
@@ -48,7 +52,7 @@ export async function registerStudentExamSubmissionRoutes(
 
       const exam = await prisma.exam.findUnique({
         where: { id: examId },
-        select: { id: true, rosterBatchId: true },
+        select: { id: true, rosterBatchId: true, contentModules: true },
       });
 
       if (!exam || entry.batchId !== exam.rosterBatchId) {
@@ -58,57 +62,86 @@ export async function registerStudentExamSubmissionRoutes(
         });
       }
 
-      const submission = await prisma.submission.findUnique({
-        where: {
-          examId_rosterEntryId: { examId, rosterEntryId },
-        },
-        include: {
-          answers: {
-            select: {
-              examQuestionId: true,
-              selectedKeys: true,
-              isCorrect: true,
-              pointsAwarded: true,
-            },
-          },
-        },
-      });
+      const [submission, practicalSubmission] = await Promise.all([
+        requiresQuestionSubmission(exam.contentModules)
+          ? prisma.submission.findUnique({
+              where: {
+                examId_rosterEntryId: { examId, rosterEntryId },
+              },
+              include: {
+                answers: {
+                  select: {
+                    examQuestionId: true,
+                    selectedKeys: true,
+                    isCorrect: true,
+                    pointsAwarded: true,
+                  },
+                },
+              },
+            })
+          : Promise.resolve(null),
+        requiresPracticalBatch(exam.contentModules)
+          ? prisma.practicalSubmission.findUnique({
+              where: { examId_rosterEntryId: { examId, rosterEntryId } },
+              select: {
+                docxFileName: true,
+                submittedAt: true,
+              },
+            })
+          : Promise.resolve(null),
+      ]);
 
-      if (!submission) {
+      const questionsDone =
+        !requiresQuestionSubmission(exam.contentModules) || Boolean(submission);
+      const practicalDone =
+        !requiresPracticalBatch(exam.contentModules) ||
+        Boolean(practicalSubmission);
+
+      if (!questionsDone || !practicalDone) {
         return reply.status(404).send({
           code: 'NOT_SUBMITTED',
           message: '尚未提交试卷',
         });
       }
 
-      const examQuestions = await prisma.examQuestion.findMany({
-        where: { examId },
-        orderBy: { sortOrder: 'asc' },
-        select: {
-          id: true,
-          sortOrder: true,
-          question: {
+      const examQuestions = requiresQuestionSubmission(exam.contentModules)
+        ? await prisma.examQuestion.findMany({
+            where: { examId },
+            orderBy: { sortOrder: 'asc' },
             select: {
-              type: true,
-              stem: true,
-              points: true,
-              options: {
-                orderBy: { sortOrder: 'asc' },
-                select: { key: true, text: true, sortOrder: true },
+              id: true,
+              sortOrder: true,
+              question: {
+                select: {
+                  type: true,
+                  stem: true,
+                  points: true,
+                  knowledgePoints: true,
+                  explanation: true,
+                  options: {
+                    orderBy: { sortOrder: 'asc' },
+                    select: { key: true, text: true, sortOrder: true },
+                  },
+                },
               },
             },
-          },
-        },
-      });
+          })
+        : [];
 
       const answerByQuestionId = new Map(
-        submission.answers.map((a) => [a.examQuestionId, a]),
+        submission?.answers.map((a) => [a.examQuestionId, a]) ?? [],
       );
+
+      const submittedAt =
+        submission?.submittedAt ??
+        practicalSubmission?.submittedAt ??
+        new Date();
 
       return reply.send({
         examId,
-        totalScore: submission.totalScore,
-        submittedAt: submission.submittedAt,
+        contentModules: exam.contentModules,
+        totalScore: submission?.totalScore ?? null,
+        submittedAt,
         items: examQuestions.map((eq) => {
           const answer = answerByQuestionId.get(eq.id);
           return {
@@ -117,12 +150,23 @@ export async function registerStudentExamSubmissionRoutes(
             type: eq.question.type,
             stem: eq.question.stem,
             points: eq.question.points,
+            fillQuestionNo:
+              eq.question.type === 'FILL' ? eq.question.knowledgePoints : null,
+            fillBlankIndex:
+              eq.question.type === 'FILL' ? eq.question.explanation : null,
             options: eq.question.options,
             selectedKeys: answer?.selectedKeys ?? '',
             isCorrect: answer?.isCorrect ?? false,
             pointsAwarded: answer?.pointsAwarded ?? 0,
           };
         }),
+        practical: practicalSubmission
+          ? {
+              submitted: true,
+              docxFileName: practicalSubmission.docxFileName,
+              submittedAt: practicalSubmission.submittedAt.toISOString(),
+            }
+          : null,
       });
     },
   );

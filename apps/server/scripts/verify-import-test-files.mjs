@@ -15,7 +15,7 @@ const rosterBuf = readFileSync(join(dir, '名单导入-测试.xlsx'));
 const qbankBuf = readFileSync(join(dir, '题库导入-测试.xlsx'));
 
 const rp = await parseRoster(rosterBuf);
-const rv = await validateRoster(prisma, rp.rows);
+const rv = await validateRoster(rp.rows);
 console.log(
   `roster: ${rp.rows.length} rows, ${rv.entries.length} entries, ${rv.errors.length} errors`,
 );

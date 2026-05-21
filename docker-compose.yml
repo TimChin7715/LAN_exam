@@ -28,9 +28,13 @@ services:
       LISTEN_HOST: '0.0.0.0'
       DATABASE_URL: postgresql://lan_exam:lan_exam_dev@db:5432/lan_exam
       SESSION_SECRET: ${SESSION_SECRET:-dev-session-secret-min-16-chars}
+      DATA_DIR: /app/data
+    volumes:
+      - uploads_data:/app/data
     depends_on:
       db:
         condition: service_healthy
 
 volumes:
   postgres_data:
+  uploads_data:

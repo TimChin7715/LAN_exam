@@ -3,6 +3,7 @@ import rateLimit from '@fastify/rate-limit';
 import Fastify from 'fastify';
 
 import { getListenHost, getListenPort, shouldServeWeb } from './lib/env.js';
+import { getMultipartPluginLimits } from './lib/upload-limits.js';
 import { prisma } from './lib/prisma.js';
 import { registerWebStatic } from './lib/web-static.js';
 import { registerAdminLoopbackGuard } from './plugins/admin-loopback-guard.js';
@@ -15,6 +16,13 @@ import { registerAdminRosterListRoutes } from './routes/api/admin/roster-list.js
 import { registerAdminRosterTemplateRoutes } from './routes/api/admin/roster-template.js';
 import { registerAdminRosterBatchesRoutes } from './routes/api/admin/roster-batches.js';
 import { registerAdminQuestionBatchesRoutes } from './routes/api/admin/question-batches.js';
+import { registerAdminFillInBatchesImportRoutes } from './routes/api/admin/fill-in-batches-import.js';
+import { registerAdminFillInBatchesRoutes } from './routes/api/admin/fill-in-batches.js';
+import { registerAdminFillInBatchesTemplateRoutes } from './routes/api/admin/fill-in-batches-template.js';
+import { registerAdminPracticalBatchesImportRoutes } from './routes/api/admin/practical-batches-import.js';
+import { registerAdminPracticalBatchesRoutes } from './routes/api/admin/practical-batches.js';
+import { registerAdminExamSeatsRoutes } from './routes/api/admin/exam-seats.js';
+import { registerAdminSettingsRoutes } from './routes/api/admin/settings.js';
 import { registerAdminExamsCrudRoutes } from './routes/api/admin/exams-crud.js';
 import { registerAdminExamsLifecycleRoutes } from './routes/api/admin/exams-lifecycle.js';
 import { registerAdminExamsSubmissionsRoutes } from './routes/api/admin/exams-submissions.js';
@@ -36,7 +44,7 @@ await app.register(sessionPlugin);
 await registerAdminLoopbackGuard(app);
 await app.register(rateLimit, { global: false });
 await app.register(multipart, {
-  limits: { files: 1 },
+  limits: getMultipartPluginLimits(),
 });
 await registerAuthRoutes(app);
 await registerStudentRoutes(app);
@@ -48,8 +56,15 @@ await registerAdminRosterTemplateRoutes(app);
 await registerAdminRosterImportRoutes(app);
 await registerAdminRosterListRoutes(app);
 await registerAdminQuestionBatchesRoutes(app);
+await registerAdminFillInBatchesTemplateRoutes(app);
+await registerAdminFillInBatchesImportRoutes(app);
+await registerAdminFillInBatchesRoutes(app);
+await registerAdminPracticalBatchesImportRoutes(app);
+await registerAdminPracticalBatchesRoutes(app);
 await registerAdminRosterBatchesRoutes(app);
 await registerAdminExamsCrudRoutes(app);
+await registerAdminSettingsRoutes(app);
+await registerAdminExamSeatsRoutes(app);
 await registerAdminExamsLifecycleRoutes(app);
 await registerAdminExamsSubmissionsRoutes(app);
 await registerAdminExamsExportRoutes(app);

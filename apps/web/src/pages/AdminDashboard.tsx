@@ -1,7 +1,6 @@
 import { BookOpen, ClipboardList, Users } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
-import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 
@@ -12,20 +11,8 @@ const PLACEHOLDER_CARDS = [
 ] as const;
 
 export default function AdminDashboard() {
-  const { user } = useAuth();
-
   return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="text-xl font-semibold leading-tight text-foreground">
-          欢迎，{user?.displayName}
-        </h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          请导入题库与名单后创建考试。若从旧版考官账号环境升级，历史数据不会自动显示，需重新导入。
-        </p>
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-3">
+    <div className="grid gap-4 sm:grid-cols-3">
         {PLACEHOLDER_CARDS.map(({ title, icon: Icon, ...rest }) => {
           const href = 'href' in rest ? rest.href : undefined;
           const card = (
@@ -71,7 +58,6 @@ export default function AdminDashboard() {
 
           return <div key={title}>{card}</div>;
         })}
-      </div>
     </div>
   );
 }

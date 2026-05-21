@@ -2,7 +2,7 @@ import { toast } from 'sonner';
 
 import { ApiError, apiFetch, handleAuthResponse } from '@/lib/api';
 
-export type QuestionType = 'SINGLE' | 'MULTI' | 'JUDGE';
+export type QuestionType = 'SINGLE' | 'MULTI' | 'JUDGE' | 'FILL';
 
 export type QuestionBankListItem = {
   id: string;
@@ -18,8 +18,16 @@ export type QuestionBankDetail = QuestionBankListItem & {
 };
 
 export class QuestionBankInUseError extends Error {
-  constructor(public examTitles: string[]) {
-    super('BATCH_IN_USE');
+  constructor(
+    public examTitles: string[],
+    message?: string,
+  ) {
+    const titles = examTitles;
+    const hint =
+      titles.length > 0
+        ? `已被考试「${titles.join('」「')}」使用`
+        : '已被考试使用';
+    super(message ?? `无法删除：该题库${hint}。`);
     this.name = 'QuestionBankInUseError';
   }
 }
@@ -79,6 +87,7 @@ const TYPE_LABELS: Record<QuestionType, string> = {
   SINGLE: '单选',
   MULTI: '多选',
   JUDGE: '判断',
+  FILL: '填空',
 };
 
 export function questionTypeLabel(type: QuestionType): string {
@@ -221,7 +230,10 @@ export async function deleteQuestionBank(id: string): Promise<void> {
     const titles = Array.isArray(payload.examTitles)
       ? (payload.examTitles as string[])
       : [];
-    throw new QuestionBankInUseError(titles);
+    throw new QuestionBankInUseError(
+      titles,
+      typeof payload.message === 'string' ? payload.message : undefined,
+    );
   }
 
   if (!response.ok) {
@@ -274,10 +286,4 @@ export async function fetchQuestionDetail(id: string): Promise<QuestionDetail> {
   return data.question;
 }
 
-export function validateXlsxFile(file: File): string | null {
-  const name = file.name.toLowerCase();
-  if (!name.endsWith('.xlsx')) {
-    return '请选择 .xlsx 格式的 Excel 文件。';
-  }
-  return null;
-}
+export { validateSpreadsheetFile as validateXlsxFile } from '@/lib/upload-formats';

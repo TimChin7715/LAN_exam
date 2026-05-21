@@ -1,5 +1,10 @@
 import type { FastifyInstance } from 'fastify';
 
+import {
+  BATCH_LINKED_TO_EXAM_MESSAGE,
+  BatchDeleteBlockedError,
+  deleteRosterBatchIfUnused,
+} from '../../../lib/batch/delete-with-exam-unlink.js';
 import { resolveAdminTeacherId } from '../../../lib/admin-context.js';
 import { prisma } from '../../../lib/prisma.js';
 import { requireAdminSession } from '../../../plugins/admin-guard.js';
@@ -106,21 +111,19 @@ export async function registerAdminRosterBatchesRoutes(
         });
       }
 
-      const linkedExams = await prisma.exam.findMany({
-        where: { rosterBatchId: id },
-        select: { title: true },
-        take: 3,
-      });
-
-      if (linkedExams.length > 0) {
-        return reply.status(409).send({
-          error: 'Batch in use',
-          code: 'BATCH_IN_USE',
-          examTitles: linkedExams.map((e) => e.title),
-        });
+      try {
+        await deleteRosterBatchIfUnused(prisma, teacherId, id);
+      } catch (err) {
+        if (err instanceof BatchDeleteBlockedError) {
+          return reply.status(409).send({
+            error: 'Batch in use',
+            code: 'BATCH_IN_USE',
+            message: BATCH_LINKED_TO_EXAM_MESSAGE,
+            examTitles: err.examTitles,
+          });
+        }
+        throw err;
       }
-
-      await prisma.rosterImportBatch.delete({ where: { id } });
 
       return reply.send({ ok: true });
     },

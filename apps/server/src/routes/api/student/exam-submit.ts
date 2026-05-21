@@ -3,7 +3,6 @@ import { z } from 'zod';
 
 import { submitExam } from '../../../lib/exam/submit.js';
 import { SubmitExamError } from '../../../lib/exam/types.js';
-import { prisma } from '../../../lib/prisma.js';
 import {
   ensureStudentRosterEntryId,
   requireStudentSession,
@@ -43,7 +42,7 @@ export async function registerStudentExamSubmitRoutes(
       }
 
       try {
-        const result = await submitExam(prisma, {
+        const result = await submitExam({
           examId: parsed.data.examId,
           rosterEntryId,
         });

@@ -41,21 +41,27 @@ function headerMap(sheet) {
   return map;
 }
 
-function setByHeader(row, map, header, value) {
+function setByHeader(row, map, header, value, options = {}) {
   const col = map.get(header);
   if (!col) throw new Error(`missing column: ${header}`);
-  row.getCell(col).value = value;
+  const cell = row.getCell(col);
+  if (options.asText) {
+    cell.value = String(value);
+    cell.numFmt = '@';
+  } else {
+    cell.value = value;
+  }
 }
 
 const rosterRows = [
-  ['李明', makeNationalId('11010119900307803')],
-  ['王芳', makeNationalId('11010119880515602')],
-  ['张伟', makeNationalId('32010619951212001')],
-  ['刘洋', makeNationalId('44010419920815301')],
-  ['陈静', makeNationalId('33010219961108002')],
-  ['赵强', makeNationalId('51010519940122001')],
-  ['孙丽', makeNationalId('37010219970605001')],
-  ['周杰', makeNationalId('42010619930901101')],
+  ['李明', '第一考场', makeNationalId('11010119900307803')],
+  ['王芳', '第一考场', makeNationalId('11010119880515602')],
+  ['张伟', '第二考场', makeNationalId('32010619951212001')],
+  ['刘洋', '第二考场', makeNationalId('44010419920815301')],
+  ['陈静', '第三考场', makeNationalId('33010219961108002')],
+  ['赵强', '第三考场', makeNationalId('51010519940122001')],
+  ['孙丽', '第四考场', makeNationalId('37010219970605001')],
+  ['周杰', '第四考场', makeNationalId('42010619930901101')],
 ];
 
 const qbankRows = [
@@ -155,11 +161,12 @@ async function buildRoster(outPath) {
   if (!sheet) throw new Error('missing sheet 名单导入');
   const headers = headerMap(sheet);
   let rowNum = sheet.rowCount;
-  for (const [name, id] of rosterRows) {
+  for (const [name, organization, id] of rosterRows) {
     rowNum += 1;
     const row = sheet.getRow(rowNum);
     setByHeader(row, headers, '姓名', name);
-    setByHeader(row, headers, '身份证号', id);
+    setByHeader(row, headers, '单位', organization);
+    setByHeader(row, headers, '身份证号', id, { asText: true });
   }
   await wb.xlsx.writeFile(outPath);
 }

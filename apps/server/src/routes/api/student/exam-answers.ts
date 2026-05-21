@@ -11,7 +11,7 @@ import {
 
 const answerItemSchema = z.object({
   examQuestionId: z.string().min(1),
-  selectedKeys: z.string().max(64),
+  selectedKeys: z.string().max(4096),
 });
 
 const putBodySchema = z.object({
@@ -49,6 +49,14 @@ export async function registerStudentExamAnswersRoutes(
       }
 
       const { examId, answers } = parsed.data;
+      const normalizedAnswers = [
+        ...new Map(
+          answers.map((item) => [item.examQuestionId, item.selectedKeys]),
+        ).entries(),
+      ].map(([examQuestionId, selectedKeys]) => ({
+        examQuestionId,
+        selectedKeys,
+      }));
 
       try {
         await assertStudentExamAccess(rosterEntryId, examId, 'write');
@@ -65,7 +73,7 @@ export async function registerStudentExamAnswersRoutes(
       const questionCount = await prisma.examQuestion.count({
         where: { examId },
       });
-      if (answers.length > questionCount) {
+      if (normalizedAnswers.length > questionCount) {
         return reply.status(400).send({
           code: 'VALIDATION_ERROR',
           message: '请求参数无效',
@@ -86,9 +94,7 @@ export async function registerStudentExamAnswersRoutes(
         });
       }
 
-      const examQuestionIds = [
-        ...new Set(answers.map((a) => a.examQuestionId)),
-      ];
+      const examQuestionIds = normalizedAnswers.map((a) => a.examQuestionId);
 
       const validQuestions = await prisma.examQuestion.findMany({
         where: {
@@ -106,29 +112,22 @@ export async function registerStudentExamAnswersRoutes(
       }
 
       await prisma.$transaction(async (tx) => {
-        for (const examQuestionId of examQuestionIds) {
-          const item = answers.find(
-            (a) => a.examQuestionId === examQuestionId,
-          )!;
-          await tx.answerDraft.upsert({
-            where: {
-              examId_rosterEntryId_examQuestionId: {
-                examId,
-                rosterEntryId,
-                examQuestionId,
-              },
-            },
-            create: {
-              examId,
-              rosterEntryId,
-              examQuestionId,
-              selectedKeys: item.selectedKeys,
-            },
-            update: {
-              selectedKeys: item.selectedKeys,
-            },
-          });
-        }
+        await tx.answerDraft.deleteMany({
+          where: {
+            examId,
+            rosterEntryId,
+            examQuestionId: { in: examQuestionIds },
+          },
+        });
+
+        await tx.answerDraft.createMany({
+          data: normalizedAnswers.map((item) => ({
+            examId,
+            rosterEntryId,
+            examQuestionId: item.examQuestionId,
+            selectedKeys: item.selectedKeys,
+          })),
+        });
       });
 
       return reply.send({ ok: true });

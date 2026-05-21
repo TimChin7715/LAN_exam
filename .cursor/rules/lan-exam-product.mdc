@@ -1,33 +1,45 @@
 ---
-description: LAN Exam 产品约束 — 免登录部署、端口、认证与数据隔离
+description: LAN Exam 硬约束摘要 — 免登录、loopback、考场离线、当前能力边界
 alwaysApply: true
 ---
 
-# LAN Exam 产品约束
+# LAN Exam 产品约束（硬约束摘要）
 
-完整上下文见仓库根目录 [AGENTS.md](../../AGENTS.md)；完整方案见 [docs/PLAN-考官免登录一键部署.md](../../docs/PLAN-考官免登录一键部署.md)。
+完整上下文：[AGENTS.md](../../AGENTS.md)。部署决策档案：[docs/PLAN-考官免登录一键部署.md](../../docs/PLAN-考官免登录一键部署.md)。产品能力入口：[README.md](../../README.md)。
 
 ## 部署与拓扑
 
 - **考场推荐**：Windows 离线 `LAN-Exam-Setup.exe`，非 Docker。考场 **禁止** 安装/运行时访问外网。
 - **生产单端口 5180**：API + SPA；Postgres **5434 仅本机**。
-- **开发**：API 3101 + Vite 5180 代理，保持分离。
+- **开发**：API **3101** + Vite **5180** 代理 `/api`，保持分离。
 
 ## 考官端（默认 disabled）
 
-- 管理台仅 `http://127.0.0.1:5180/admin`；`ADMIN_AUTH_MODE` 与 `VITE_ADMIN_AUTH_MODE` 须成对（默认均为 `disabled`）。
+- 管理台仅 `http://127.0.0.1:5180/admin`；`ADMIN_AUTH_MODE` 与 `VITE_ADMIN_AUTH_MODE` **须成对**（默认均为 `disabled`）。
 - `/api/admin/*` 始终 loopback-only；`disabled` 时 `/api/auth/*` 亦 loopback-only。
-- 数据写入 `local_exam_admin`；**不迁移** `teacher_admin` 历史数据 — 文档与 UI 提示重新导入。
-- 保留 `session` 回退代码，勿删除 `AdminLogin` / `teacher_admin` 种子路径。
+- 数据归属 `local_exam_admin`；**不迁移** `teacher_admin` — UI 与文档须提示重新导入。
+- 保留 `session` 回退（`AdminLogin`、`teacher_admin` 种子），勿删。
+
+## 当前能力（勿按旧“仅客观题”模型改代码）
+
+- 考试内容模块：`OBJECTIVE` / `FILL` / `PRACTICAL` 可混合；操作题不自动计分。
+- 填空题：Word 题目 + Excel 答题卡（工作表 `答题卡`，列“题号/答案/分值”）；`lib/fillin/`。
+- 操作题：Word 试卷 + 附件；学员上传 `.doc`/`.docx`；`lib/practical/`。
+- 名单：姓名 / 单位 / 身份证号；学员登录同名 + 身份证号。
+- 座位表：`showSeatBoard`（`lib/admin-settings.ts`）；考试维度随机分配 `lib/seat/`。
+- 设置页：座位表开关 + “清除全部数据”（`lib/admin/clear-teacher-data.ts`）。
+- 学员流程：`/exam/login` → waiting → take → submitted → ended；与 `ADMIN_AUTH_MODE` 无关。
+- 存储：`DATA_DIR` 下 `fill-in-batches/`、`practical-batches/`、`exam-work/`。
 
 ## 代码落点
 
-- 考官 ID：`resolveAdminTeacherId()`（`apps/server/src/lib/admin-context.ts`）。
-- 守卫：`admin-guard.ts`、`admin-loopback-guard.ts`；学员：`student-guard.ts`。
-- 前端：`admin-auth.ts`、`AdminRoute.tsx`、`router.tsx`、`AuthContext.tsx`。
+- 考官 ID：`resolveAdminTeacherId()`（`lib/admin-context.ts`）。
+- 插件：`session.ts`、`admin-loopback-guard.ts`、`admin-guard.ts`、`student-guard.ts`（见 `apps/server/src/plugins/README.md`）。
+- 前端考官：`admin-auth.ts`、`AdminRoute.tsx`、`router.tsx`、`AuthContext.tsx`。
 
 ## 禁止
 
-- 在考场文档或安装脚本中引导访问微软官网下载依赖。
-- 关闭 `ADMIN_API_LOOPBACK_ONLY` 于机房包。
-- 仅改后端或仅改前端的 `*_AUTH_MODE` 导致登录 UI 与 API 不一致。
+- 考场文档/安装脚本引导访问微软官网或现场下载依赖。
+- 机房包关闭 `ADMIN_API_LOOPBACK_ONLY`。
+- 仅改后端或仅改前端的 `*_AUTH_MODE`，导致登录 UI 与 API 不一致。
+- 暗示 `teacher_admin` 数据会自动迁移到 `local_exam_admin`。

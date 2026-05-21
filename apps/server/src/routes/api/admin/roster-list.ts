@@ -37,6 +37,7 @@ export async function registerAdminRosterListRoutes(
           ? {
               OR: [
                 { fullName: { contains: q } },
+                { organization: { contains: q } },
                 { nationalId: { contains: q } },
               ],
             }
@@ -53,6 +54,7 @@ export async function registerAdminRosterListRoutes(
           select: {
             id: true,
             fullName: true,
+            organization: true,
             nationalId: true,
             createdAt: true,
           },

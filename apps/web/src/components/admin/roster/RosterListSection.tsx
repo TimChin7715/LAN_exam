@@ -110,7 +110,7 @@ export function RosterListSection({
           <Input
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
-            placeholder="按姓名或身份证号搜索"
+            placeholder="按姓名、单位或身份证号搜索"
             className="min-h-11 flex-1"
             aria-label="搜索名单"
           />
@@ -165,7 +165,7 @@ export function RosterListSection({
           <div className="flex flex-col items-center gap-2 py-12 text-center">
             <h3 className="text-xl font-semibold text-foreground">未找到匹配记录</h3>
             <p className="text-base text-muted-foreground">
-              请检查姓名或身份证号是否输入正确。
+              请检查姓名、单位或身份证号是否输入正确。
             </p>
           </div>
         ) : (
@@ -175,6 +175,7 @@ export function RosterListSection({
                 <TableHeader>
                   <TableRow>
                     <TableHead scope="col">姓名</TableHead>
+                    <TableHead scope="col">单位</TableHead>
                     <TableHead scope="col">身份证号</TableHead>
                     <TableHead scope="col">导入时间</TableHead>
                   </TableRow>
@@ -183,6 +184,7 @@ export function RosterListSection({
                   {items.map((item) => (
                     <TableRow key={item.id}>
                       <TableCell>{item.fullName}</TableCell>
+                      <TableCell>{item.organization}</TableCell>
                       <TableCell className="font-mono tabular-nums">
                         {maskNationalId(item.nationalId)}
                       </TableCell>

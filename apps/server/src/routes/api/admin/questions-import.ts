@@ -5,7 +5,8 @@ import { importQuestions } from '../../../lib/qbank/import-questions.js';
 import { parseWorkbook } from '../../../lib/qbank/parse-workbook.js';
 import { QbankTemplateError } from '../../../lib/qbank/types.js';
 import { validateRows } from '../../../lib/qbank/validate-rows.js';
-import { assertValidXlsxUpload } from '../../../lib/qbank/xlsx-file.js';
+import { SpreadsheetReadError } from '../../../lib/spreadsheet/read-workbook.js';
+import { assertValidSpreadsheetUpload } from '../../../lib/upload/spreadsheet-file.js';
 import { prisma } from '../../../lib/prisma.js';
 import { requireAdminSession } from '../../../plugins/admin-guard.js';
 
@@ -52,7 +53,7 @@ export async function registerAdminQuestionsImportRoutes(
       }
 
       const buffer = await data.toBuffer();
-      const fileCheck = assertValidXlsxUpload(
+      const fileCheck = assertValidSpreadsheetUpload(
         data.filename,
         data.mimetype,
         buffer,
@@ -98,6 +99,13 @@ export async function registerAdminQuestionsImportRoutes(
           previewQuestions: questions.slice(0, 3).map(previewQuestion),
         });
       } catch (err) {
+        if (err instanceof SpreadsheetReadError) {
+          return reply.status(400).send({
+            ok: false,
+            code: err.code,
+            message: err.message,
+          });
+        }
         if (err instanceof QbankTemplateError) {
           return reply.status(400).send({
             ok: false,

@@ -1,7 +1,10 @@
-import type { PrismaClient } from '@prisma/client';
-
 import { isValidNationalIdFormat } from './national-id.js';
-import type { ParsedRosterEntry, RawRosterRow, RowError } from './types.js';
+import {
+  MAX_ORGANIZATION_LENGTH,
+  type ParsedRosterEntry,
+  type RawRosterRow,
+  type RowError,
+} from './types.js';
 
 function pairKey(fullName: string, nationalId: string): string {
   return `${fullName}\0${nationalId}`;
@@ -13,6 +16,7 @@ function validateRow(row: RawRosterRow): {
 } {
   const errors: RowError[] = [];
   const fullName = row.fullName.trim();
+  const organization = row.organization.trim();
   const nationalId = row.nationalId.trim();
 
   if (!fullName) {
@@ -20,6 +24,20 @@ function validateRow(row: RawRosterRow): {
       row: row.rowNumber,
       column: '姓名',
       message: '姓名不能为空',
+    });
+  }
+
+  if (!organization) {
+    errors.push({
+      row: row.rowNumber,
+      column: '单位',
+      message: '单位不能为空',
+    });
+  } else if (organization.length > MAX_ORGANIZATION_LENGTH) {
+    errors.push({
+      row: row.rowNumber,
+      column: '单位',
+      message: `单位不得超过 ${MAX_ORGANIZATION_LENGTH} 个字符`,
     });
   }
 
@@ -45,6 +63,7 @@ function validateRow(row: RawRosterRow): {
     entry: {
       rowNumber: row.rowNumber,
       fullName,
+      organization,
       nationalId,
     },
     errors: [],
@@ -57,7 +76,6 @@ export type ValidateRowsResult = {
 };
 
 export async function validateRows(
-  prisma: PrismaClient,
   rows: RawRosterRow[],
 ): Promise<ValidateRowsResult> {
   const entries: ParsedRosterEntry[] = [];
@@ -95,33 +113,6 @@ export async function validateRows(
     return { entries, errors };
   }
 
-  const existing = await prisma.rosterEntry.findMany({
-    where: {
-      OR: entries.map((e) => ({
-        fullName: e.fullName,
-        nationalId: e.nationalId,
-      })),
-    },
-    select: { fullName: true, nationalId: true },
-  });
-
-  const existingKeys = new Set(
-    existing.map((e) => pairKey(e.fullName, e.nationalId)),
-  );
-
-  for (const entry of entries) {
-    if (existingKeys.has(pairKey(entry.fullName, entry.nationalId))) {
-      errors.push({
-        row: entry.rowNumber,
-        column: '身份证号',
-        message: '该姓名与身份证号已存在于名单中',
-      });
-    }
-  }
-
-  if (errors.length > 0) {
-    return { entries: [], errors };
-  }
-
+  // Duplicates are scoped per import batch (see @@unique([batchId, fullName, nationalId])).
   return { entries, errors: [] };
 }

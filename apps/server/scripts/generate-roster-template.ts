@@ -13,17 +13,18 @@ async function main(): Promise<void> {
 
   sheet.columns = [
     { header: '姓名', key: 'name', width: 16 },
+    { header: '单位', key: 'organization', width: 24 },
     { header: '身份证号', key: 'id', width: 22 },
   ];
 
   sheet.getRow(1).font = { bold: true };
 
-  const idCell = sheet.getCell('B2');
-  idCell.value = '11010519491231002X';
-  idCell.numFmt = '@';
-
   sheet.getCell('A2').value =
     '【示例】请删除本行后填写真实考生信息；姓名与身份证号须与证件一致（除首尾空格外须完全一致）';
+  sheet.getCell('B2').value = '示例单位';
+  const idCell = sheet.getCell('C2');
+  idCell.value = '11010519491231002X';
+  idCell.numFmt = '@';
 
   const outDir = dirname(outPath);
   mkdirSync(outDir, { recursive: true });

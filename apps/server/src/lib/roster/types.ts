@@ -22,16 +22,20 @@ export type RowError = {
 export type ParsedRosterEntry = {
   rowNumber: number;
   fullName: string;
+  organization: string;
   nationalId: string;
 };
 
 export type RawRosterRow = {
   rowNumber: number;
   fullName: string;
+  organization: string;
   nationalId: string;
 };
 
-export const REQUIRED_HEADERS = ['姓名', '身份证号'] as const;
+export const REQUIRED_HEADERS = ['姓名', '单位', '身份证号'] as const;
+
+export const MAX_ORGANIZATION_LENGTH = 100;
 
 export const MAX_ROSTER_IMPORT_ROWS = 2000;
 

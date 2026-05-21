@@ -11,7 +11,12 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { formatExamDateTime } from '@/lib/exam';
-import { ApiError, studentApi, type StudentProfile } from '@/lib/student';
+import {
+  ApiError,
+  STUDENT_WAITING_POLL_INTERVAL_MS,
+  studentApi,
+  type StudentProfile,
+} from '@/lib/student';
 
 export default function StudentWaiting() {
   const navigate = useNavigate();
@@ -57,6 +62,11 @@ export default function StudentWaiting() {
           navigate(`/exam/take?examId=${encodeURIComponent(status.examId)}`, {
             replace: true,
           });
+        } else if (status.status === 'ENDED') {
+          setWaitingHint(null);
+          navigate(`/exam/ended?examId=${encodeURIComponent(status.examId)}`, {
+            replace: true,
+          });
         } else if (status.status === 'waiting') {
           setWaitingHint(
             `考试将于 ${formatExamDateTime(status.scheduledStartAt)} 开始，请稍候。`,
@@ -76,7 +86,7 @@ export default function StudentWaiting() {
       void poll();
       intervalId = setInterval(() => {
         void poll();
-      }, 4000);
+      }, STUDENT_WAITING_POLL_INTERVAL_MS);
     };
 
     const stopPolling = () => {

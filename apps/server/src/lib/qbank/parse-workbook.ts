@@ -1,5 +1,8 @@
-import ExcelJS from 'exceljs';
-
+import {
+  getCellByHeader,
+  headerIndexMap,
+  loadSpreadsheet,
+} from '../spreadsheet/read-workbook.js';
 import {
   MAX_IMPORT_ROWS,
   OPTION_HEADER_PATTERN,
@@ -27,27 +30,6 @@ export type ParseWorkbookResult = {
   skippedEmptyCount: number;
 };
 
-function cellText(cell: ExcelJS.Cell | undefined): string {
-  if (!cell || cell.value == null) return '';
-  if (typeof cell.value === 'object' && 'text' in cell.value) {
-    return String(cell.value.text ?? '').trim();
-  }
-  if (typeof cell.value === 'object' && 'richText' in cell.value) {
-    const rich = cell.value as ExcelJS.CellRichTextValue;
-    return rich.richText.map((p) => p.text).join('').trim();
-  }
-  return String(cell.value).trim();
-}
-
-function normalizeHeaderRow(row: ExcelJS.Row): Map<string, number> {
-  const headerToCol = new Map<string, number>();
-  row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
-    const name = cellText(cell);
-    if (name) headerToCol.set(name, colNumber);
-  });
-  return headerToCol;
-}
-
 function assertRequiredHeaders(headerToCol: Map<string, number>): void {
   for (const h of REQUIRED_HEADERS) {
     if (!headerToCol.has(h)) {
@@ -59,16 +41,6 @@ function assertRequiredHeaders(headerToCol: Map<string, number>): void {
   }
 }
 
-function getCellByHeader(
-  row: ExcelJS.Row,
-  headerToCol: Map<string, number>,
-  header: string,
-): string {
-  const col = headerToCol.get(header);
-  if (!col) return '';
-  return cellText(row.getCell(col));
-}
-
 export function mapTypeText(typeText: string): 'SINGLE' | 'MULTI' | 'JUDGE' | null {
   const key = typeText.trim();
   return TYPE_MAP[key] ?? null;
@@ -77,19 +49,8 @@ export function mapTypeText(typeText: string): 'SINGLE' | 'MULTI' | 'JUDGE' | nu
 export { TYPE_MAP };
 
 export async function parseWorkbook(buffer: Buffer): Promise<ParseWorkbookResult> {
-  const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.load(buffer as unknown as ExcelJS.Buffer);
-
-  const sheet = workbook.getWorksheet(SHEET_NAME);
-  if (!sheet) {
-    throw new QbankTemplateError(
-      'INVALID_TEMPLATE',
-      `缺少工作表「${SHEET_NAME}」`,
-    );
-  }
-
-  const headerRow = sheet.getRow(1);
-  const headerToCol = normalizeHeaderRow(headerRow);
+  const { rows: allRows } = loadSpreadsheet(buffer, { sheetName: SHEET_NAME });
+  const headerToCol = headerIndexMap(allRows[0] ?? []);
   assertRequiredHeaders(headerToCol);
 
   const optionHeaders: { key: string; col: number }[] = [];
@@ -105,17 +66,17 @@ export async function parseWorkbook(buffer: Buffer): Promise<ParseWorkbookResult
   let skippedEmptyCount = 0;
   let dataRowCount = 0;
 
-  sheet.eachRow((row, rowNumber) => {
-    if (rowNumber === 1) return;
-
+  for (let i = 1; i < allRows.length; i++) {
+    const row = allRows[i]!;
+    const rowNumber = i + 1;
     const stem = getCellByHeader(row, headerToCol, '题干');
     if (!stem) {
       skippedEmptyCount += 1;
-      return;
+      continue;
     }
     if (stem.startsWith('【示例】')) {
       skippedExampleCount += 1;
-      return;
+      continue;
     }
 
     dataRowCount += 1;
@@ -128,7 +89,7 @@ export async function parseWorkbook(buffer: Buffer): Promise<ParseWorkbookResult
 
     const options = new Map<string, string>();
     for (const { key, col } of optionHeaders) {
-      const text = cellText(row.getCell(col));
+      const text = (row[col] ?? '').trim();
       if (text) options.set(key, text);
     }
 
@@ -150,7 +111,7 @@ export async function parseWorkbook(buffer: Buffer): Promise<ParseWorkbookResult
       pointsRaw: getCellByHeader(row, headerToCol, '分值') || undefined,
       options,
     });
-  });
+  }
 
   return { rows, skippedExampleCount, skippedEmptyCount };
 }

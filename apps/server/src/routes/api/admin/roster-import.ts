@@ -5,7 +5,8 @@ import { importRoster } from '../../../lib/roster/import-roster.js';
 import { parseWorkbook } from '../../../lib/roster/parse-workbook.js';
 import { RosterTemplateError } from '../../../lib/roster/types.js';
 import { validateRows } from '../../../lib/roster/validate-rows.js';
-import { assertValidXlsxUpload } from '../../../lib/qbank/xlsx-file.js';
+import { SpreadsheetReadError } from '../../../lib/spreadsheet/read-workbook.js';
+import { assertValidSpreadsheetUpload } from '../../../lib/upload/spreadsheet-file.js';
 import { prisma } from '../../../lib/prisma.js';
 import { requireAdminSession } from '../../../plugins/admin-guard.js';
 
@@ -36,7 +37,7 @@ export async function registerAdminRosterImportRoutes(
       }
 
       const buffer = await data.toBuffer();
-      const fileCheck = assertValidXlsxUpload(
+      const fileCheck = assertValidSpreadsheetUpload(
         data.filename,
         data.mimetype,
         buffer,
@@ -51,7 +52,7 @@ export async function registerAdminRosterImportRoutes(
 
       try {
         const parsed = await parseWorkbook(buffer);
-        const { entries, errors } = await validateRows(prisma, parsed.rows);
+        const { entries, errors } = await validateRows(parsed.rows);
 
         if (errors.length > 0) {
           return reply.status(400).send({ ok: false, errors });
@@ -91,6 +92,13 @@ export async function registerAdminRosterImportRoutes(
           fileName: data.filename ?? 'import.xlsx',
         });
       } catch (err) {
+        if (err instanceof SpreadsheetReadError) {
+          return reply.status(400).send({
+            ok: false,
+            code: err.code,
+            message: err.message,
+          });
+        }
         if (err instanceof RosterTemplateError) {
           return reply.status(400).send({
             ok: false,

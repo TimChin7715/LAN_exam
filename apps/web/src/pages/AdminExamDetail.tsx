@@ -29,8 +29,12 @@ import {
 } from '@/components/ui/table';
 import {
   downloadExamExport,
+  downloadPracticalAnswer,
   endExam,
+  examContentModulesLabel,
+  hasExamModule,
   examStatusLabel,
+  fetchExamSeats,
   fetchExamSubmissions,
   formatExamDateTime,
   formatExamScheduleRange,
@@ -38,8 +42,11 @@ import {
   handleExamApiError,
   startExam,
   type ExamDetail,
+  type ExamSeatBoard,
   type SubmissionListItem,
 } from '@/lib/exam';
+import { ExamSeatBoardPanel } from '@/components/exam/ExamSeatBoardPanel';
+import { fetchAdminSettings } from '@/lib/admin-settings';
 import { maskNationalId } from '@/lib/roster';
 import type { PreviewQuestion } from '@/lib/qbank';
 
@@ -47,6 +54,10 @@ export default function AdminExamDetail() {
   const { examId } = useParams<{ examId: string }>();
   const [exam, setExam] = useState<ExamDetail | null>(null);
   const [submissions, setSubmissions] = useState<SubmissionListItem[]>([]);
+  const [showSeatBoard, setShowSeatBoard] = useState(true);
+  const [seatBoard, setSeatBoard] = useState<ExamSeatBoard | null>(null);
+  const [seatsLoading, setSeatsLoading] = useState(true);
+  const [seatsError, setSeatsError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -71,6 +82,49 @@ export default function AdminExamDetail() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const settings = await fetchAdminSettings();
+        if (!cancelled) setShowSeatBoard(settings.showSeatBoard);
+      } catch (err) {
+        if (!cancelled) handleExamApiError(err, '无法加载设置。');
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!examId || !showSeatBoard) {
+      setSeatBoard(null);
+      setSeatsError(null);
+      setSeatsLoading(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      setSeatsLoading(true);
+      setSeatsError(null);
+      try {
+        const board = await fetchExamSeats(examId);
+        if (!cancelled) setSeatBoard(board);
+      } catch (err) {
+        if (!cancelled) {
+          handleExamApiError(err, '无法加载考生座位信息。');
+          setSeatsError('无法加载考生座位信息。');
+        }
+      } finally {
+        if (!cancelled) setSeatsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [examId, showSeatBoard]);
 
   async function handleStart() {
     if (!examId) return;
@@ -146,10 +200,34 @@ export default function AdminExamDetail() {
         <CardHeader>
           <CardTitle className="text-base">考试配置</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-2 text-sm text-muted-foreground">
-          <p>题目批次：{exam.questionBatch.fileName}</p>
+        <CardContent className="grid gap-6 lg:grid-cols-2">
+          <div className="space-y-2 text-sm text-muted-foreground">
+          <p>考试内容：{examContentModulesLabel(exam.contentModules)}</p>
+          {exam.questionBatch ? (
+            <p>客观题批次：{exam.questionBatch.fileName}</p>
+          ) : null}
+          {exam.fillInBatch ? (
+            <p>
+              填空题批次：{exam.fillInBatch.title}（{exam.fillInBatch.wordFileName}、
+              {exam.fillInBatch.excelFileName}）
+            </p>
+          ) : null}
+          {exam.practicalBatch ? (
+            <p>
+              操作题批次：{exam.practicalBatch.title}（{exam.practicalBatch.wordFileName}
+              、{exam.practicalBatch.excelFileName}）
+            </p>
+          ) : null}
           <p>名单批次：{exam.rosterBatch.fileName}</p>
-          <p>题目数量：{exam.questions.length}</p>
+          {hasExamModule(exam.contentModules, 'OBJECTIVE') ||
+          hasExamModule(exam.contentModules, 'FILL') ? (
+            <p>试题数量（客观+填空）：{exam.questions.length}</p>
+          ) : null}
+          {hasExamModule(exam.contentModules, 'PRACTICAL') ? (
+            <p className="text-amber-700 dark:text-amber-400">
+              操作题需人工评阅，系统不自动计分。
+            </p>
+          ) : null}
           <p>
             计划时间：
             {formatExamScheduleRange(exam.scheduledStartAt, exam.scheduledEndAt)}
@@ -214,17 +292,30 @@ export default function AdminExamDetail() {
               </AlertDialog>
             ) : null}
           </div>
+          </div>
+          {showSeatBoard ? (
+            <ExamSeatBoardPanel
+              mode="admin"
+              board={seatBoard}
+              loading={seatsLoading}
+              error={seatsError}
+            />
+          ) : null}
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">题目预览（含标准答案）</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <QuestionPreviewCards questions={previewQuestions} />
-        </CardContent>
-      </Card>
+      {(hasExamModule(exam.contentModules, 'OBJECTIVE') ||
+        hasExamModule(exam.contentModules, 'FILL')) &&
+      exam.questions.length > 0 ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">试题预览（含标准答案）</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <QuestionPreviewCards questions={previewQuestions} />
+          </CardContent>
+        </Card>
+      ) : null}
 
       <Card>
         <CardHeader>
@@ -235,15 +326,20 @@ export default function AdminExamDetail() {
             <TableHeader>
               <TableRow>
                 <TableHead>姓名</TableHead>
+                <TableHead>单位</TableHead>
                 <TableHead>身份证号</TableHead>
                 <TableHead>状态</TableHead>
-                <TableHead>得分</TableHead>
+                <TableHead>试题得分</TableHead>
+                {hasExamModule(exam.contentModules, 'PRACTICAL') ? (
+                  <TableHead>操作题</TableHead>
+                ) : null}
               </TableRow>
             </TableHeader>
             <TableBody>
               {submissions.map((row) => (
                 <TableRow key={row.rosterEntryId}>
                   <TableCell>{row.fullName}</TableCell>
+                  <TableCell>{row.organization}</TableCell>
                   <TableCell>{maskNationalId(row.nationalId)}</TableCell>
                   <TableCell>
                     {row.submitted ? (
@@ -253,8 +349,35 @@ export default function AdminExamDetail() {
                     )}
                   </TableCell>
                   <TableCell>
-                    {row.submitted ? row.totalScore : '—'}
+                    {!hasExamModule(exam.contentModules, 'OBJECTIVE') &&
+                    !hasExamModule(exam.contentModules, 'FILL')
+                      ? '—'
+                      : row.submitted && row.totalScore !== null
+                        ? row.totalScore
+                        : '—'}
                   </TableCell>
+                  {hasExamModule(exam.contentModules, 'PRACTICAL') ? (
+                    <TableCell>
+                      {row.practicalSubmitted && examId ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() =>
+                            void downloadPracticalAnswer(
+                              examId,
+                              row.rosterEntryId,
+                              `${row.fullName}-操作题`,
+                            )
+                          }
+                        >
+                          下载答卷
+                        </Button>
+                      ) : (
+                        <span className="text-muted-foreground">未提交</span>
+                      )}
+                    </TableCell>
+                  ) : null}
                 </TableRow>
               ))}
             </TableBody>

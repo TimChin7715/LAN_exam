@@ -44,6 +44,7 @@ export type ImportFailure = {
 export type RosterListItem = {
   id: string;
   fullName: string;
+  organization: string;
   nationalId: string;
   createdAt: string;
 };
@@ -210,10 +211,4 @@ export async function fetchRosterList(params: {
   };
 }
 
-export function validateXlsxFile(file: File): string | null {
-  const name = file.name.toLowerCase();
-  if (!name.endsWith('.xlsx')) {
-    return '请选择 .xlsx 格式的 Excel 文件。';
-  }
-  return null;
-}
+export { validateSpreadsheetFile as validateXlsxFile } from '@/lib/upload-formats';

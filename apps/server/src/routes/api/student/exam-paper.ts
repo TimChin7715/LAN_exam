@@ -2,6 +2,11 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 
 import { assertStudentExamAccess } from '../../../lib/exam/access.js';
+import {
+  hasContentModule,
+  requiresFillInBatch,
+  requiresPracticalBatch,
+} from '../../../lib/exam/content-mode.js';
 import { ExamAccessError } from '../../../lib/exam/types.js';
 import { prisma } from '../../../lib/prisma.js';
 import {
@@ -48,6 +53,35 @@ export async function registerStudentExamPaperRoutes(
         throw err;
       }
 
+      const exam = await prisma.exam.findUnique({
+        where: { id: examId },
+        select: {
+          contentModules: true,
+          fillInBatch: {
+            select: {
+              title: true,
+              wordFileName: true,
+              excelFileName: true,
+              attachmentFileName: true,
+            },
+          },
+          practicalBatch: {
+            select: {
+              title: true,
+              wordFileName: true,
+              excelFileName: true,
+            },
+          },
+        },
+      });
+
+      if (!exam) {
+        return reply.status(404).send({
+          code: 'EXAM_NOT_FOUND',
+          message: '考试不存在',
+        });
+      }
+
       const examQuestions = await prisma.examQuestion.findMany({
         where: { examId },
         orderBy: { sortOrder: 'asc' },
@@ -60,6 +94,8 @@ export async function registerStudentExamPaperRoutes(
               type: true,
               stem: true,
               points: true,
+              knowledgePoints: true,
+              explanation: true,
               options: {
                 orderBy: { sortOrder: 'asc' },
                 select: {
@@ -86,17 +122,64 @@ export async function registerStudentExamPaperRoutes(
         drafts.map((d) => [d.examQuestionId, d.selectedKeys]),
       );
 
+      let practical: {
+        batchTitle: string;
+        wordFileName: string;
+        excelFileName: string;
+        hasAnswerDraft: boolean;
+        answerFileName: string | null;
+        answerUpdatedAt: string | null;
+      } | null = null;
+
+      if (requiresPracticalBatch(exam.contentModules) && exam.practicalBatch) {
+        const practicalDraft = await prisma.practicalAnswerDraft.findUnique({
+          where: { examId_rosterEntryId: { examId, rosterEntryId } },
+          select: { docxFileName: true, updatedAt: true },
+        });
+        practical = {
+          batchTitle: exam.practicalBatch.title,
+          wordFileName: exam.practicalBatch.wordFileName,
+          excelFileName: exam.practicalBatch.excelFileName,
+          hasAnswerDraft: Boolean(practicalDraft),
+          answerFileName: practicalDraft?.docxFileName ?? null,
+          answerUpdatedAt: practicalDraft?.updatedAt.toISOString() ?? null,
+        };
+      }
+
+      let fillIn: {
+        batchTitle: string;
+        wordFileName: string;
+        excelFileName: string;
+        attachmentFileName: string | null;
+      } | null = null;
+
+      if (requiresFillInBatch(exam.contentModules) && exam.fillInBatch) {
+        fillIn = {
+          batchTitle: exam.fillInBatch.title,
+          wordFileName: exam.fillInBatch.wordFileName,
+          excelFileName: exam.fillInBatch.excelFileName,
+          attachmentFileName: exam.fillInBatch.attachmentFileName,
+        };
+      }
+
       return reply.send({
         examId,
+        contentModules: exam.contentModules,
         items: examQuestions.map((eq) => ({
           examQuestionId: eq.id,
           sortOrder: eq.sortOrder,
           type: eq.question.type,
           stem: eq.question.stem,
           points: eq.question.points,
+          fillQuestionNo:
+            eq.question.type === 'FILL' ? eq.question.knowledgePoints : null,
+          fillBlankIndex:
+            eq.question.type === 'FILL' ? eq.question.explanation : null,
           options: eq.question.options,
           selectedKeys: draftByQuestionId.get(eq.id) ?? '',
         })),
+        practical,
+        fillIn,
       });
     },
   );

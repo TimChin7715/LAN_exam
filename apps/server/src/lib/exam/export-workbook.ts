@@ -1,27 +1,74 @@
 import type { QuestionType } from '@prisma/client';
 import ExcelJS from 'exceljs';
 
+import {
+  displayFillAnswer,
+  formatFillAnswerKeysPreview,
+} from '../fillin/export-display.js';
 import { prisma } from '../prisma.js';
 import { buildSummaryRowQuestionFields } from './export-summary.js';
 import { maskNationalId } from './mask-national-id.js';
 
-export type SummaryExamQuestion = { id: string; sortOrder: number };
+export type SummaryExamQuestion = {
+  id: string;
+  sortOrder: number;
+  type: QuestionType;
+  fillQuestionNo: string | null;
+  fillBlankIndex: string | null;
+};
 
-/** Fixed 5 + dynamic 第k题 columns — shared by production and tests. */
+function summaryColumnHeader(eq: SummaryExamQuestion): string {
+  const base = `第${eq.sortOrder + 1}题`;
+  if (eq.type !== 'FILL') return base;
+  const qNo = eq.fillQuestionNo?.trim();
+  const blank = eq.fillBlankIndex?.trim();
+  if (!qNo) return base;
+  const suffix = blank ? `题号${qNo}-${blank}` : `题号${qNo}`;
+  return `${base}(${suffix})`;
+}
+
+/** Fixed 6 + dynamic 第k题 columns — shared by production and tests. */
 export function buildSummarySheetColumns(examQuestions: SummaryExamQuestion[]) {
   return [
     { header: '姓名', key: 'name', width: 16 },
+    { header: '单位', key: 'organization', width: 24 },
     { header: '身份证号', key: 'id', width: 22 },
     { header: '总分', key: 'score', width: 10 },
     { header: '是否提交', key: 'submitted', width: 12 },
     { header: '提交时间', key: 'time', width: 20 },
     ...examQuestions.map((eq) => ({
-      header: `第${eq.sortOrder + 1}题`,
+      header: summaryColumnHeader(eq),
       key: `q_${eq.id}`,
-      width: 10,
+      width: 14,
     })),
   ];
 }
+
+export const OBJECTIVE_DETAIL_HEADERS = [
+  '姓名',
+  '单位',
+  '身份证号',
+  '题号',
+  '题型',
+  '所选',
+  '正确答案',
+  '对错',
+  '得分',
+] as const;
+
+export const FILL_IN_DETAIL_HEADERS = [
+  '姓名',
+  '单位',
+  '身份证号',
+  '题序',
+  '答题卡题号',
+  '空位',
+  '学员作答',
+  '参考答案',
+  '对错',
+  '得分',
+  '满分',
+] as const;
 
 function questionTypeLabelZh(type: QuestionType): string {
   switch (type) {
@@ -31,6 +78,8 @@ function questionTypeLabelZh(type: QuestionType): string {
       return '多选';
     case 'JUDGE':
       return '判断';
+    case 'FILL':
+      return '填空';
     default:
       return type;
   }
@@ -42,9 +91,28 @@ function formatDateTime(d: Date | null | undefined): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
+function toSummaryExamQuestion(row: {
+  id: string;
+  sortOrder: number;
+  question: {
+    type: QuestionType;
+    knowledgePoints: string | null;
+    explanation: string | null;
+  };
+}): SummaryExamQuestion {
+  const isFill = row.question.type === 'FILL';
+  return {
+    id: row.id,
+    sortOrder: row.sortOrder,
+    type: row.question.type,
+    fillQuestionNo: isFill ? row.question.knowledgePoints : null,
+    fillBlankIndex: isFill ? row.question.explanation : null,
+  };
+}
+
 /**
- * Builds dual-sheet exam export. v1 scale note: ~2000 roster × ~200 questions
- * is the practical upper bound before streaming/chunking is required.
+ * Builds exam export: 成绩汇总 + 答题明细（客观）+ 填空题明细.
+ * v1 scale note: ~2000 roster × ~200 questions is the practical upper bound.
  */
 export async function buildExamExportWorkbook(
   examId: string,
@@ -62,11 +130,24 @@ export async function buildExamExportWorkbook(
     throw new Error('EXAM_NOT_FOUND');
   }
 
-  const examQuestions = await prisma.examQuestion.findMany({
+  const examQuestionRows = await prisma.examQuestion.findMany({
     where: { examId },
     orderBy: { sortOrder: 'asc' },
-    select: { id: true, sortOrder: true },
+    select: {
+      id: true,
+      sortOrder: true,
+      question: {
+        select: {
+          type: true,
+          knowledgePoints: true,
+          explanation: true,
+          points: true,
+        },
+      },
+    },
   });
+
+  const examQuestions = examQuestionRows.map(toSummaryExamQuestion);
 
   const rosterEntries = await prisma.rosterEntry.findMany({
     where: { batchId: exam.rosterBatchId },
@@ -74,6 +155,7 @@ export async function buildExamExportWorkbook(
     select: {
       id: true,
       fullName: true,
+      organization: true,
       nationalId: true,
       submissions: {
         where: { examId },
@@ -94,6 +176,9 @@ export async function buildExamExportWorkbook(
                     select: {
                       type: true,
                       answerKeys: true,
+                      knowledgePoints: true,
+                      explanation: true,
+                      points: true,
                     },
                   },
                 },
@@ -116,6 +201,7 @@ export async function buildExamExportWorkbook(
     const submission = entry.submissions[0];
     summarySheet.addRow({
       name: entry.fullName,
+      organization: entry.organization,
       id: maskNationalId(entry.nationalId),
       score: submission ? submission.totalScore : '—',
       submitted: submission ? '已提交' : '未提交',
@@ -125,17 +211,39 @@ export async function buildExamExportWorkbook(
   }
 
   const detailSheet = workbook.addWorksheet('答题明细');
-  detailSheet.columns = [
-    { header: '姓名', key: 'name', width: 16 },
-    { header: '身份证号', key: 'id', width: 22 },
-    { header: '题号', key: 'num', width: 8 },
-    { header: '题型', key: 'type', width: 10 },
-    { header: '所选', key: 'selected', width: 16 },
-    { header: '正确答案', key: 'correct', width: 16 },
-    { header: '对错', key: 'right', width: 8 },
-    { header: '得分', key: 'points', width: 8 },
-  ];
+  detailSheet.columns = OBJECTIVE_DETAIL_HEADERS.map((header, i) => ({
+    header,
+    key: ['name', 'organization', 'id', 'num', 'type', 'selected', 'correct', 'right', 'points'][i]!,
+    width: header === '单位' ? 24 : header === '身份证号' ? 22 : 10,
+  }));
   detailSheet.getRow(1).font = { bold: true };
+
+  const fillInSheet = workbook.addWorksheet('填空题明细');
+  fillInSheet.columns = FILL_IN_DETAIL_HEADERS.map((header, i) => ({
+    header,
+    key: [
+      'name',
+      'organization',
+      'id',
+      'num',
+      'fillNo',
+      'blank',
+      'selected',
+      'correct',
+      'right',
+      'points',
+      'maxPoints',
+    ][i]!,
+    width:
+      header === '单位'
+        ? 24
+        : header === '身份证号'
+          ? 22
+          : header === '学员作答' || header === '参考答案'
+            ? 20
+            : 10,
+  }));
+  fillInSheet.getRow(1).font = { bold: true };
 
   for (const entry of rosterEntries) {
     const submission = entry.submissions[0];
@@ -146,13 +254,32 @@ export async function buildExamExportWorkbook(
     );
 
     for (const answer of sortedAnswers) {
+      const q = answer.examQuestion.question;
+      if (q.type === 'FILL') {
+        fillInSheet.addRow({
+          name: entry.fullName,
+          organization: entry.organization,
+          id: maskNationalId(entry.nationalId),
+          num: answer.examQuestion.sortOrder + 1,
+          fillNo: q.knowledgePoints?.trim() || '—',
+          blank: q.explanation?.trim() || '—',
+          selected: displayFillAnswer(answer.selectedKeys) || '—',
+          correct: formatFillAnswerKeysPreview(q.answerKeys),
+          right: answer.isCorrect ? '是' : '否',
+          points: answer.pointsAwarded,
+          maxPoints: q.points,
+        });
+        continue;
+      }
+
       detailSheet.addRow({
         name: entry.fullName,
+        organization: entry.organization,
         id: maskNationalId(entry.nationalId),
         num: answer.examQuestion.sortOrder + 1,
-        type: questionTypeLabelZh(answer.examQuestion.question.type),
+        type: questionTypeLabelZh(q.type),
         selected: answer.selectedKeys || '—',
-        correct: answer.examQuestion.question.answerKeys,
+        correct: q.answerKeys,
         right: answer.isCorrect ? '是' : '否',
         points: answer.pointsAwarded,
       });

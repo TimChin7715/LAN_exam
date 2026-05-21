@@ -1,15 +1,27 @@
+import type { ExamContentModule } from '@prisma/client';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 
 import { resolveAdminTeacherId } from '../../../lib/admin-context.js';
-import { materializeExamQuestions } from '../../../lib/exam/materialize-questions.js';
+import {
+  assertTeacherOwnsExamBatches,
+  contentModulesSchema,
+  hasContentModule,
+  requiresFillInBatch,
+  requiresObjectiveBatch,
+} from '../../../lib/exam/content-mode.js';
+import { materializeExamQuestionSets } from '../../../lib/exam/materialize-questions.js';
+import { assignExamSeats } from '../../../lib/seat/assign-seats.js';
 import { prisma } from '../../../lib/prisma.js';
 import { requireAdminSession } from '../../../plugins/admin-guard.js';
 
 const createBodySchema = z
   .object({
     title: z.string().trim().min(1).max(200),
-    questionBatchId: z.string().min(1),
+    contentModules: contentModulesSchema,
+    questionBatchId: z.string().min(1).optional(),
+    fillInBatchId: z.string().min(1).optional(),
+    practicalBatchId: z.string().min(1).optional(),
     rosterBatchId: z.string().min(1),
     scheduledStartAt: z.string().datetime(),
     scheduledEndAt: z.string().datetime(),
@@ -25,52 +37,25 @@ const createBodySchema = z
 const patchBodySchema = z
   .object({
     title: z.string().trim().min(1).max(200).optional(),
-    questionBatchId: z.string().min(1).optional(),
+    contentModules: contentModulesSchema.optional(),
+    questionBatchId: z.string().min(1).nullable().optional(),
+    fillInBatchId: z.string().min(1).nullable().optional(),
+    practicalBatchId: z.string().min(1).nullable().optional(),
     rosterBatchId: z.string().min(1).optional(),
   })
   .refine(
     (data) =>
       data.title !== undefined ||
+      data.contentModules !== undefined ||
       data.questionBatchId !== undefined ||
+      data.fillInBatchId !== undefined ||
+      data.practicalBatchId !== undefined ||
       data.rosterBatchId !== undefined,
     { message: '至少提供一个可更新字段' },
   );
 
-async function assertTeacherOwnsBatches(
-  teacherId: string,
-  questionBatchId: string,
-  rosterBatchId: string,
-): Promise<{ ok: true } | { ok: false; status: number; code: string; message: string }> {
-  const [questionBatch, rosterBatch] = await Promise.all([
-    prisma.questionImportBatch.findFirst({
-      where: { id: questionBatchId, teacherId },
-      select: { id: true },
-    }),
-    prisma.rosterImportBatch.findFirst({
-      where: { id: rosterBatchId, teacherId },
-      select: { id: true },
-    }),
-  ]);
-
-  if (!questionBatch) {
-    return {
-      ok: false,
-      status: 400,
-      code: 'INVALID_QUESTION_BATCH',
-      message: '题目批次不存在或无权使用',
-    };
-  }
-
-  if (!rosterBatch) {
-    return {
-      ok: false,
-      status: 400,
-      code: 'INVALID_ROSTER_BATCH',
-      message: '名单批次不存在或无权使用',
-    };
-  }
-
-  return { ok: true };
+function needsQuestionMaterialize(modules: ExamContentModule[]): boolean {
+  return requiresObjectiveBatch(modules) || requiresFillInBatch(modules);
 }
 
 export async function registerAdminExamsCrudRoutes(
@@ -89,14 +74,25 @@ export async function registerAdminExamsCrudRoutes(
           id: true,
           title: true,
           status: true,
+          contentModules: true,
           scheduledStartAt: true,
           scheduledEndAt: true,
           startedAt: true,
           endedAt: true,
           createdAt: true,
           questionBatch: { select: { id: true, fileName: true } },
+          fillInBatch: { select: { id: true, title: true } },
+          practicalBatch: {
+            select: { id: true, title: true, wordFileName: true },
+          },
           rosterBatch: { select: { id: true, fileName: true } },
-          _count: { select: { submissions: true, questions: true } },
+          _count: {
+            select: {
+              submissions: true,
+              questions: true,
+              practicalSubmissions: true,
+            },
+          },
         },
       });
 
@@ -106,15 +102,19 @@ export async function registerAdminExamsCrudRoutes(
           id: exam.id,
           title: exam.title,
           status: exam.status,
+          contentModules: exam.contentModules,
           scheduledStartAt: exam.scheduledStartAt,
           scheduledEndAt: exam.scheduledEndAt,
           startedAt: exam.startedAt,
           endedAt: exam.endedAt,
           createdAt: exam.createdAt,
-          questionBatchFileName: exam.questionBatch.fileName,
+          questionBatchFileName: exam.questionBatch?.fileName ?? null,
+          fillInBatchTitle: exam.fillInBatch?.title ?? null,
+          practicalBatchTitle: exam.practicalBatch?.title ?? null,
           rosterBatchFileName: exam.rosterBatch.fileName,
           questionCount: exam._count.questions,
           submissionCount: exam._count.submissions,
+          practicalSubmissionCount: exam._count.practicalSubmissions,
         })),
       });
     },
@@ -134,11 +134,13 @@ export async function registerAdminExamsCrudRoutes(
         });
       }
 
-      const batchCheck = await assertTeacherOwnsBatches(
-        teacherId,
-        parsed.data.questionBatchId,
-        parsed.data.rosterBatchId,
-      );
+      const batchCheck = await assertTeacherOwnsExamBatches(teacherId, {
+        contentModules: parsed.data.contentModules,
+        questionBatchId: parsed.data.questionBatchId,
+        fillInBatchId: parsed.data.fillInBatchId,
+        practicalBatchId: parsed.data.practicalBatchId,
+        rosterBatchId: parsed.data.rosterBatchId,
+      });
       if (!batchCheck.ok) {
         return reply.status(batchCheck.status).send({
           ok: false,
@@ -152,18 +154,23 @@ export async function registerAdminExamsCrudRoutes(
           const created = await tx.exam.create({
             data: {
               title: parsed.data.title,
+              contentModules: parsed.data.contentModules,
               teacherId,
-              questionBatchId: parsed.data.questionBatchId,
+              questionBatchId: parsed.data.questionBatchId ?? null,
+              fillInBatchId: parsed.data.fillInBatchId ?? null,
+              practicalBatchId: parsed.data.practicalBatchId ?? null,
               rosterBatchId: parsed.data.rosterBatchId,
               scheduledStartAt: new Date(parsed.data.scheduledStartAt),
               scheduledEndAt: new Date(parsed.data.scheduledEndAt),
             },
           });
-          await materializeExamQuestions(
-            tx,
-            created.id,
-            parsed.data.questionBatchId,
-          );
+          if (needsQuestionMaterialize(parsed.data.contentModules)) {
+            await materializeExamQuestionSets(tx, created.id, {
+              questionBatchId: parsed.data.questionBatchId,
+              fillInBatchId: parsed.data.fillInBatchId,
+            });
+          }
+          await assignExamSeats(tx, created.id, parsed.data.rosterBatchId);
           return created;
         },
         { timeout: 30_000 },
@@ -184,7 +191,27 @@ export async function registerAdminExamsCrudRoutes(
       const exam = await prisma.exam.findFirst({
         where: { id, teacherId },
         include: {
-          questionBatch: { select: { id: true, fileName: true, createdAt: true } },
+          questionBatch: {
+            select: { id: true, fileName: true, createdAt: true },
+          },
+          fillInBatch: {
+            select: {
+              id: true,
+              title: true,
+              wordFileName: true,
+              excelFileName: true,
+              createdAt: true,
+            },
+          },
+          practicalBatch: {
+            select: {
+              id: true,
+              title: true,
+              wordFileName: true,
+              excelFileName: true,
+              createdAt: true,
+            },
+          },
           rosterBatch: { select: { id: true, fileName: true, createdAt: true } },
           questions: {
             orderBy: { sortOrder: 'asc' },
@@ -204,7 +231,9 @@ export async function registerAdminExamsCrudRoutes(
               },
             },
           },
-          _count: { select: { submissions: true } },
+          _count: {
+            select: { submissions: true, practicalSubmissions: true },
+          },
         },
       });
 
@@ -239,7 +268,10 @@ export async function registerAdminExamsCrudRoutes(
         select: {
           id: true,
           status: true,
+          contentModules: true,
           questionBatchId: true,
+          fillInBatchId: true,
+          practicalBatchId: true,
           rosterBatchId: true,
         },
       });
@@ -259,32 +291,51 @@ export async function registerAdminExamsCrudRoutes(
         });
       }
 
+      const nextModules =
+        parsed.data.contentModules ?? existing.contentModules;
       const nextQuestionBatchId =
-        parsed.data.questionBatchId ?? existing.questionBatchId;
+        parsed.data.questionBatchId !== undefined
+          ? parsed.data.questionBatchId
+          : existing.questionBatchId;
+      const nextFillInBatchId =
+        parsed.data.fillInBatchId !== undefined
+          ? parsed.data.fillInBatchId
+          : existing.fillInBatchId;
+      const nextPracticalBatchId =
+        parsed.data.practicalBatchId !== undefined
+          ? parsed.data.practicalBatchId
+          : existing.practicalBatchId;
       const nextRosterBatchId =
         parsed.data.rosterBatchId ?? existing.rosterBatchId;
 
-      if (
-        parsed.data.questionBatchId !== undefined ||
-        parsed.data.rosterBatchId !== undefined
-      ) {
-        const batchCheck = await assertTeacherOwnsBatches(
-          teacherId,
-          nextQuestionBatchId,
-          nextRosterBatchId,
-        );
-        if (!batchCheck.ok) {
-          return reply.status(batchCheck.status).send({
-            ok: false,
-            code: batchCheck.code,
-            message: batchCheck.message,
-          });
-        }
+      const batchCheck = await assertTeacherOwnsExamBatches(teacherId, {
+        contentModules: nextModules,
+        questionBatchId: nextQuestionBatchId,
+        fillInBatchId: nextFillInBatchId,
+        practicalBatchId: nextPracticalBatchId,
+        rosterBatchId: nextRosterBatchId,
+      });
+      if (!batchCheck.ok) {
+        return reply.status(batchCheck.status).send({
+          ok: false,
+          code: batchCheck.code,
+          message: batchCheck.message,
+        });
       }
 
-      const questionBatchChanged =
+      const rosterBatchChanged =
+        parsed.data.rosterBatchId !== undefined &&
+        parsed.data.rosterBatchId !== existing.rosterBatchId;
+      const questionSetsChanged =
         parsed.data.questionBatchId !== undefined &&
         parsed.data.questionBatchId !== existing.questionBatchId;
+      const fillInBatchChanged =
+        parsed.data.fillInBatchId !== undefined &&
+        parsed.data.fillInBatchId !== existing.fillInBatchId;
+      const modulesChanged =
+        parsed.data.contentModules !== undefined &&
+        JSON.stringify(parsed.data.contentModules) !==
+          JSON.stringify(existing.contentModules);
 
       await prisma.$transaction(
         async (tx) => {
@@ -294,8 +345,17 @@ export async function registerAdminExamsCrudRoutes(
               ...(parsed.data.title !== undefined
                 ? { title: parsed.data.title }
                 : {}),
+              ...(parsed.data.contentModules !== undefined
+                ? { contentModules: parsed.data.contentModules }
+                : {}),
               ...(parsed.data.questionBatchId !== undefined
                 ? { questionBatchId: parsed.data.questionBatchId }
+                : {}),
+              ...(parsed.data.fillInBatchId !== undefined
+                ? { fillInBatchId: parsed.data.fillInBatchId }
+                : {}),
+              ...(parsed.data.practicalBatchId !== undefined
+                ? { practicalBatchId: parsed.data.practicalBatchId }
                 : {}),
               ...(parsed.data.rosterBatchId !== undefined
                 ? { rosterBatchId: parsed.data.rosterBatchId }
@@ -303,8 +363,29 @@ export async function registerAdminExamsCrudRoutes(
             },
           });
 
-          if (questionBatchChanged) {
-            await materializeExamQuestions(tx, id, nextQuestionBatchId);
+          if (
+            questionSetsChanged ||
+            fillInBatchChanged ||
+            modulesChanged
+          ) {
+            if (needsQuestionMaterialize(nextModules)) {
+              await materializeExamQuestionSets(tx, id, {
+                questionBatchId: hasContentModule(nextModules, 'OBJECTIVE')
+                  ? nextQuestionBatchId
+                  : null,
+                fillInBatchId: hasContentModule(nextModules, 'FILL')
+                  ? nextFillInBatchId
+                  : null,
+              });
+            } else {
+              await tx.examQuestion.deleteMany({ where: { examId: id } });
+            }
+          }
+
+          if (rosterBatchChanged) {
+            await assignExamSeats(tx, id, nextRosterBatchId, 'random_shuffle_v1', {
+              force: true,
+            });
           }
         },
         { timeout: 30_000 },

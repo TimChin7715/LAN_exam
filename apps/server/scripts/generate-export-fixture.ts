@@ -8,15 +8,32 @@ import { fileURLToPath } from 'node:url';
 
 import ExcelJS from 'exceljs';
 
-import { buildSummarySheetColumns } from '../src/lib/exam/export-workbook.js';
+import {
+  buildSummarySheetColumns,
+  FILL_IN_DETAIL_HEADERS,
+  OBJECTIVE_DETAIL_HEADERS,
+  type SummaryExamQuestion,
+} from '../src/lib/exam/export-workbook.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '../../..');
 const outDir = join(root, 'fixtures/export');
 const outPath = join(outDir, 'test1-成绩导出.xlsx');
 
-const examQuestions = [
-  { id: 'sample-eq1', sortOrder: 0 },
-  { id: 'sample-eq2', sortOrder: 1 },
+const examQuestions: SummaryExamQuestion[] = [
+  {
+    id: 'sample-eq1',
+    sortOrder: 0,
+    type: 'SINGLE',
+    fillQuestionNo: null,
+    fillBlankIndex: null,
+  },
+  {
+    id: 'sample-eq2',
+    sortOrder: 1,
+    type: 'SINGLE',
+    fillQuestionNo: null,
+    fillBlankIndex: null,
+  },
 ];
 
 mkdirSync(outDir, { recursive: true });
@@ -29,6 +46,7 @@ summary.columns = buildSummarySheetColumns(examQuestions);
 summary.getRow(1).font = { bold: true };
 summary.addRow({
   name: '示例学生',
+  organization: '示例单位',
   id: '110101********1234',
   score: 3,
   submitted: '已提交',
@@ -38,17 +56,42 @@ summary.addRow({
 });
 
 const detail = wb.addWorksheet('答题明细');
-detail.columns = [
-  { header: '姓名', key: 'name', width: 16 },
-  { header: '身份证号', key: 'id', width: 22 },
-  { header: '题号', key: 'num', width: 8 },
-  { header: '题型', key: 'type', width: 10 },
-  { header: '所选', key: 'selected', width: 16 },
-  { header: '正确答案', key: 'correct', width: 16 },
-  { header: '对错', key: 'right', width: 8 },
-  { header: '得分', key: 'points', width: 8 },
-];
+detail.columns = OBJECTIVE_DETAIL_HEADERS.map((header, i) => ({
+  header,
+  key: [
+    'name',
+    'organization',
+    'id',
+    'num',
+    'type',
+    'selected',
+    'correct',
+    'right',
+    'points',
+  ][i]!,
+  width: 10,
+}));
 detail.getRow(1).font = { bold: true };
+
+const fillIn = wb.addWorksheet('填空题明细');
+fillIn.columns = FILL_IN_DETAIL_HEADERS.map((header, i) => ({
+  header,
+  key: [
+    'name',
+    'organization',
+    'id',
+    'num',
+    'fillNo',
+    'blank',
+    'selected',
+    'correct',
+    'right',
+    'points',
+    'maxPoints',
+  ][i]!,
+  width: 10,
+}));
+fillIn.getRow(1).font = { bold: true };
 
 await wb.xlsx.writeFile(outPath);
 console.log(`Wrote ${outPath}`);

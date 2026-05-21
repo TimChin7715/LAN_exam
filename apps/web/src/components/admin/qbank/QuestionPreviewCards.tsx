@@ -1,5 +1,6 @@
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
+import { formatFillAnswerKeysPreview, parseFillBlankSpecs } from '@/lib/fillin';
 import {
   formatAnswerKeys,
   formatStemForDisplay,
@@ -86,7 +87,23 @@ function PreviewCard({ q, compact }: { q: PreviewQuestion; compact: boolean }) {
             ) : null}
           </ul>
         ) : null}
-        {isMulti && answerKeys.length > 0 ? (
+        {q.type === 'FILL' ? (
+          <div className="space-y-1 text-sm text-muted-foreground">
+            <p>
+              标准答案：{formatFillAnswerKeysPreview(q.answerKeys)}
+            </p>
+            <p className="tabular-nums">分值：{q.points} 分/空</p>
+            {parseFillBlankSpecs(q.answerKeys).length > 1 ? (
+              <ul className="list-inside list-disc">
+                {parseFillBlankSpecs(q.answerKeys).map((blank) => (
+                  <li key={blank.blankIndex}>
+                    空 {blank.blankIndex}：{blank.answers.join(' / ')}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
+        ) : isMulti && answerKeys.length > 0 ? (
           <AnswerKeyBadges answerKeys={answerKeys} />
         ) : (
           <p className="text-sm font-semibold">

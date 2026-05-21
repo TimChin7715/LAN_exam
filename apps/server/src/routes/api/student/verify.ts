@@ -46,9 +46,25 @@ export async function registerStudentVerifyRoutes(
         });
       }
 
-      const entry = await prisma.rosterEntry.findFirst({
+      const matches = await prisma.rosterEntry.findMany({
         where: { fullName, nationalId },
+        select: { id: true, fullName: true, batchId: true },
+        orderBy: { createdAt: 'desc' },
       });
+
+      let entry = matches[0] ?? null;
+      if (matches.length > 1) {
+        const activeExam = await prisma.exam.findFirst({
+          where: { status: 'IN_PROGRESS' },
+          select: { rosterBatchId: true },
+        });
+        if (activeExam) {
+          const inActiveBatch = matches.find(
+            (m) => m.batchId === activeExam.rosterBatchId,
+          );
+          if (inActiveBatch) entry = inActiveBatch;
+        }
+      }
 
       if (!entry) {
         request.log.warn(

@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Users } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
+import { AdminBackToConsoleButton } from '@/components/admin/AdminBackToConsoleButton';
 import { ImportDropzone } from '@/components/admin/roster/ImportDropzone';
 import { ImportErrorTable } from '@/components/admin/roster/ImportErrorTable';
 import { ImportResultSummary } from '@/components/admin/roster/ImportResultSummary';
@@ -115,17 +116,12 @@ export default function AdminRoster() {
   return (
     <div className="space-y-8">
       <div className="space-y-2">
-        <Link
-          to="/admin"
-          className="inline-block text-sm font-semibold text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        >
-          ← 返回仪表盘
-        </Link>
+        <AdminBackToConsoleButton />
         <h1 className="text-xl font-semibold leading-tight text-foreground">
           名单管理
         </h1>
         <p className="text-base text-muted-foreground">
-          每次上传一个 Excel 文件将生成一份独立名单。请使用官方模板批量导入，姓名与身份证号须与证件一致（除首尾空格外须完全一致）。
+          每次上传一个 Excel 文件将生成一份独立名单。请使用官方模板批量导入，须填写单位；姓名与身份证号须与证件一致（除首尾空格外须完全一致）。
         </p>
       </div>
 
@@ -233,7 +229,7 @@ export default function AdminRoster() {
                                 <AlertDialogTitle>确认删除名单？</AlertDialogTitle>
                                 <AlertDialogDescription>
                                   将永久删除「{batch.fileName}」及其中的 {batch.itemCount}{' '}
-                                  名考生，此操作不可恢复。已被考试引用的名单无法删除。
+                                  名考生，此操作不可恢复。已被考试引用的名单无法删除，以免影响考后成绩导出。
                                 </AlertDialogDescription>
                               </AlertDialogHeader>
                               <AlertDialogFooter>
