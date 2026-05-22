@@ -31,14 +31,21 @@ export function hasOleMagic(buffer: Buffer): boolean {
   return buffer.length >= 4 && buffer.subarray(0, 4).equals(OLE_MAGIC);
 }
 
+/** Detect real format from file header (extension may be wrong). */
+export function detectWordFormat(buffer: Buffer): WordUploadExt | null {
+  if (hasZipMagic(buffer)) return 'docx';
+  if (hasOleMagic(buffer)) return 'doc';
+  return null;
+}
+
 export function assertValidWordUpload(
   filename: string | undefined,
   mimetype: string | undefined,
   buffer: Buffer,
   maxBytes: number,
 ): { ok: true; ext: WordUploadExt } | { ok: false; message: string } {
-  const ext = wordUploadExt(filename);
-  if (!ext) {
+  const extFromName = wordUploadExt(filename);
+  if (!extFromName) {
     return { ok: false, message: '请上传 .doc 或 .docx 文件' };
   }
   if (!isWordMime(mimetype)) {
@@ -53,13 +60,25 @@ export function assertValidWordUpload(
       message: `Word 文件不能超过 ${Math.round(maxBytes / 1024 / 1024)}MB`,
     };
   }
-  if (ext === 'docx' && !hasZipMagic(buffer)) {
-    return { ok: false, message: '文件内容不是有效的 Word 文档' };
+
+  const actualExt = detectWordFormat(buffer);
+  if (!actualExt) {
+    return {
+      ok: false,
+      message:
+        '文件内容不是有效的 Word 文档，请用 Word/WPS 另存为 .docx 或 Word 97-2003 .doc 后重试',
+    };
   }
-  if (ext === 'doc' && !hasOleMagic(buffer)) {
-    return { ok: false, message: '文件内容不是有效的 Word 文档' };
+
+  if (extFromName === 'doc' && actualExt === 'docx') {
+    return {
+      ok: false,
+      message:
+        '该文件实际为 .docx 格式，请将扩展名改为 .docx 后上传（.docx 才支持考试端预览图片）',
+    };
   }
-  return { ok: true, ext };
+
+  return { ok: true, ext: actualExt };
 }
 
 /** @deprecated use assertValidWordUpload */

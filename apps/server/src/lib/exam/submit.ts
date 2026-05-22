@@ -6,6 +6,7 @@ import {
   requiresQuestionSubmission,
 } from './content-mode.js';
 import { finalizePracticalSubmission } from './submit-practical.js';
+import { finalizeFillInScreenshots } from '../fillin/finalize-screenshots.js';
 import { scoreQuestion } from './score-question.js';
 import { SubmitExamError } from './types.js';
 import { prisma } from '../prisma.js';
@@ -155,7 +156,13 @@ async function submitScoredQuestionsPart(
       totalScore,
       answers: { create: answerCreates },
     },
-    select: { totalScore: true, submittedAt: true },
+    select: { id: true, totalScore: true, submittedAt: true },
+  });
+
+  await finalizeFillInScreenshots(tx, {
+    examId,
+    rosterEntryId,
+    submissionId: submission.id,
   });
 
   await tx.answerDraft.deleteMany({

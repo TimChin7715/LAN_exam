@@ -40,6 +40,9 @@ export async function clearAllTeacherData(
   ]);
 
   const result = await prisma.$transaction(async (tx) => {
+    // Answer.examQuestionId 无 ON DELETE CASCADE；须先删答卷再删考试。
+    await tx.submission.deleteMany({ where: { exam: { teacherId } } });
+
     const deletedExams = await tx.exam.deleteMany({ where: { teacherId } });
     const deletedQuestions = await tx.questionImportBatch.deleteMany({
       where: { teacherId },

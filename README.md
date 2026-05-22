@@ -10,12 +10,12 @@
 ## 当前能力
 
 - 客观题：Excel 题库导入，支持单选 / 多选 / 判断，成绩自动统计并导出。
-- 填空题：Word 试卷全文展示 + Excel 答题卡自动判分，可附带额外表格附件供学员下载。
+- 填空题：Word 试卷全文展示 + Excel 答题卡自动判分，可附带额外表格附件供学员下载；学员每空可上传或粘贴截图作为作答佐证（不参与自动评分）。
 - 操作题：Word 试卷 + Excel / CSV 附件下发，学员上传 `.doc` / `.docx` 作答，考官下载后人工评阅。
 - 名单管理：按“姓名 / 单位 / 身份证号”批量导入；学员以姓名和身份证号登录。
 - 考试流程：草稿 / 进行中 / 已结束，支持混合考试（客观题 + 填空题 + 操作题任意组合）。
 - 座位表：考试创建后自动随机分配座位，可在设置页开启或关闭学员端 / 管理端展示。
-- 考后整理：导出成绩（含成绩汇总、客观题答题明细、填空题明细三个工作表）、下载操作题答卷、按需清除当前考场全部业务数据。
+- 考后整理：导出成绩（含成绩汇总、客观题答题明细、填空题明细三个工作表）、导出已交卷学员的填空题截图 ZIP、下载操作题答卷、按需清除当前考场全部业务数据。
 
 ## 文档导航
 
@@ -32,10 +32,17 @@
 
 本仓库为 **pnpm monorepo**：
 
-| 包 | 路径 | 说明 |
-| --- | --- | --- |
-| `@lan-exam/server` | `apps/server` | Fastify API（开发默认 **3101**；生产单进程 **5180**） |
-| `@lan-exam/web` | `apps/web` | Vite + React + TypeScript（开发默认 **5180**） |
+| 路径 | 说明 |
+| --- | --- |
+| `apps/server` | Fastify API（`@lan-exam/server`；开发默认 **3101**；生产单进程 **5180**） |
+| `apps/web` | Vite + React SPA（`@lan-exam/web`；开发默认 **5180**） |
+| `templates/` | 考官下载的导入模板（客观题 / 名单 / 填空题）；Docker 与 Windows 离线包会打包此目录 |
+| `fixtures/` | 开发与 CI 用的测试样例（`import-test/`、`export/`），不参与运行时 |
+| `prisma/` | 数据库 schema 与迁移 |
+| `scripts/` | `docker-entrypoint.sh`、`windows/` 发版与安装脚本（`scripts/windows/templates/` 为安装 bat/ps1 模板，与业务 Excel 无关） |
+| `tools/lan-exam-tray/` | Windows 托盘程序源码 |
+| `inno-setup/` | Inno Setup 安装包定义 |
+| `docs/` | 部署与方案文档（Markdown） |
 
 开发时 Vite 将 `/api/*` 代理到 API。生产 / Docker / Windows 原生安装在 **5180** 由同一 Node 进程托管 API + 静态前端。
 
@@ -108,7 +115,7 @@ Docker / 反向代理等可选方案见 [docs/DEPLOY.md](./docs/DEPLOY.md)。
 | 填空题 | Word 题目 + Excel 答题卡 + 可选附件 | 答题卡仅支持 `.xls` / `.xlsx`，工作表名 `答题卡`，列为“题号 / 答案 / 分值” |
 | 操作题 | Word 试卷 + Excel / CSV 附件 | 不自动计分，考官下载答卷后人工评阅 |
 
-上传与存储相关环境变量见 `.env.example`：`DATA_DIR`、`MAX_PRACTICAL_DOCX_BYTES`、`MAX_PRACTICAL_XLSX_BYTES`、`MULTIPART_MAX_FILE_BYTES`。
+上传与存储相关环境变量见 `.env.example`：`DATA_DIR`、`MAX_PRACTICAL_DOCX_BYTES`、`MAX_PRACTICAL_XLSX_BYTES`、`MAX_FILLIN_SCREENSHOT_BYTES`、`MULTIPART_MAX_FILE_BYTES`（须不小于各类单文件上限，含截图）。
 
 ## 安全与数据约束
 

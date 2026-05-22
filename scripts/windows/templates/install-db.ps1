@@ -48,10 +48,12 @@ if (-not (Test-Path (Join-Path $pgData 'PG_VERSION'))) {
 & (Join-Path $InstallHome 'start.bat')
 Start-Sleep -Seconds 3
 
-$prismaCli = Join-Path $app 'node_modules\prisma\build\index.js'
+$bundle = Join-Path $app 'server-bundle'
+$prismaCli = Join-Path $bundle 'node_modules\prisma\build\index.js'
 if (-not (Test-Path $prismaCli)) {
     throw "Prisma CLI not found at $prismaCli — rebuild the release package."
 }
+$env:NODE_PATH = Join-Path $bundle 'node_modules'
 
 $schema = Join-Path $app 'prisma\schema.prisma'
 Write-Host '[install-db] prisma migrate deploy...'
@@ -63,7 +65,7 @@ $seedScript = Join-Path $app 'prisma\seed.cjs'
 if (Test-Path $seedScript) {
     & $node $seedScript 2>&1 | Tee-Object -FilePath (Join-Path $logDir 'seed.log') -Append
 } else {
-    $tsx = Join-Path $app 'node_modules\tsx\dist\cli.mjs'
+    $tsx = Join-Path $bundle 'node_modules\tsx\dist\cli.mjs'
     & $node $tsx (Join-Path $app 'prisma\seed.ts') 2>&1 | Tee-Object -FilePath (Join-Path $logDir 'seed.log') -Append
 }
 

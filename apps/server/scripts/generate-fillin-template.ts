@@ -8,7 +8,7 @@ const root = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   '../../..',
 );
-const outPath = path.join(root, 'docs/templates/填空题导入模板.xlsx');
+const outPath = path.join(root, 'templates/填空题导入模板.xlsx');
 
 const buf = await buildFillInImportTemplateExcel();
 fs.mkdirSync(path.dirname(outPath), { recursive: true });

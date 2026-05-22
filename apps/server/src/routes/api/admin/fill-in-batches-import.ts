@@ -158,6 +158,7 @@ export async function registerAdminFillInBatchesImportRoutes(
         batchId,
         title,
         wordFileName: word.filename,
+        wordExt: wordCheck.ext,
         wordBuffer: word.buffer,
         excelFileName: excel.filename,
         excelBuffer: excel.buffer,

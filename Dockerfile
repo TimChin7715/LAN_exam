@@ -40,6 +40,6 @@ RUN sed -i 's/\r$//' scripts/docker-entrypoint.sh \
 ENV NODE_ENV=production
 COPY --from=build /app/apps/server/dist apps/server/dist
 COPY --from=build /app/apps/web/dist apps/web/dist
-COPY docs/templates docs/templates
+COPY templates templates
 EXPOSE 5180
 ENTRYPOINT ["sh", "/app/scripts/docker-entrypoint.sh"]

@@ -92,6 +92,17 @@ export type FillInPaperMeta = {
   attachmentFileName: string | null;
 };
 
+export type FillInScreenshotInfo = {
+  id: string;
+  sortOrder: number;
+  previewUrl: string;
+};
+
+export type FillInScreenshotsByQuestion = {
+  examQuestionId: string;
+  screenshots: FillInScreenshotInfo[];
+};
+
 export type ExamPaperItem = {
   examQuestionId: string;
   sortOrder: number;
@@ -244,16 +255,47 @@ export const studentApi = {
       { skipAuthRedirect: true },
     ),
 
-  downloadFillInExcel: (examId: string) =>
-    downloadBlob(
-      `/api/student/exam/fillin/excel?examId=${encodeURIComponent(examId)}`,
-      '答题卡.xlsx',
-    ),
-
   downloadFillInAttachment: (examId: string, fileName: string) =>
     downloadBlob(
       `/api/student/exam/fillin/attachment?examId=${encodeURIComponent(examId)}`,
       fileName,
+    ),
+
+  listFillInScreenshots: (examId: string) =>
+    apiFetch<{ ok: true; items: FillInScreenshotsByQuestion[] }>(
+      `/api/student/exam/fillin/screenshots?examId=${encodeURIComponent(examId)}`,
+      { skipAuthRedirect: true },
+    ),
+
+  uploadFillInScreenshot: async (
+    examId: string,
+    examQuestionId: string,
+    file: File,
+  ) => {
+    const form = new FormData();
+    form.append('file', file);
+    const url = `/api/student/exam/fillin/screenshots?examId=${encodeURIComponent(examId)}&examQuestionId=${encodeURIComponent(examQuestionId)}`;
+    const response = await fetch(url, {
+      method: 'POST',
+      body: form,
+      credentials: 'include',
+    });
+    const payload = (await response.json()) as Record<string, unknown>;
+    if (!response.ok) {
+      const message =
+        typeof payload.message === 'string' ? payload.message : '上传失败';
+      throw new ApiError(message, response.status);
+    }
+    return payload as {
+      ok: true;
+      screenshot: FillInScreenshotInfo;
+    };
+  },
+
+  deleteFillInScreenshot: (examId: string, screenshotId: string) =>
+    apiFetch<{ ok: true }>(
+      `/api/student/exam/fillin/screenshots/${encodeURIComponent(screenshotId)}?examId=${encodeURIComponent(examId)}`,
+      { method: 'DELETE', skipAuthRedirect: true },
     ),
 
   uploadPracticalAnswer: async (examId: string, file: File) => {

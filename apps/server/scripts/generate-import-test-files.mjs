@@ -207,7 +207,7 @@ async function buildQbank(outPath) {
   await wb.xlsx.writeFile(outPath);
 }
 
-const outDir = join(repoRoot, 'docs', 'fixtures', 'import-test');
+const outDir = join(repoRoot, 'fixtures', 'import-test');
 mkdirSync(outDir, { recursive: true });
 
 const rosterOut = join(outDir, '名单导入-测试.xlsx');

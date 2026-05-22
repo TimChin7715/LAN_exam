@@ -23,13 +23,14 @@ alwaysApply: true
 ## 当前能力（勿按旧“仅客观题”模型改代码）
 
 - 考试内容模块：`OBJECTIVE` / `FILL` / `PRACTICAL` 可混合；操作题不自动计分。
-- 填空题：Word 题目 + Excel 答题卡（工作表 `答题卡`，列“题号/答案/分值”）；`lib/fillin/`。
+- 填空题：Word 题目 + Excel 答题卡（工作表 `答题卡`，列“题号/答案/分值”）；学员每空可上传/粘贴截图佐证（不参与自动评分）；`lib/fillin/`。
+- 考试详情：导出成绩、导出已交卷学员填空题截图 ZIP、下载操作题答卷。
 - 操作题：Word 试卷 + 附件；学员上传 `.doc`/`.docx`；`lib/practical/`。
 - 名单：姓名 / 单位 / 身份证号；学员登录同名 + 身份证号。
 - 座位表：`showSeatBoard`（`lib/admin-settings.ts`）；考试维度随机分配 `lib/seat/`。
 - 设置页：座位表开关 + “清除全部数据”（`lib/admin/clear-teacher-data.ts`）。
 - 学员流程：`/exam/login` → waiting → take → submitted → ended；与 `ADMIN_AUTH_MODE` 无关。
-- 存储：`DATA_DIR` 下 `fill-in-batches/`、`practical-batches/`、`exam-work/`。
+- 存储：`DATA_DIR` 下 `fill-in-batches/`、`practical-batches/`、`exam-work/`（含 `exam-work/.../fill-in/` 截图）；考官导入模板在仓库根 `templates/`（非 `docs/`）。
 
 ## 代码落点
 

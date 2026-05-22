@@ -27,6 +27,7 @@ import { registerAdminExamsCrudRoutes } from './routes/api/admin/exams-crud.js';
 import { registerAdminExamsLifecycleRoutes } from './routes/api/admin/exams-lifecycle.js';
 import { registerAdminExamsSubmissionsRoutes } from './routes/api/admin/exams-submissions.js';
 import { registerAdminExamsExportRoutes } from './routes/api/admin/exams-export.js';
+import { registerAdminExamsExportFillInScreenshotsRoutes } from './routes/api/admin/exams-export-fillin-screenshots.js';
 import { registerAdminPingRoutes } from './routes/api/admin/ping.js';
 import { registerAuthRoutes } from './routes/api/auth/index.js';
 import { registerStudentRoutes } from './routes/api/student/index.js';
@@ -68,6 +69,7 @@ await registerAdminExamSeatsRoutes(app);
 await registerAdminExamsLifecycleRoutes(app);
 await registerAdminExamsSubmissionsRoutes(app);
 await registerAdminExamsExportRoutes(app);
+await registerAdminExamsExportFillInScreenshotsRoutes(app);
 
 app.get('/health', async () => {
   await prisma.$queryRaw`SELECT 1`;

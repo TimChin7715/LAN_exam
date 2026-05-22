@@ -45,3 +45,11 @@ export async function deleteStorageTree(storageKeyPrefix: string): Promise<void>
   const dir = resolveStoragePath(storageKeyPrefix);
   await fs.rm(dir, { recursive: true, force: true });
 }
+
+export async function deleteStorageFile(storageKey: string): Promise<void> {
+  try {
+    await fs.unlink(resolveStoragePath(storageKey));
+  } catch {
+    // 文件可能已不存在
+  }
+}

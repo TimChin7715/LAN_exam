@@ -90,6 +90,8 @@ export default function StudentExamTake() {
   );
   const [submitOpen, setSubmitOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [logoutOpen, setLogoutOpen] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
   const [activePage, setActivePage] = useState<ExamContentModule>('OBJECTIVE');
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const saveInFlightRef = useRef<Promise<void> | null>(null);
@@ -369,6 +371,20 @@ export default function StudentExamTake() {
     });
   }, [examId, navigate]);
 
+  async function handleLogout() {
+    setLoggingOut(true);
+    try {
+      if (!readOnly) {
+        await flushDirtyAnswers();
+      }
+      await studentApi.logout();
+      setLogoutOpen(false);
+    } finally {
+      setLoggingOut(false);
+      navigate('/exam/login', { replace: true });
+    }
+  }
+
   async function handleSubmit() {
     if (!examId || readOnly) return;
     if (!canSubmit()) {
@@ -435,15 +451,50 @@ export default function StudentExamTake() {
     activePage === 'FILL' && hasExamModule(contentModules, 'FILL');
 
   return (
-    <div
-      className={cn(
-        'mx-auto w-full p-4 pb-24',
-        pageMaxWidth,
-        isFillPage
-          ? 'flex h-svh max-h-svh flex-col gap-3 overflow-hidden'
-          : 'space-y-6',
-      )}
-    >
+    <>
+      <AlertDialog open={logoutOpen} onOpenChange={setLogoutOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>确认退出登录？</AlertDialogTitle>
+            <AlertDialogDescription>
+              退出后需重新验证身份才能登录。已自动保存的作答会保留，重新登录后可继续本场考试。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={loggingOut}>取消</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={loggingOut}
+              onClick={() => void handleLogout()}
+            >
+              {loggingOut ? '退出中…' : '确认退出'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {!readOnly ? (
+        <div className="fixed right-0 top-0 z-50 p-3 sm:p-4">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setLogoutOpen(true)}
+          >
+            退出登录
+          </Button>
+        </div>
+      ) : null}
+
+      <div
+        className={cn(
+          'mx-auto w-full p-4 pb-24',
+          !readOnly && 'pt-14',
+          pageMaxWidth,
+          isFillPage
+            ? 'flex h-svh max-h-svh flex-col gap-3 overflow-hidden'
+            : 'space-y-6',
+        )}
+      >
       {readOnly ? (
         <Alert className={isFillPage ? 'shrink-0' : undefined}>
           <AlertDescription>
@@ -638,7 +689,21 @@ export default function StudentExamTake() {
         )
       ) : null}
 
-      {!readOnly ? (
+      {readOnly ? (
+        <div className="fixed inset-x-0 bottom-0 border-t bg-background p-4">
+          <div className={cn('mx-auto w-full', pageMaxWidth)}>
+            <Button
+              type="button"
+              variant="secondary"
+              className="w-full"
+              size="lg"
+              onClick={() => setLogoutOpen(true)}
+            >
+              退出登录
+            </Button>
+          </div>
+        </div>
+      ) : (
         <div className="fixed inset-x-0 bottom-0 border-t bg-background p-4">
           <div className={cn('mx-auto w-full', pageMaxWidth)}>
             <AlertDialog open={submitOpen} onOpenChange={setSubmitOpen}>
@@ -670,7 +735,8 @@ export default function StudentExamTake() {
             </AlertDialog>
           </div>
         </div>
-      ) : null}
-    </div>
+      )}
+      </div>
+    </>
   );
 }

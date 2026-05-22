@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 
 import { registerStudentExamAnswersRoutes } from './exam-answers.js';
 import { registerStudentExamFillInRoutes } from './exam-fillin.js';
+import { registerStudentExamFillInScreenshotRoutes } from './exam-fillin-screenshots.js';
 import { registerStudentExamPaperRoutes } from './exam-paper.js';
 import { registerStudentExamPracticalRoutes } from './exam-practical.js';
 import { registerStudentExamStatusRoutes } from './exam-status.js';
@@ -23,6 +24,7 @@ export async function registerStudentRoutes(
   await registerStudentExamStatusRoutes(app);
   await registerStudentExamPaperRoutes(app);
   await registerStudentExamFillInRoutes(app);
+  await registerStudentExamFillInScreenshotRoutes(app);
   await registerStudentExamPracticalRoutes(app);
   await registerStudentExamAnswersRoutes(app);
   await registerStudentExamSubmitRoutes(app);

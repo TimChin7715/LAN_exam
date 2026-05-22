@@ -17,9 +17,9 @@ const root = path.resolve(
   '../../..',
 );
 
-const rosterXlsx = path.join(root, 'docs/fixtures/import-test/名单导入-测试.xlsx');
-const fillinXlsx = path.join(root, 'docs/templates/填空题导入模板.xlsx');
-const fillinDocx = path.join(root, 'docs/templates/填空题导入示例-题目.docx');
+const rosterXlsx = path.join(root, 'fixtures/import-test/名单导入-测试.xlsx');
+const fillinXlsx = path.join(root, 'templates/填空题导入模板.xlsx');
+const fillinDocx = path.join(root, 'templates/填空题导入示例-题目.docx');
 
 function writeXlsFromXlsx(xlsxPath, xlsPath) {
   const buf = fs.readFileSync(xlsxPath);
@@ -28,7 +28,7 @@ function writeXlsFromXlsx(xlsxPath, xlsPath) {
   fs.writeFileSync(xlsPath, out);
 }
 
-const tmpDir = path.join(root, 'docs/fixtures/import-test');
+const tmpDir = path.join(root, 'fixtures/import-test');
 const rosterXls = path.join(tmpDir, '名单导入-测试.xls');
 if (fs.existsSync(rosterXlsx) && !fs.existsSync(rosterXls)) {
   writeXlsFromXlsx(rosterXlsx, rosterXls);

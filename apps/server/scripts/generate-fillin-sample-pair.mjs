@@ -12,7 +12,7 @@ const root = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   '../../..',
 );
-const templatesDir = path.join(root, 'docs/templates');
+const templatesDir = path.join(root, 'templates');
 const wordPath = path.join(templatesDir, '填空题导入示例-题目.docx');
 const excelPath = path.join(templatesDir, '填空题导入示例-答题卡.xlsx');
 

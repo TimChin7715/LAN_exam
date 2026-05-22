@@ -68,9 +68,9 @@ curl http://127.0.0.1:5180/health
 
 | 模块 | 需要文件 | 规则 |
 | --- | --- | --- |
-| 客观题 | `.xls` / `.xlsx` / `.csv` | 使用 `docs/templates/题库导入模板.xlsx` |
-| 名单 | `.xls` / `.xlsx` / `.csv` | 使用 `docs/templates/名单导入模板.xlsx`；列为“姓名 / 单位 / 身份证号” |
-| 填空题 | Word 题目 + `.xls` / `.xlsx` 答题卡 + 可选附件 | 参考 `docs/templates/填空题导入模板.xlsx`；答题卡工作表名 `答题卡`，列“题号 / 答案 / 分值” |
+| 客观题 | `.xls` / `.xlsx` / `.csv` | 使用 `templates/题库导入模板.xlsx` |
+| 名单 | `.xls` / `.xlsx` / `.csv` | 使用 `templates/名单导入模板.xlsx`；列为“姓名 / 单位 / 身份证号” |
+| 填空题 | Word 题目 + `.xls` / `.xlsx` 答题卡 + 可选附件 | 参考 `templates/填空题导入模板.xlsx`；答题卡工作表名 `答题卡`，列“题号 / 答案 / 分值” |
 | 操作题 | Word 试卷 + `.xls` / `.xlsx` / `.csv` 附件 | 不自动计分，考后下载答卷人工评阅 |
 
 重要说明：
@@ -120,7 +120,7 @@ curl http://127.0.0.1:5180/health
 ### 作答行为
 
 - 客观题 / 填空题会自动保存
-- 填空题在考试端显示 Word 题目全文，并提供 Excel 答题卡下载 / 填写
+- 填空题在考试端显示 Word 题目全文，并提供 Excel 答题卡下载 / 填写；每空还可上传或粘贴截图（PNG / JPEG / WebP，每空最多 5 张，单张默认不超过 5MB）作为作答佐证，**不参与自动评分**
 - 操作题需上传 `.doc` / `.docx` 作答文件后才能交卷
 - 已交卷学员会进入“提交成功”页，等待考官结束考试
 
@@ -139,11 +139,12 @@ curl http://127.0.0.1:5180/health
 在考试详情页：
 
 - 点击“导出成绩与明细”下载 Excel
+- 若考试包含填空题，可点击“导出填空题截图”下载 ZIP（仅含**已交卷**学员的截图；ZIP 内按学员分文件夹 `姓名_身份证后4位`，文件名为 `第x题` 或 `第x题1`、`第x题2`…，题号与答题卡一致）
 - 若考试包含操作题，可按学员逐个下载操作题答卷
 
 计分说明：
 
-- 客观题 / 填空题自动计分
+- 客观题 / 填空题按答题卡自动计分；填空题截图仅作佐证，不计入分数
 - 操作题不自动计分，需人工评阅
 - 混合考试总分仅累计自动评分部分
 
@@ -173,7 +174,7 @@ D:\LAN-Exam\
 ├── LAN-Exam-Tray.exe
 ├── start.bat / stop.bat / install.bat / open-admin.bat
 ├── runtime\   (node, postgres, vcredist)
-├── app\       (server dist, web dist, prisma)
+├── app\       (server-bundle 运行时依赖 + dist, web dist, prisma)
 ├── data\
 │   ├── pg\    (数据库，升级保留)
 │   └── ...    (上传文件、答卷、衍生文件)
@@ -199,6 +200,7 @@ D:\LAN-Exam\
 | 考试机可打开 `/admin` | 页面提示“请在本机打开”属预期；`/api/admin/*` 应 403 |
 | 填空题导入失败 | 检查答题卡是否为 `.xls/.xlsx`，工作表名是否为 `答题卡`，列是否为“题号 / 答案 / 分值” |
 | 上传作答文件失败 | 检查 `.doc` / `.docx` 文件大小与上传限制；必要时查看 `.env` 中 `MAX_PRACTICAL_*` |
+| 填空题截图上传失败 | 确认格式为 PNG / JPEG / WebP、每空不超过 5 张、单张大小；必要时查看 `.env` 中 `MAX_FILLIN_SCREENSHOT_BYTES` 与 `MULTIPART_MAX_FILE_BYTES` |
 | 导入后看不到旧数据 | 当前只显示 `local_exam_admin` 下的数据；旧 `teacher_admin` 数据需重新导入 |
 | 端口占用 | 修改 `.env` 中 `WEB_PORT` 并同步调整防火墙规则 |
 

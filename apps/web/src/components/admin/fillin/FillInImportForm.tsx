@@ -151,6 +151,7 @@ export function FillInImportForm({
         <ImportFileDropzone
           label="Word 题目"
           hint="完整试卷 .doc/.docx，无需与 Excel 题号对应"
+          note="为考试机能显示图片请上传.docx格式文档"
           accept={WORD_ACCEPT}
           file={wordFile}
           disabled={disabled || importing}

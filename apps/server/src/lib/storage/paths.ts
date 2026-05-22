@@ -43,6 +43,18 @@ export function examWorkAnswerKey(
   return `exam-work/${examId}/${rosterEntryId}/answer.${ext}`;
 }
 
+export type FillInScreenshotExt = 'png' | 'jpg' | 'webp';
+
+export function examWorkFillInScreenshotKey(
+  examId: string,
+  rosterEntryId: string,
+  examQuestionId: string,
+  screenshotId: string,
+  ext: FillInScreenshotExt,
+): string {
+  return `exam-work/${examId}/${rosterEntryId}/fill-in/${examQuestionId}/${screenshotId}.${ext}`;
+}
+
 export function fillInBatchWordKey(
   batchId: string,
   ext: 'doc' | 'docx' = 'docx',

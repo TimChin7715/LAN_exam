@@ -9,7 +9,7 @@ import { validateRows as validateQbank } from '../src/lib/qbank/validate-rows.js
 import { prisma } from '../src/lib/prisma.js';
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '../../..');
-const dir = join(repoRoot, 'docs/fixtures/import-test');
+const dir = join(repoRoot, 'fixtures/import-test');
 
 const rosterBuf = readFileSync(join(dir, '名单导入-测试.xlsx'));
 const qbankBuf = readFileSync(join(dir, '题库导入-测试.xlsx'));

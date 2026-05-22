@@ -9,7 +9,7 @@ import {
 import type { RowError } from './types.js';
 import type { SpreadsheetExt } from '../upload/spreadsheet-file.js';
 import { spreadsheetExt } from '../upload/spreadsheet-file.js';
-import { wordUploadExt } from '../upload/word-file.js';
+import type { WordUploadExt } from '../upload/word-file.js';
 import {
   fillInBatchAttachmentKey,
   fillInBatchExcelKey,
@@ -40,6 +40,7 @@ export async function importFillInBatch(
     batchId: string;
     title: string;
     wordFileName: string;
+    wordExt: WordUploadExt;
     wordBuffer: Buffer;
     excelFileName: string;
     excelBuffer: Buffer;
@@ -64,7 +65,7 @@ export async function importFillInBatch(
   }
 
   const studentExcelBuffer = await buildStudentAnswerSheetExcel(blanks);
-  const wordExt = wordUploadExt(input.wordFileName) ?? 'docx';
+  const wordExt = input.wordExt;
   const excelExt = spreadsheetExt(input.excelFileName) ?? 'xlsx';
   const wordKey = fillInBatchWordKey(input.batchId, wordExt);
   const excelKey = fillInBatchExcelKey(

@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import ExcelJS from 'exceljs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '../../..');
-const outPath = join(root, 'docs/templates/名单导入模板.xlsx');
+const outPath = join(root, 'templates/名单导入模板.xlsx');
 
 async function main(): Promise<void> {
   const workbook = new ExcelJS.Workbook();

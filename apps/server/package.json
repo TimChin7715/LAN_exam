@@ -15,6 +15,7 @@
     "@fastify/multipart": "^10.0.0",
     "@fastify/rate-limit": "^10.3.0",
     "@prisma/client": "^6.8.2",
+    "archiver": "^7.0.1",
     "argon2": "^0.43.0",
     "connect-pg-simple": "^10.0.0",
     "exceljs": "^4.4.0",
@@ -28,6 +29,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@types/archiver": "^6.0.3",
     "@types/connect-pg-simple": "^7.0.3",
     "@types/express-session": "^1.19.0",
     "@types/node": "^22.15.21",

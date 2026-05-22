@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import type { FastifyInstance } from 'fastify';
 
 import { requireAdminSession } from '../../../plugins/admin-guard.js';
-import { getRepoRoot } from '../../../lib/repo-root.js';
+import { TEMPLATES_DIR } from '../../../lib/templates-dir.js';
 
 const TEMPLATE_FILENAME = '题库导入模板.xlsx';
 const TEMPLATE_DISPOSITION =
@@ -17,11 +17,7 @@ export async function registerAdminQuestionsTemplateRoutes(
     '/api/admin/questions/template',
     { preHandler: requireAdminSession },
     async (_request, reply) => {
-      const templatePath = join(
-        getRepoRoot(),
-        'docs/templates',
-        TEMPLATE_FILENAME,
-      );
+      const templatePath = join(TEMPLATES_DIR, TEMPLATE_FILENAME);
 
       return reply
         .header(

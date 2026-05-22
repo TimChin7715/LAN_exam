@@ -3,11 +3,11 @@ import { join } from 'node:path';
 
 import type { FastifyInstance } from 'fastify';
 
-import { getRepoRoot } from '../../../lib/repo-root.js';
 import { requireAdminSession } from '../../../plugins/admin-guard.js';
+import { TEMPLATES_DIR } from '../../../lib/templates-dir.js';
 
 const TEMPLATE_FILENAME = '填空题导入模板.xlsx';
-const TEMPLATE_PATH = join(getRepoRoot(), 'docs/templates', TEMPLATE_FILENAME);
+const TEMPLATE_PATH = join(TEMPLATES_DIR, TEMPLATE_FILENAME);
 
 export async function registerAdminFillInBatchesTemplateRoutes(
   app: FastifyInstance,

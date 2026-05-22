@@ -1,5 +1,6 @@
 node_modules
 dist
+.build
 .env
 .env.*
 !.env.example
@@ -9,3 +10,16 @@ coverage
 .turbo
 *.tsbuildinfo
 data/
+
+# .NET tray local build
+tools/lan-exam-tray/bin/
+tools/lan-exam-tray/obj/
+
+# Windows release runtimes (fetch on build machine only)
+runtime/
+
+# Release intermediate output
+dist/tray-publish/
+
+# Local debug cookies
+*_cookies.txt

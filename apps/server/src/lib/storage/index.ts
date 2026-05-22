@@ -9,13 +9,16 @@ export {
   fillInBatchAttachmentKey,
   examWorkPaperKey,
   examWorkAnswerKey,
+  examWorkFillInScreenshotKey,
   resolveStoragePath,
+  type FillInScreenshotExt,
 } from './paths.js';
 export {
   writeStorageFile,
   copyStorageFile,
   storageFileExists,
   readStorageFile,
+  deleteStorageFile,
   deleteStorageTree,
   ensureDirForFile,
 } from './files.js';
@@ -28,6 +31,14 @@ export {
   getMaxWordUploadBytes,
   wordUploadExt,
 } from './docx-file.js';
+export {
+  assertValidImageUpload,
+  contentTypeForImageExt,
+  getMaxFillInScreenshotBytes,
+  imageUploadExt,
+  MAX_FILLIN_SCREENSHOTS_PER_BLANK,
+  type ImageUploadExt,
+} from '../upload/image-file.js';
 export {
   assertValidSpreadsheetUpload,
   contentTypeForSpreadsheetFilename,

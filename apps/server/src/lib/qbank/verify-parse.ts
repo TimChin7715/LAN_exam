@@ -1,12 +1,11 @@
 import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
 
+import { TEMPLATES_DIR } from '../templates-dir.js';
 import { parseWorkbook } from './parse-workbook.js';
 import { validateRows } from './validate-rows.js';
 
-const root = join(dirname(fileURLToPath(import.meta.url)), '../../../../..');
-const templatePath = join(root, 'docs/templates/题库导入模板.xlsx');
+const templatePath = join(TEMPLATES_DIR, '题库导入模板.xlsx');
 
 async function main(): Promise<void> {
   const buffer = readFileSync(templatePath);

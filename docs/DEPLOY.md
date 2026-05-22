@@ -117,8 +117,8 @@ docker compose up --build
 
 | 模块 | 支持文件 | 规则 |
 | --- | --- | --- |
-| 客观题 | `.xls` / `.xlsx` / `.csv` | 使用 `docs/templates/题库导入模板.xlsx` |
-| 名单 | `.xls` / `.xlsx` / `.csv` | 使用 `docs/templates/名单导入模板.xlsx`；列为“姓名 / 单位 / 身份证号” |
+| 客观题 | `.xls` / `.xlsx` / `.csv` | 使用 `templates/题库导入模板.xlsx` |
+| 名单 | `.xls` / `.xlsx` / `.csv` | 使用 `templates/名单导入模板.xlsx`；列为“姓名 / 单位 / 身份证号” |
 | 填空题 | Word 题目 + `.xls` / `.xlsx` 答题卡 + 可选 `.xls` / `.xlsx` / `.csv` 附件 | 答题卡工作表名必须为 `答题卡`，列为“题号 / 答案 / 分值” |
 | 操作题 | Word 试卷 + `.xls` / `.xlsx` / `.csv` 附件 | 不自动计分，无固定题库模板 |
 
@@ -142,7 +142,8 @@ docker compose up --build
 - 开始考试后，学员用姓名 + 身份证号在 `/exam/login` 登录。
 - 若设置页 `showSeatBoard=true`，学员登录页与考试详情会展示座位表。
 - 座位分配按考试自动随机生成，首次读取座位表时若无记录会补分配。
-- 客观题 / 填空题自动保存；操作题需先上传作答文档后才允许交卷。
+- 客观题 / 填空题自动保存；填空题每空可上传或粘贴截图（PNG / JPEG / WebP，每空最多 5 张，单张默认不超过 5MB）作为作答佐证，**不参与自动评分**。
+- 操作题需先上传作答文档后才允许交卷。
 - 已交卷学员进入 `/exam/submitted`，等待考官结束考试；考试结束后统一进入 `/exam/ended`。
 
 ### 4. 考后处理
@@ -150,8 +151,9 @@ docker compose up --build
 在 `/admin/exams/:id`：
 
 - 可导出成绩与答题明细 Excel
+- 若考试含填空题，可导出已交卷学员的填空题截图 ZIP（按学员分文件夹，文件名为 `第x题` / `第x题1`…；无已交卷截图时导出失败）
 - 若考试含操作题，可逐人下载操作题答卷
-- 自动总分只包含客观题与填空题；操作题需人工评阅
+- 自动总分只包含客观题与填空题（截图不计分）；操作题需人工评阅
 
 在 `/admin/settings`：
 
@@ -177,10 +179,11 @@ docker compose up --build
 
 | 项 | 说明 |
 | --- | --- |
-| `DATA_DIR` | 上传与衍生文件目录；Compose 默认挂载到 `/app/data` |
+| `DATA_DIR` | 上传与衍生文件目录；Compose 默认挂载到 `/app/data`；学员截图位于 `exam-work/{examId}/{rosterEntryId}/fill-in/` |
 | `MAX_PRACTICAL_DOCX_BYTES` | Word 试卷 / 学员操作题答卷上限，默认 20MB |
 | `MAX_PRACTICAL_XLSX_BYTES` | 操作题 / 填空题附件上限，默认 10MB |
-| `MULTIPART_MAX_FILE_BYTES` | Fastify multipart 单文件上限，必须不小于上面单文件限制 |
+| `MAX_FILLIN_SCREENSHOT_BYTES` | 填空题每空单张截图上限，默认 5MB；格式 PNG / JPEG / WebP，每空最多 5 张（代码常量） |
+| `MULTIPART_MAX_FILE_BYTES` | Fastify multipart 单文件上限，必须不小于 practical、附件与截图等各类单文件上限中的最大值 |
 
 若导入或上传出现 `request file too large`，优先检查 `MULTIPART_MAX_FILE_BYTES`。
 
@@ -256,5 +259,5 @@ server {
 | 考试机能打开 `/admin` | 页面提示“请在本机打开”属预期；`/api/admin/*` 应返回 `403` |
 | 导入后看不到旧数据 | 当前为 `local_exam_admin` 数据视图；旧 `teacher_admin` 数据不会自动迁移 |
 | 填空题导入失败 | 检查答题卡是否为 `.xls/.xlsx`，工作表名是否为 `答题卡`，列是否为“题号 / 答案 / 分值” |
-| 上传大文件失败 | 检查 `MAX_PRACTICAL_*` 与 `MULTIPART_MAX_FILE_BYTES` |
+| 上传大文件失败 | 检查 `MAX_PRACTICAL_*`、`MAX_FILLIN_SCREENSHOT_BYTES` 与 `MULTIPART_MAX_FILE_BYTES` |
 | `/health` 非 200 | 检查 `5180` 端口映射、应用日志、数据库就绪情况 |

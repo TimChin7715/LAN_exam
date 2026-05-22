@@ -48,6 +48,7 @@ Phase A / B 已落地；真机双机验收仍需在目标环境执行。
   - 开始 / 结束考试
   - 查看随机分配后的座位表
   - 导出成绩（成绩汇总 + 客观题答题明细 + 填空题明细）
+  - 导出填空题截图（已交卷学员 ZIP，按答题卡题号命名：第 x 题 / 第 x 题1…）
   - 下载学员操作题答卷
 
 ### 学员端
@@ -59,7 +60,7 @@ Phase A / B 已落地；真机双机验收仍需在目标环境执行。
   - `/exam/take`
   - `/exam/submitted`
   - `/exam/ended`
-- 客观题与填空题作答会自动保存；操作题需上传 `.doc` / `.docx` 作答文件后才能交卷。
+- 客观题与填空题作答会自动保存；填空题每空可上传或粘贴截图（佐证，不参与自动评分）；操作题需上传 `.doc` / `.docx` 作答文件后才能交卷。
 - 考试结束后：
   - 已交卷学员进入 submitted / ended 只读视图
   - 未交卷学员进入 ended 提示页，不再允许继续作答
@@ -125,11 +126,14 @@ Phase A / B 已落地；真机双机验收仍需在目标环境执行。
 
 - 免登录默认数据归属：`local_exam_admin`
 - 旧 `teacher_admin` 数据不迁移、不自动映射
+- 考官导入模板：仓库根 `templates/`（`lib/templates-dir.ts` → `getRepoRoot()/templates`；Docker / Windows 离线包须打包此目录）
+- 开发与 CI 测试样例：`fixtures/import-test/`、`fixtures/export/`（不参与运行时）
 - 上传与衍生文件位于 `DATA_DIR`（默认 `data/`）
 - 当前重要存储前缀：
   - `fill-in-batches/{batchId}`
   - `practical-batches/{batchId}`
-  - `exam-work/{examId}`
+  - `exam-work/{examId}`（含操作题答卷与填空题截图 `.../{rosterEntryId}/fill-in/{examQuestionId}/{screenshotId}.{png|jpg|webp}`）
+- 填空题截图：考中 `FillInScreenshotDraft`，交卷时 `lib/fillin/finalize-screenshots.ts` 固化到 `FillInScreenshot`（绑定 `Submission`）
 
 ## 关键代码落点
 
@@ -158,6 +162,8 @@ apps/server/src/
 
 - 改 admin 路由时使用 `await resolveAdminTeacherId(request)`，不要直接依赖 `getSessionTeacherId`。
 - 成绩导出：`lib/exam/export-workbook.ts`（成绩汇总 + 客观题明细 + 填空题明细）。
+- 导入模板下载：`lib/templates-dir.ts`；`routes/api/admin/*-template.ts` 从 `templates/` 读取。
+- 填空题截图：`lib/fillin/finalize-screenshots.ts`、`build-screenshots-zip.ts`、`screenshot-export-name.ts`；上传校验 `lib/upload/image-file.ts`（`MAX_FILLIN_SCREENSHOT_BYTES`，每空最多 5 张）；学员 API `routes/api/student/exam-fillin-screenshots.ts`；考官导出 `routes/api/admin/exams-export-fillin-screenshots.ts`。
 - 清除全部数据：`lib/admin/clear-teacher-data.ts` + `routes/api/admin/settings.ts`。
 - 学员状态流转重点看：
   - `routes/api/student/exam-status.ts`
@@ -187,14 +193,17 @@ apps/web/src/
 
 - `AdminQuestions.tsx`：客观题 / 填空题 / 操作题三标签
 - `AdminExams.tsx`：混合考试创建
-- `AdminExamDetail.tsx`：座位表、导出、下载操作题答卷
+- `AdminExamDetail.tsx`：座位表、导出成绩、导出填空题截图 ZIP、下载操作题答卷
+- `FillInScreenshotAttach.tsx` / `StudentFillInWorkspace.tsx`：学员填空题截图上传与粘贴
 - `AdminSettings.tsx`：座位表开关、清除全部数据
 - `StudentExamTake.tsx` / `StudentExamSubmitted.tsx` / `StudentExamEnded.tsx`
 
 ### 发版与安装
 
 ```
-scripts/windows/
+templates/              # 业务导入模板（打包进 Docker / dist/lan-exam-win/templates）
+fixtures/               # 测试样例，不打包
+scripts/windows/        # 发版脚本；scripts/windows/templates/ 仅为 install.bat 等
 inno-setup/LAN-Exam.iss
 tools/lan-exam-tray/
 Dockerfile
@@ -236,4 +245,4 @@ SQLite 迁移、多考官 RBAC、HTTPS、云端更新、考后自动备份（Pha
 
 - 默认 `ADMIN_AUTH_MODE=disabled` 与 `.env.example`、种子、entrypoint 对齐。
 - `VITE_ADMIN_AUTH_MODE` 已在 `.env.example` 中启用；前后端必须成对设置。
-- 文档应以当前代码面为准：三类题型、座位表、设置页、清除全部数据、学生 submitted / ended 流程均已存在。
+- 文档应以当前代码面为准：三类题型、座位表、设置页、清除全部数据、学员 submitted / ended 流程、填空题截图上传与考后 ZIP 导出均已存在。

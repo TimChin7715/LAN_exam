@@ -12,7 +12,9 @@ if (-not $OutDir) {
 
 & (Join-Path $PSScriptRoot 'build-release.ps1') -OutDir $OutDir
 & (Join-Path $PSScriptRoot 'fetch-runtimes.ps1') -OutDir $OutDir
-& (Join-Path $PSScriptRoot 'build-tray.ps1') -OutDir $OutDir
+& (Join-Path $PSScriptRoot 'build-tray.ps1') -OutDir $OutDir -SkipIfMissingDotnet
+
+& (Join-Path $PSScriptRoot 'verify-package.ps1') -OutDir $OutDir
 
 $iss = Join-Path $root 'inno-setup\LAN-Exam.iss'
 if (-not (Test-Path $InnoSetupCompiler)) {

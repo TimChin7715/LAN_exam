@@ -29,6 +29,7 @@ import {
 } from '@/components/ui/table';
 import {
   downloadExamExport,
+  downloadFillInScreenshots,
   downloadPracticalAnswer,
   endExam,
   examContentModulesLabel,
@@ -47,6 +48,7 @@ import {
 } from '@/lib/exam';
 import { ExamSeatBoardPanel } from '@/components/exam/ExamSeatBoardPanel';
 import { fetchAdminSettings } from '@/lib/admin-settings';
+import { ApiError } from '@/lib/api';
 import { maskNationalId } from '@/lib/roster';
 import type { PreviewQuestion } from '@/lib/qbank';
 
@@ -61,6 +63,7 @@ export default function AdminExamDetail() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [exportingScreenshots, setExportingScreenshots] = useState(false);
 
   const load = useCallback(async () => {
     if (!examId) return;
@@ -150,6 +153,21 @@ export default function AdminExamDetail() {
       handleExamApiError(err, '导出失败。');
     } finally {
       setExporting(false);
+    }
+  }
+
+  async function handleExportFillInScreenshots() {
+    if (!examId || !exam) return;
+    setExportingScreenshots(true);
+    try {
+      await downloadFillInScreenshots(examId, exam.title);
+      toast.success('填空题截图导出已开始下载。');
+    } catch (err) {
+      if (!(err instanceof ApiError)) {
+        handleExamApiError(err, '导出填空题截图失败。');
+      }
+    } finally {
+      setExportingScreenshots(false);
     }
   }
 
@@ -259,14 +277,28 @@ export default function AdminExamDetail() {
               </AlertDialog>
             ) : null}
             {exam.status === 'IN_PROGRESS' || exam.status === 'ENDED' ? (
-              <Button
-                variant="outline"
-                disabled={exporting}
-                onClick={() => void handleExport()}
-              >
-                <Download className="size-4" aria-hidden />
-                {exporting ? '导出中…' : '导出成绩与明细'}
-              </Button>
+              <>
+                <Button
+                  variant="outline"
+                  disabled={exporting}
+                  onClick={() => void handleExport()}
+                >
+                  <Download className="size-4" aria-hidden />
+                  {exporting ? '导出中…' : '导出成绩与明细'}
+                </Button>
+                {hasExamModule(exam.contentModules, 'FILL') ? (
+                  <Button
+                    variant="outline"
+                    disabled={exportingScreenshots}
+                    onClick={() => void handleExportFillInScreenshots()}
+                  >
+                    <Download className="size-4" aria-hidden />
+                    {exportingScreenshots
+                      ? '导出中…'
+                      : '导出填空题截图'}
+                  </Button>
+                ) : null}
+              </>
             ) : null}
             {exam.status === 'IN_PROGRESS' ? (
               <AlertDialog>

@@ -11,28 +11,42 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { FillInScreenshotAttach } from '@/components/student/FillInScreenshotAttach';
 import { displayFillAnswer, parseFillQuestionNo } from '@/lib/fillin';
 import { formatStemForDisplay } from '@/lib/qbank';
-import type { ExamPaperItem, ExamSubmissionItem } from '@/lib/student';
+import type {
+  ExamPaperItem,
+  ExamSubmissionItem,
+  FillInScreenshotInfo,
+} from '@/lib/student';
 
 type FillRow = ExamPaperItem | ExamSubmissionItem;
 
 type StudentFillInAnswerSheetProps = {
+  examId: string;
   items: FillRow[];
   answers: Record<string, string>;
   readOnly: boolean;
   showResult?: boolean;
   /** 嵌入左右分栏右栏时使用，占满高度并可滚动 */
   variant?: 'card' | 'panel';
+  screenshotsByQuestion: Record<string, FillInScreenshotInfo[]>;
+  onScreenshotsChange: (
+    examQuestionId: string,
+    screenshots: FillInScreenshotInfo[],
+  ) => void;
   onAnswerChange: (examQuestionId: string, value: string) => void;
 };
 
 export function StudentFillInAnswerSheet({
+  examId,
   items,
   answers,
   readOnly,
   showResult = false,
   variant = 'card',
+  screenshotsByQuestion,
+  onScreenshotsChange,
   onAnswerChange,
 }: StudentFillInAnswerSheetProps) {
   const rows = useMemo(
@@ -122,6 +136,15 @@ export function StudentFillInAnswerSheet({
                           onChange={(e) =>
                             onAnswerChange(row.examQuestionId, e.target.value)
                           }
+                        />
+                        <FillInScreenshotAttach
+                          examId={examId}
+                          examQuestionId={row.examQuestionId}
+                          screenshots={
+                            screenshotsByQuestion[row.examQuestionId] ?? []
+                          }
+                          readOnly={readOnly}
+                          onScreenshotsChange={onScreenshotsChange}
                         />
                       </TableCell>
                       <TableCell className="text-right tabular-nums">

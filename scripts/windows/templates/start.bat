@@ -37,9 +37,9 @@ if errorlevel 1 (
     set "NODE_ENV=production"
     set "SERVE_WEB=true"
     set "WEB_DIST_PATH=%LAN_EXAM_HOME%\app\web\dist"
-    set "NODE_PATH=%LAN_EXAM_HOME%\app\node_modules;%LAN_EXAM_HOME%\app\server\node_modules"
+    set "NODE_PATH=%LAN_EXAM_HOME%\app\server-bundle\node_modules"
     cd /d "%LAN_EXAM_HOME%\app"
-    start "LAN-Exam-Node" /MIN "%NODE%" "server\dist\index.js" >> "%LOG_DIR%\app.log" 2>&1
+    start "LAN-Exam-Node" /MIN "%NODE%" "server-bundle\dist\index.js" >> "%LOG_DIR%\app.log" 2>&1
   )
 )
 

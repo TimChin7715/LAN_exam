@@ -306,6 +306,44 @@ export async function downloadExamExport(examId: string, title: string): Promise
   URL.revokeObjectURL(url);
 }
 
+export async function downloadFillInScreenshots(
+  examId: string,
+  title: string,
+): Promise<void> {
+  const response = await fetch(
+    `/api/admin/exams/${encodeURIComponent(examId)}/export-fillin-screenshots`,
+    { credentials: 'include' },
+  );
+
+  if (response.status === 401 || response.status === 403) {
+    const ct = response.headers.get('content-type') ?? '';
+    const payload = ct.includes('application/json')
+      ? ((await response.json()) as Record<string, unknown>)
+      : null;
+    handleAuthResponse(response.status, payload);
+    throw new ApiError('Unauthorized', response.status);
+  }
+
+  if (!response.ok) {
+    const ct = response.headers.get('content-type') ?? '';
+    if (ct.includes('application/json')) {
+      const payload = (await response.json()) as { message?: string };
+      toast.error(payload.message ?? '导出填空题截图失败。');
+    } else {
+      toast.error('导出填空题截图失败。');
+    }
+    throw new ApiError('Export failed', response.status);
+  }
+
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = `${title.replace(/[\\/:*?"<>|]/g, '_')}-填空题截图.zip`;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
 export function handleExamApiError(err: unknown, fallback: string): void {
   if (err instanceof ApiError) {
     toast.error(err.message || fallback);

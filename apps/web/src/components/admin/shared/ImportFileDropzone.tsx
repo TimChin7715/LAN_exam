@@ -1,11 +1,13 @@
 import { useId, useRef } from 'react';
-import { Upload } from 'lucide-react';
+import { Info, Upload } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 
 export type ImportFileDropzoneProps = {
   label: string;
   hint: string;
+  /** Optional tip shown below the dropzone (e.g. format warnings). */
+  note?: string;
   accept: string;
   file: File | null;
   disabled?: boolean;
@@ -19,6 +21,7 @@ export type ImportFileDropzoneProps = {
 export function ImportFileDropzone({
   label,
   hint,
+  note,
   accept,
   file,
   disabled,
@@ -92,6 +95,20 @@ export function ImportFileDropzone({
           onChange={(e) => onPick(e.target.files?.[0] ?? null)}
         />
       </div>
+      {note ? (
+        <div
+          role="note"
+          className="flex gap-2 rounded-md border-2 border-amber-400/90 bg-amber-50 px-3 py-2.5 shadow-sm dark:border-amber-500/70 dark:bg-amber-950/50"
+        >
+          <Info
+            className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400"
+            aria-hidden
+          />
+          <p className="text-sm font-semibold leading-snug text-amber-950 dark:text-amber-100">
+            {note}
+          </p>
+        </div>
+      ) : null}
     </div>
   );
 }

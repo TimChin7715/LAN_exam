@@ -109,6 +109,7 @@ model RosterEntry {
   createdAt    DateTime          @default(now())
   submissions            Submission[]
   answerDrafts           AnswerDraft[]
+  fillInScreenshotDrafts FillInScreenshotDraft[]
   practicalSubmissions PracticalSubmission[]
   practicalAnswerDrafts  PracticalAnswerDraft[]
   examSeatAssignments    ExamSeatAssignment[]
@@ -189,6 +190,7 @@ model Exam {
   questions            ExamQuestion[]
   submissions          Submission[]
   answerDrafts         AnswerDraft[]
+  fillInScreenshotDrafts FillInScreenshotDraft[]
   practicalSubmissions PracticalSubmission[]
   practicalAnswerDrafts PracticalAnswerDraft[]
   seatAssignments        ExamSeatAssignment[]
@@ -209,6 +211,7 @@ model ExamQuestion {
   sortOrder  Int
   answers    Answer[]
   answerDrafts AnswerDraft[]
+  fillInScreenshotDrafts FillInScreenshotDraft[]
 
   @@unique([examId, questionId])
   @@index([examId, sortOrder])
@@ -223,9 +226,43 @@ model Submission {
   totalScore    Int
   submittedAt   DateTime    @default(now())
   answers       Answer[]
+  fillInScreenshots FillInScreenshot[]
 
   @@unique([examId, rosterEntryId])
   @@index([examId])
+}
+
+model FillInScreenshotDraft {
+  id               String       @id @default(cuid())
+  examId           String
+  exam             Exam         @relation(fields: [examId], references: [id], onDelete: Cascade)
+  rosterEntryId    String
+  rosterEntry      RosterEntry  @relation(fields: [rosterEntryId], references: [id], onDelete: Cascade)
+  examQuestionId   String
+  examQuestion     ExamQuestion @relation(fields: [examQuestionId], references: [id], onDelete: Cascade)
+  sortOrder        Int
+  storageKey       String
+  mimeType         String
+  byteSize         Int
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  @@unique([examId, rosterEntryId, examQuestionId, sortOrder])
+  @@index([examId, rosterEntryId])
+}
+
+model FillInScreenshot {
+  id               String       @id @default(cuid())
+  submissionId     String
+  submission       Submission   @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  examQuestionId   String
+  sortOrder        Int
+  storageKey       String
+  mimeType         String
+  byteSize         Int
+
+  @@unique([submissionId, examQuestionId, sortOrder])
+  @@index([submissionId])
 }
 
 model Answer {
@@ -233,7 +270,7 @@ model Answer {
   submissionId   String
   submission     Submission   @relation(fields: [submissionId], references: [id], onDelete: Cascade)
   examQuestionId String
-  examQuestion   ExamQuestion @relation(fields: [examQuestionId], references: [id])
+  examQuestion   ExamQuestion @relation(fields: [examQuestionId], references: [id], onDelete: Cascade)
   selectedKeys   String
   isCorrect      Boolean
   pointsAwarded  Int
