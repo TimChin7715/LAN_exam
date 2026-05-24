@@ -89,7 +89,8 @@ export type FillInPaperMeta = {
   batchTitle: string;
   wordFileName: string;
   excelFileName: string;
-  attachmentFileName: string | null;
+  hasAttachments: boolean;
+  attachmentZipFileName: string | null;
 };
 
 export type FillInScreenshotInfo = {
@@ -249,16 +250,38 @@ export const studentApi = {
       fileName,
     ),
 
-  fetchFillInWordPreview: (examId: string) =>
-    apiFetch<{ ok: true; html: string }>(
-      `/api/student/exam/fillin/word/preview?examId=${encodeURIComponent(examId)}`,
-      { skipAuthRedirect: true },
-    ),
+  fetchFillInWordPreview: async (examId: string, etag?: string) => {
+    const url = `/api/student/exam/fillin/word/preview?examId=${encodeURIComponent(examId)}`;
+    const headers = new Headers();
+    if (etag) {
+      headers.set('If-None-Match', `"${etag}"`);
+    }
+    const response = await fetch(url, {
+      credentials: 'include',
+      headers,
+    });
+    if (response.status === 304) {
+      return { ok: true as const, notModified: true as const };
+    }
+    const payload = (await response.json()) as Record<string, unknown>;
+    if (!response.ok) {
+      const message =
+        typeof payload.message === 'string'
+          ? payload.message
+          : '无法加载试卷预览';
+      throw new ApiError(message, response.status);
+    }
+    return {
+      ok: true as const,
+      html: String(payload.html ?? ''),
+      version: String(payload.version ?? ''),
+    };
+  },
 
-  downloadFillInAttachment: (examId: string, fileName: string) =>
+  downloadFillInAttachmentsZip: (examId: string, fallbackZipName: string) =>
     downloadBlob(
       `/api/student/exam/fillin/attachment?examId=${encodeURIComponent(examId)}`,
-      fileName,
+      fallbackZipName,
     ),
 
   listFillInScreenshots: (examId: string) =>

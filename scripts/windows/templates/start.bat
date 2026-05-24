@@ -1,9 +1,7 @@
 @echo off
 setlocal
 cd /d "%~dp0"
-
-if not defined LAN_EXAM_HOME set "LAN_EXAM_HOME=%~dp0"
-set "LAN_EXAM_HOME=%LAN_EXAM_HOME:~0,-1%"
+set "LAN_EXAM_HOME=%CD%"
 
 set "NODE=%LAN_EXAM_HOME%\runtime\node\node.exe"
 set "PG_BIN=%LAN_EXAM_HOME%\runtime\postgres\bin"
@@ -17,7 +15,7 @@ if not exist "%PGDATA%\PG_VERSION" (
   exit /b 1
 )
 
-tasklist /FI "IMAGENAME eq postgres.exe" 2>nul | find /I "postgres.exe" >nul
+netstat -ano | findstr "127.0.0.1:5434" | findstr "LISTENING" >nul
 if errorlevel 1 (
   echo [start] Starting Postgres on 127.0.0.1:5434...
   start "" /B "%PG_BIN%\pg_ctl.exe" -D "%PGDATA%" -l "%LOG_DIR%\postgres.log" -o "-p 5434 -h 127.0.0.1" start >nul 2>&1

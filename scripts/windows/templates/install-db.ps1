@@ -14,6 +14,51 @@ $logDir = Join-Path $InstallHome 'logs'
 $app = Join-Path $InstallHome 'app'
 $envFile = Join-Path $InstallHome '.env'
 
+function Write-InstallLog {
+    param([string]$Path, [object]$Output)
+    if ($null -eq $Output) { return }
+    @($Output) | Out-File -FilePath $Path -Append -Encoding utf8
+}
+
+function Invoke-InstallNode {
+    param(
+        [string[]]$NodeArgs,
+        [string]$LogPath,
+        [string]$Label
+    )
+    $prevEap = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    Write-Host "[install-db] $Label..."
+    $output = & $node @NodeArgs 2>&1
+    $exitCode = $LASTEXITCODE
+    $ErrorActionPreference = $prevEap
+    Write-InstallLog -Path $LogPath -Output $output
+    $text = (@($output) | Out-String).Trim()
+    if ($text) { Write-Host $text }
+    if ($exitCode -ne 0) {
+        throw "$Label failed (exit $exitCode). See $LogPath"
+    }
+}
+
+function Wait-PostgresReady {
+    param([int]$TimeoutSeconds = 60)
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    while ((Get-Date) -lt $deadline) {
+        $listening = netstat -ano | Select-String '127.0.0.1:5434' | Select-String 'LISTENING'
+        if ($listening) { return }
+        Start-Sleep -Seconds 1
+    }
+    throw 'Postgres did not listen on 127.0.0.1:5434 within timeout'
+}
+
+function Test-TeacherTable {
+    $psql = Join-Path $pgBin 'psql.exe'
+    $result = (& $psql -h 127.0.0.1 -p 5434 -U lan_exam -d lan_exam -tAc `
+        "SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='Teacher'" `
+        2>$null | Out-String).Trim()
+    return $result -eq '1'
+}
+
 if (-not (Test-Path $logDir)) { New-Item -ItemType Directory -Path $logDir | Out-Null }
 if (-not (Test-Path $envFile)) { throw ".env not found at $envFile" }
 
@@ -34,19 +79,29 @@ if (-not (Test-Path (Join-Path $pgData 'PG_VERSION'))) {
     Write-Host '[install-db] initdb...'
     & (Join-Path $pgBin 'initdb.exe') -D $pgData -U postgres -E UTF8 --locale=C `
         *> (Join-Path $logDir 'initdb.log')
-
-    & (Join-Path $InstallHome 'start.bat')
-    Start-Sleep -Seconds 4
-
-    $psql = Join-Path $pgBin 'psql.exe'
-    & $psql -h 127.0.0.1 -p 5434 -U postgres -d postgres -c "CREATE USER lan_exam WITH PASSWORD 'lan_exam';" `
-        2>&1 | Out-File (Join-Path $logDir 'install.log') -Append
-    & $psql -h 127.0.0.1 -p 5434 -U postgres -d postgres -c "CREATE DATABASE lan_exam OWNER lan_exam;" `
-        2>&1 | Out-File (Join-Path $logDir 'install.log') -Append
 }
 
 & (Join-Path $InstallHome 'start.bat')
-Start-Sleep -Seconds 3
+Wait-PostgresReady
+
+$installLog = Join-Path $logDir 'install.log'
+$psql = Join-Path $pgBin 'psql.exe'
+$hasUser = (& $psql -h 127.0.0.1 -p 5434 -U postgres -d postgres -tAc `
+    "SELECT 1 FROM pg_roles WHERE rolname='lan_exam'" 2>$null | Out-String).Trim()
+if ($hasUser -ne '1') {
+    Write-Host '[install-db] creating role lan_exam...'
+    & $psql -h 127.0.0.1 -p 5434 -U postgres -d postgres -c `
+        "CREATE USER lan_exam WITH PASSWORD 'lan_exam';" `
+        2>&1 | Out-File $installLog -Append
+}
+$hasDb = (& $psql -h 127.0.0.1 -p 5434 -U postgres -d postgres -tAc `
+    "SELECT 1 FROM pg_database WHERE datname='lan_exam'" 2>$null | Out-String).Trim()
+if ($hasDb -ne '1') {
+    Write-Host '[install-db] creating database lan_exam...'
+    & $psql -h 127.0.0.1 -p 5434 -U postgres -d postgres -c `
+        "CREATE DATABASE lan_exam OWNER lan_exam;" `
+        2>&1 | Out-File $installLog -Append
+}
 
 $bundle = Join-Path $app 'server-bundle'
 $prismaCli = Join-Path $bundle 'node_modules\prisma\build\index.js'
@@ -56,17 +111,29 @@ if (-not (Test-Path $prismaCli)) {
 $env:NODE_PATH = Join-Path $bundle 'node_modules'
 
 $schema = Join-Path $app 'prisma\schema.prisma'
-Write-Host '[install-db] prisma migrate deploy...'
-& $node $prismaCli migrate deploy --schema $schema 2>&1 `
-    | Tee-Object -FilePath (Join-Path $logDir 'install.log') -Append
+Push-Location $app
+try {
+    Invoke-InstallNode -NodeArgs @(
+        $prismaCli, 'migrate', 'deploy', '--schema', $schema
+    ) -LogPath $installLog -Label 'prisma migrate deploy'
+} finally {
+    Pop-Location
+}
 
-Write-Host '[install-db] prisma db seed...'
+if (-not (Test-TeacherTable)) {
+    throw 'Database migrations did not create table Teacher. See logs\install.log'
+}
+
+$seedLog = Join-Path $logDir 'seed.log'
 $seedScript = Join-Path $app 'prisma\seed.cjs'
-if (Test-Path $seedScript) {
-    & $node $seedScript 2>&1 | Tee-Object -FilePath (Join-Path $logDir 'seed.log') -Append
-} else {
-    $tsx = Join-Path $bundle 'node_modules\tsx\dist\cli.mjs'
-    & $node $tsx (Join-Path $app 'prisma\seed.ts') 2>&1 | Tee-Object -FilePath (Join-Path $logDir 'seed.log') -Append
+if (-not (Test-Path $seedScript)) {
+    throw "Missing $seedScript — reinstall from a full LAN-Exam-Setup package (v1.6.3+)."
+}
+Push-Location $app
+try {
+    Invoke-InstallNode -NodeArgs @($seedScript) -LogPath $seedLog -Label 'prisma db seed'
+} finally {
+    Pop-Location
 }
 
 Write-Host '[install-db] Done.'

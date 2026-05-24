@@ -25,6 +25,7 @@
 | [AGENTS.md](./AGENTS.md) | 维护者 / AI 协作者 | 产品约束、认证模型、关键代码落点 |
 | [docs/DEPLOY-WINDOWS-NATIVE.md](./docs/DEPLOY-WINDOWS-NATIVE.md) | 考场实施 / 运维 | Windows 离线安装、考前考后操作 |
 | [docs/DEPLOY.md](./docs/DEPLOY.md) | 开发运维 / 验收环境 | Docker Compose、反向代理、上传与运维约束 |
+| [docs/DEPLOY-LINUX-TEST.md](./docs/DEPLOY-LINUX-TEST.md) | 开发运维 | Linux 公网 Docker 联调（端口 8001，非考场交付） |
 | [docs/PLAN-考官免登录一键部署.md](./docs/PLAN-考官免登录一键部署.md) | 决策追踪 | 免登录 + Windows 原生部署方案、验收与风险（非产品说明书） |
 | [apps/server/src/plugins/README.md](./apps/server/src/plugins/README.md) | 后端维护者 | Fastify 插件与 admin/student 守卫索引 |
 
@@ -39,7 +40,7 @@
 | `templates/` | 考官下载的导入模板（客观题 / 名单 / 填空题）；Docker 与 Windows 离线包会打包此目录 |
 | `fixtures/` | 开发与 CI 用的测试样例（`import-test/`、`export/`），不参与运行时 |
 | `prisma/` | 数据库 schema 与迁移 |
-| `scripts/` | `docker-entrypoint.sh`、`windows/` 发版与安装脚本（`scripts/windows/templates/` 为安装 bat/ps1 模板，与业务 Excel 无关） |
+| `scripts/` | `docker-entrypoint.sh`、`windows/` 发版与安装、`linux/` Linux Docker 测试部署（非考场交付；`scripts/windows/templates/` 为安装 bat/ps1，与业务 Excel 无关） |
 | `tools/lan-exam-tray/` | Windows 托盘程序源码 |
 | `inno-setup/` | Inno Setup 安装包定义 |
 | `docs/` | 部署与方案文档（Markdown） |
@@ -97,7 +98,7 @@ docker compose up --build
 
 **Windows 原生离线安装** 是考场推荐交付方式：
 
-- 安装包：`LAN-Exam-Setup.exe`
+- 安装包：`LAN-Exam-Setup-v<版本>.exe`（版本号见仓库根目录 `VERSION`）
 - 形态：桌面快捷方式 + 托盘常驻 + 便携 Node / Postgres
 - 现场要求：考场机器不访问外网
 

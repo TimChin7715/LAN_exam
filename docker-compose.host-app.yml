@@ -1,0 +1,9 @@
+# Linux Docker test: app uses host network so SSH tunnel -> 127.0.0.1:WEB_PORT
+# is seen as loopback by Fastify (published bridge ports show as 172.x otherwise).
+# Use: docker compose -f docker-compose.yml -f docker-compose.host-app.yml up -d
+services:
+  app:
+    network_mode: host
+    environment:
+      WEB_PORT: ${WEB_HOST_PORT:-8001}
+      DATABASE_URL: postgresql://lan_exam:lan_exam_dev@127.0.0.1:${DB_HOST_PORT:-5434}/lan_exam

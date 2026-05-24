@@ -204,10 +204,12 @@ apps/web/src/
 templates/              # 业务导入模板（打包进 Docker / dist/lan-exam-win/templates）
 fixtures/               # 测试样例，不打包
 scripts/windows/        # 发版脚本；scripts/windows/templates/ 仅为 install.bat 等
+scripts/linux/          # Linux 公网 Docker 测试部署（非考场交付）
 inno-setup/LAN-Exam.iss
 tools/lan-exam-tray/
 Dockerfile
 docker-compose.yml
+docker-compose.host-app.yml  # Linux 测试：app host 网络
 prisma/seed.ts
 ```
 
@@ -217,9 +219,10 @@ prisma/seed.ts
 | --- | --- |
 | [docs/DEPLOY-WINDOWS-NATIVE.md](./docs/DEPLOY-WINDOWS-NATIVE.md) | 考场 U 盘安装、考前 / 考后操作、故障排查 |
 | [docs/DEPLOY.md](./docs/DEPLOY.md) | Docker Compose / 反向代理（可选） |
+| [docs/DEPLOY-LINUX-TEST.md](./docs/DEPLOY-LINUX-TEST.md) | Linux 公网 Docker 联调（8001 + host-app，非考场交付） |
 | [docs/PLAN-考官免登录一键部署.md](./docs/PLAN-考官免登录一键部署.md) | 方案背景、验收标准、风险、Phase C |
 
-发版（有网）：`.\scripts\windows\package.ps1` → `dist\LAN-Exam-Setup.exe`。
+发版（有网）：维护根目录 `VERSION` → `.\scripts\windows\package.ps1` → `dist\LAN-Exam-Setup-v<版本>.exe`。
 
 ## 安全假设（改代码时遵守）
 

@@ -1,5 +1,6 @@
 {
   "name": "lan-exam",
+  "version": "1.6.0",
   "private": true,
   "packageManager": "pnpm@9.15.9",
   "scripts": {

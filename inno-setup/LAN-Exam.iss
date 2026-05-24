@@ -1,16 +1,31 @@
 ; LAN Exam offline installer — compile on a build machine with Inno Setup 6.
-;   ISCC.exe /DSourceDir=E:\programs\LAN_exam\dist\lan-exam-win LAN-Exam.iss
+;   ISCC.exe /DSourceDir=E:\programs\LAN_exam\dist\lan-exam-win /DAppVersion=1.6.0 LAN-Exam.iss
+; Version: edit repo root VERSION; package.ps1 passes /DAppVersion automatically.
 
 #ifndef SourceDir
   #define SourceDir "..\dist\lan-exam-win"
 #endif
 
+#ifndef AppVersion
+  #define AppVersion "0.0.0"
+#endif
+
+#ifndef AppVersionFull
+  ; Windows VersionInfo requires four numeric segments (e.g. 1.6.0.0)
+  #define AppVersionFull AppVersion + ".0"
+#endif
+
 [Setup]
 AppName=局域网考试系统
-AppVersion=0.1.0
+AppVersion={#AppVersion}
+AppVerName=局域网考试系统 {#AppVersion}
 DefaultDirName=D:\LAN-Exam
 DefaultGroupName=局域网考试系统
-OutputBaseFilename=LAN-Exam-Setup
+VersionInfoVersion={#AppVersionFull}
+VersionInfoProductVersion={#AppVersion}
+VersionInfoProductName=局域网考试系统
+VersionInfoCompany=LAN Exam
+OutputBaseFilename=LAN-Exam-Setup-v{#AppVersion}
 OutputDir=..\dist
 Compression=lzma2
 SolidCompression=yes

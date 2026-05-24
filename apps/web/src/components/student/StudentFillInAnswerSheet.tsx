@@ -84,7 +84,7 @@ export function StudentFillInAnswerSheet({
       <Table className="table-fixed">
         <TableHeader>
           <TableRow>
-            <TableHead className="w-16 shrink-0">题号</TableHead>
+            <TableHead className="w-16 shrink-0 text-left">题号</TableHead>
             <TableHead className="min-w-0">作答</TableHead>
             <TableHead className="w-14 shrink-0 text-right">分值</TableHead>
             {showResult ? (
@@ -120,34 +120,40 @@ export function StudentFillInAnswerSheet({
                       </TableRow>
                     ) : null}
                     <TableRow>
-                      <TableCell className="align-middle font-medium tabular-nums">
+                      <TableCell className="align-middle text-left font-bold tabular-nums">
                         {qNo}
                         {multiBlank && row.fillBlankIndex
                           ? `-${row.fillBlankIndex}`
                           : null}
                       </TableCell>
-                      <TableCell>
-                        <Input
-                          value={displayFillAnswer(
-                            answers[row.examQuestionId] ?? '',
-                          )}
-                          disabled={readOnly}
-                          placeholder="请填写答案"
-                          onChange={(e) =>
-                            onAnswerChange(row.examQuestionId, e.target.value)
-                          }
-                        />
-                        <FillInScreenshotAttach
-                          examId={examId}
-                          examQuestionId={row.examQuestionId}
-                          screenshots={
-                            screenshotsByQuestion[row.examQuestionId] ?? []
-                          }
-                          readOnly={readOnly}
-                          onScreenshotsChange={onScreenshotsChange}
-                        />
+                      <TableCell className="align-top">
+                        <div className="flex flex-col gap-2 rounded-lg border border-border/80 bg-muted/20 p-3">
+                          <Input
+                            className="bg-background"
+                            value={displayFillAnswer(
+                              answers[row.examQuestionId] ?? '',
+                            )}
+                            disabled={readOnly}
+                            placeholder="请填写答案"
+                            onChange={(e) =>
+                              onAnswerChange(
+                                row.examQuestionId,
+                                e.target.value,
+                              )
+                            }
+                          />
+                          <FillInScreenshotAttach
+                            examId={examId}
+                            examQuestionId={row.examQuestionId}
+                            screenshots={
+                              screenshotsByQuestion[row.examQuestionId] ?? []
+                            }
+                            readOnly={readOnly}
+                            onScreenshotsChange={onScreenshotsChange}
+                          />
+                        </div>
                       </TableCell>
-                      <TableCell className="text-right tabular-nums">
+                      <TableCell className="align-middle text-right font-bold tabular-nums">
                         {row.points}
                       </TableCell>
                       {showResult && submission ? (
@@ -177,7 +183,7 @@ export function StudentFillInAnswerSheet({
         <div className="shrink-0 border-b px-3 py-2">
           <p className="text-sm font-medium text-foreground">答题卡</p>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-scroll overscroll-contain p-3">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain p-3">
           {table}
         </div>
       </div>

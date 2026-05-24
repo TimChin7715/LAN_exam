@@ -261,7 +261,12 @@ export default function AdminQuestions() {
             type="button"
             variant={tab === 'practical' ? 'default' : 'outline'}
             size="sm"
-            onClick={() => setTab('practical')}
+            onClick={() => {
+              if (tab !== 'practical') {
+                window.alert('当前功能正在开发中');
+              }
+              setTab('practical');
+            }}
           >
             操作题
           </Button>

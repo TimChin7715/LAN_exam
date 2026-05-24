@@ -132,23 +132,38 @@ enum ExamContentModule {
 }
 
 model FillInQuestionImportBatch {
-  id                     String     @id @default(cuid())
+  id                     String                  @id @default(cuid())
   teacherId              String
-  teacher                Teacher    @relation(fields: [teacherId], references: [id])
+  teacher                Teacher                 @relation(fields: [teacherId], references: [id])
   title                  String
   wordFileName           String
   wordStorageKey         String
   excelFileName          String
   excelStorageKey        String
   studentExcelStorageKey String
+  /** @deprecated 仅旧数据；新导入写入 FillInBatchAttachment */
   attachmentFileName     String?
+  /** @deprecated 仅旧数据；新导入写入 FillInBatchAttachment */
   attachmentStorageKey   String?
   importedCount          Int
-  createdAt              DateTime   @default(now())
+  createdAt              DateTime                @default(now())
+  attachments            FillInBatchAttachment[]
   questions              Question[]
   exams                  Exam[]
 
   @@index([teacherId])
+}
+
+model FillInBatchAttachment {
+  id          String                    @id @default(cuid())
+  batchId     String
+  batch       FillInQuestionImportBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  fileName    String
+  storageKey  String
+  sortOrder   Int
+  createdAt   DateTime                  @default(now())
+
+  @@index([batchId])
 }
 
 model PracticalQuestionImportBatch {

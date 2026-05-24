@@ -62,6 +62,25 @@ export function fillInBatchWordKey(
   return `fill-in-batches/${batchId}/paper.${ext}`;
 }
 
+export function fillInBatchPreviewMetaKey(batchId: string): string {
+  return `fill-in-batches/${batchId}/preview/meta.json`;
+}
+
+export function fillInBatchPreviewBodyKey(batchId: string): string {
+  return `fill-in-batches/${batchId}/preview/body.html`;
+}
+
+export function fillInBatchPreviewImageKey(
+  batchId: string,
+  fileName: string,
+): string {
+  return `fill-in-batches/${batchId}/preview/images/${fileName}`;
+}
+
+export function fillInBatchPreviewImagesPrefix(batchId: string): string {
+  return `fill-in-batches/${batchId}/preview/images`;
+}
+
 export function fillInBatchExcelKey(
   batchId: string,
   ext: 'xls' | 'xlsx' = 'xlsx',
@@ -73,11 +92,20 @@ export function fillInBatchStudentExcelKey(batchId: string): string {
   return `fill-in-batches/${batchId}/student-sheet.xlsx`;
 }
 
+/** @deprecated 旧版单附件路径；新导入使用 fillInBatchAttachmentItemKey */
 export function fillInBatchAttachmentKey(
   batchId: string,
   ext: 'xls' | 'xlsx' | 'csv',
 ): string {
   return `fill-in-batches/${batchId}/attachment.${ext}`;
+}
+
+export function fillInBatchAttachmentItemKey(
+  batchId: string,
+  attachmentId: string,
+  ext: 'xls' | 'xlsx' | 'csv',
+): string {
+  return `fill-in-batches/${batchId}/attachments/${attachmentId}.${ext}`;
 }
 
 export function resolveStoragePath(storageKey: string): string {

@@ -15,7 +15,8 @@ $bundleDir = [System.IO.Path]::GetFullPath((Join-Path $appDir 'server-bundle'))
 $bundleStage = [System.IO.Path]::GetFullPath((Join-Path $root '.build\server-bundle'))
 $templates = Join-Path $PSScriptRoot 'templates'
 
-Write-Host "==> build-release: root=$root out=$OutDir"
+$releaseVersion = & (Join-Path $PSScriptRoot 'get-release-version.ps1') -Root $root
+Write-Host "==> build-release: root=$root out=$OutDir version=$releaseVersion"
 
 foreach ($stale in @(
         (Join-Path $root 'apps\server\dist\lan-exam-win'),
@@ -85,12 +86,27 @@ if (-not (Test-Path $prismaClientEngine)) {
     throw "Prisma client engine missing after generate: $prismaClientEngine"
 }
 
+Write-Host '==> compile prisma/seed.cjs (offline install, no tsx on target machine)'
+$seedCjs = Join-Path $appDir 'prisma\seed.cjs'
+$seedTs = Join-Path $root 'prisma\seed.ts'
+Push-Location $bundleDir
+npm install --no-package-lock --no-save esbuild@0.25.12
+if ($LASTEXITCODE -ne 0) { throw 'npm install esbuild failed' }
+$esbuild = Join-Path $bundleDir 'node_modules\esbuild\bin\esbuild'
+& node $esbuild $seedTs --bundle --platform=node --format=cjs --outfile=$seedCjs --packages=external
+if ($LASTEXITCODE -ne 0) { throw 'esbuild seed.cjs failed' }
+Pop-Location
+if (-not (Test-Path $seedCjs)) {
+    throw "Missing compiled seed script: $seedCjs"
+}
+
 # Root batch files + install script
 foreach ($f in @('start.bat', 'stop.bat', 'open-admin.bat', 'install.bat')) {
     Copy-Item (Join-Path $templates $f) (Join-Path $OutDir $f) -Force
 }
 New-Item -ItemType Directory -Path (Join-Path $OutDir 'scripts') -Force | Out-Null
 Copy-Item (Join-Path $templates 'install-db.ps1') (Join-Path $OutDir 'scripts\install-db.ps1') -Force
+Copy-Item (Join-Path $templates 'stop-postgres.ps1') (Join-Path $OutDir 'scripts\stop-postgres.ps1') -Force
 Copy-Item (Join-Path $templates 'write-env.ps1') (Join-Path $OutDir 'scripts\write-env.ps1') -Force
 
 $envExample = @"
@@ -107,4 +123,11 @@ WEB_DIST_PATH=
 "@
 Set-Content -Path (Join-Path $OutDir '.env.example') -Value $envExample -Encoding UTF8
 
-Write-Host "==> build-release complete: $OutDir"
+$utf8NoBom = New-Object System.Text.UTF8Encoding $false
+[System.IO.File]::WriteAllText(
+    (Join-Path $OutDir 'VERSION'),
+    "$releaseVersion`n",
+    $utf8NoBom
+)
+
+Write-Host "==> build-release complete: $OutDir (version $releaseVersion)"

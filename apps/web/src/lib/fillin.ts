@@ -12,6 +12,8 @@ export type FillInBatchListItem = {
   createdAt: string;
 };
 
+export const MAX_FILLIN_BATCH_ATTACHMENTS = 10;
+
 export type FillInImportSuccess = {
   ok: true;
   batchId: string;
@@ -19,7 +21,8 @@ export type FillInImportSuccess = {
   importedCount: number;
   wordFileName: string;
   excelFileName: string;
-  attachmentFileName: string | null;
+  attachmentCount: number;
+  attachmentFileNames: string[];
 };
 
 export type FillInImportFailure = {
@@ -65,13 +68,13 @@ export async function downloadFillInTemplate(): Promise<void> {
 export async function importFillInBatch(
   wordFile: File,
   excelFile: File,
-  attachmentFile?: File | null,
+  attachmentFiles: File[] = [],
 ): Promise<FillInImportSuccess | FillInImportFailure> {
   const form = new FormData();
   form.append('wordFile', wordFile);
   form.append('excelFile', excelFile);
-  if (attachmentFile) {
-    form.append('attachmentFile', attachmentFile);
+  for (const file of attachmentFiles) {
+    form.append('attachmentFiles', file);
   }
 
   const response = await fetch('/api/admin/fill-in-batches/import', {

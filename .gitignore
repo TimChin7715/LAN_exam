@@ -3,7 +3,16 @@ dist
 .build
 .env
 .env.*
+.env.deploy
+.deploy-ssh-password
+.deploy-ssh-password.*
 !.env.example
+!.deploy-ssh-password.example
+
+# Local deploy artifacts (password-based upload / release pack)
+lan-exam-src.tgz
+*.deploy.tgz
+docker-compose.override.yml
 *.log
 .DS_Store
 coverage

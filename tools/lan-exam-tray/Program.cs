@@ -146,17 +146,27 @@ internal static class Program
             return;
         }
 
-        RunBatch("stop.bat", wait: true);
+        var exitCode = RunBatch("stop.bat", wait: true);
+        if (exitCode != 0)
+        {
+            MessageBox.Show(
+                "Node 已尝试停止，但 PostgreSQL 可能仍在后台运行。\r\n" +
+                "请查看安装目录 logs\\stop.log；若仍存在 postgres.exe，可手动结束该进程。",
+                "退出系统",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Warning);
+        }
+
         Application.Exit();
     }
 
-    private static void RunBatch(string fileName, bool wait)
+    private static int RunBatch(string fileName, bool wait)
     {
         var path = Path.Combine(InstallRoot, fileName);
         if (!File.Exists(path))
         {
             MessageBox.Show($"未找到脚本：{path}", "LAN Exam", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            return;
+            return 1;
         }
 
         var psi = new ProcessStartInfo
@@ -169,9 +179,17 @@ internal static class Program
         };
 
         var process = Process.Start(psi);
-        if (wait && process != null)
+        if (process == null)
+        {
+            return 1;
+        }
+
+        if (wait)
         {
             process.WaitForExit(120_000);
+            return process.ExitCode;
         }
+
+        return 0;
     }
 }

@@ -12,6 +12,8 @@
 - 需要在 Nginx / IIS 后面挂单进程应用
 - 需要验证 5180 单端口部署、免登录、上传、导出、座位表等当前能力
 
+**Linux 公网 Docker 联调**（宿主机端口 8001、`docker-compose.host-app.yml`、`.env.deploy`）见 [DEPLOY-LINUX-TEST.md](./DEPLOY-LINUX-TEST.md)，与本文档默认 **5180** Compose 相互独立，非考场交付方案。
+
 ## 安全假设
 
 - 机房内网默认使用 **HTTP**；若需 HTTPS，在反向代理层终止 TLS。

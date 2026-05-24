@@ -8,6 +8,7 @@ import {
 import { finalizePracticalSubmission } from './submit-practical.js';
 import { finalizeFillInScreenshots } from '../fillin/finalize-screenshots.js';
 import { scoreQuestion } from './score-question.js';
+import { assertAnswersComplete } from './validate-answers-complete.js';
 import { SubmitExamError } from './types.js';
 import { prisma } from '../prisma.js';
 
@@ -118,6 +119,8 @@ async function submitScoredQuestionsPart(
   const draftByQuestionId = new Map(
     drafts.map((d) => [d.examQuestionId, d.selectedKeys]),
   );
+
+  assertAnswersComplete(examQuestions, draftByQuestionId);
 
   let totalScore = 0;
   const answerCreates: {

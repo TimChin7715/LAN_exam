@@ -4,6 +4,7 @@ export const CLEAR_ALL_DATA_CONFIRM_PHRASE = '清除全部数据';
 
 export type AdminSettings = {
   showSeatBoard: boolean;
+  appVersion?: string;
 };
 
 export type ClearAllDataResult = {
@@ -15,10 +16,15 @@ export type ClearAllDataResult = {
 };
 
 export async function fetchAdminSettings(): Promise<AdminSettings> {
-  const data = await apiFetch<{ ok: true; showSeatBoard: boolean }>(
-    '/api/admin/settings',
-  );
-  return { showSeatBoard: data.showSeatBoard };
+  const data = await apiFetch<{
+    ok: true;
+    showSeatBoard: boolean;
+    appVersion?: string;
+  }>('/api/admin/settings');
+  return {
+    showSeatBoard: data.showSeatBoard,
+    appVersion: data.appVersion,
+  };
 }
 
 export async function updateAdminSettings(

@@ -8,6 +8,8 @@ import {
   requiresPracticalBatch,
 } from '../../../lib/exam/content-mode.js';
 import { ExamAccessError } from '../../../lib/exam/types.js';
+import { safeFillInAttachmentsZipFilename } from '../../../lib/fillin/build-attachments-zip.js';
+import { listFillInBatchAttachments } from '../../../lib/fillin/load-batch-attachments.js';
 import { prisma } from '../../../lib/prisma.js';
 import {
   ensureStudentRosterEntryId,
@@ -59,10 +61,10 @@ export async function registerStudentExamPaperRoutes(
           contentModules: true,
           fillInBatch: {
             select: {
+              id: true,
               title: true,
               wordFileName: true,
               excelFileName: true,
-              attachmentFileName: true,
             },
           },
           practicalBatch: {
@@ -150,15 +152,24 @@ export async function registerStudentExamPaperRoutes(
         batchTitle: string;
         wordFileName: string;
         excelFileName: string;
-        attachmentFileName: string | null;
+        hasAttachments: boolean;
+        attachmentZipFileName: string | null;
       } | null = null;
 
       if (requiresFillInBatch(exam.contentModules) && exam.fillInBatch) {
+        const batchAttachments = await listFillInBatchAttachments(
+          prisma,
+          exam.fillInBatch.id,
+        );
         fillIn = {
           batchTitle: exam.fillInBatch.title,
           wordFileName: exam.fillInBatch.wordFileName,
           excelFileName: exam.fillInBatch.excelFileName,
-          attachmentFileName: exam.fillInBatch.attachmentFileName,
+          hasAttachments: batchAttachments.length > 0,
+          attachmentZipFileName:
+            batchAttachments.length > 0
+              ? safeFillInAttachmentsZipFilename(exam.fillInBatch.title)
+              : null,
         };
       }
 

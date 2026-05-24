@@ -14,6 +14,7 @@ $app = Join-Path $OutDir 'app'
 $bundle = Join-Path $app 'server-bundle'
 
 $required = @(
+    (Join-Path $OutDir 'VERSION'),
     (Join-Path $OutDir 'start.bat'),
     (Join-Path $OutDir 'install.bat'),
     (Join-Path $OutDir 'scripts\install-db.ps1'),
@@ -22,14 +23,29 @@ $required = @(
     (Join-Path $bundle 'dist\index.js'),
     (Join-Path $bundle 'node_modules\prisma\build\index.js'),
     (Join-Path $bundle 'node_modules\.prisma\client\query_engine-windows.dll.node'),
-    (Join-Path $OutDir 'templates\题库导入模板.xlsx'),
-    (Join-Path $OutDir 'templates\名单导入模板.xlsx'),
-    (Join-Path $OutDir 'templates\填空题导入模板.xlsx')
+    (Join-Path $app 'prisma\seed.cjs'),
+    (Join-Path $OutDir 'runtime\postgres\share\timezone')
 )
 foreach ($path in $required) {
     if (-not (Test-Path $path)) {
         throw "Missing required package file: $path"
     }
+}
+
+$repoTemplates = Join-Path $root 'templates'
+$packTemplates = Join-Path $OutDir 'templates'
+if (-not (Test-Path $packTemplates)) {
+    throw "Missing templates directory: $packTemplates"
+}
+Get-ChildItem $repoTemplates -File | ForEach-Object {
+    $dest = Join-Path $packTemplates $_.Name
+    if (-not (Test-Path $dest)) {
+        throw "Missing required package file: $dest (expected copy of $($_.Name))"
+    }
+}
+$requiredXlsx = @(Get-ChildItem $repoTemplates -Filter '*.xlsx')
+if ($requiredXlsx.Count -lt 3) {
+    throw "Repo templates must include at least 3 .xlsx files, found $($requiredXlsx.Count)"
 }
 Write-Host '[verify] required files OK'
 

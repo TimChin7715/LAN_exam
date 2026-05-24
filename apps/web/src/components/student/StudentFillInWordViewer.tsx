@@ -7,19 +7,48 @@ type StudentFillInWordViewerProps = {
   examId: string;
 };
 
+type PreviewCacheEntry = {
+  html: string;
+  version: string;
+};
+
+/** 同场考试切 tab 不重复请求；配合 HTTP ETag / 图片 immutable 缓存。 */
+const previewByExam = new Map<string, PreviewCacheEntry>();
+
 export function StudentFillInWordViewer({ examId }: StudentFillInWordViewerProps) {
-  const [html, setHtml] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const cached = previewByExam.get(examId);
+  const [html, setHtml] = useState<string | null>(cached?.html ?? null);
+  const [loading, setLoading] = useState(!cached);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    const entry = previewByExam.get(examId);
+    if (entry) {
+      setHtml(entry.html);
+      setLoading(false);
+      setError(null);
+      return;
+    }
+
     let cancelled = false;
     setLoading(true);
     setError(null);
     void (async () => {
       try {
         const data = await studentApi.fetchFillInWordPreview(examId);
-        if (!cancelled) setHtml(data.html);
+        if (cancelled) return;
+        if ('notModified' in data && data.notModified) {
+          const again = previewByExam.get(examId);
+          if (again) {
+            setHtml(again.html);
+          }
+          return;
+        }
+        previewByExam.set(examId, {
+          html: data.html,
+          version: data.version,
+        });
+        setHtml(data.html);
       } catch (err) {
         if (!cancelled) {
           setError(
@@ -40,7 +69,7 @@ export function StudentFillInWordViewer({ examId }: StudentFillInWordViewerProps
       <div className="shrink-0 border-b px-3 py-2">
         <p className="text-sm font-medium text-foreground">试卷预览</p>
       </div>
-      <div className="min-h-0 flex-1 overflow-y-scroll overscroll-contain p-4">
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain p-4">
         {loading ? (
           <div className="flex justify-center py-12">
             <Spinner />

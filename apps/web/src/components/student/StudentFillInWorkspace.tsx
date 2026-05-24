@@ -42,7 +42,7 @@ export function StudentFillInWorkspace({
   const [screenshotsByQuestion, setScreenshotsByQuestion] = useState<
     Record<string, FillInScreenshotInfo[]>
   >({});
-  const hasAttachment = Boolean(meta?.attachmentFileName);
+  const hasAttachment = Boolean(meta?.hasAttachments);
   const fillRows = items.filter((i) => i.type === 'FILL');
 
   const loadScreenshots = useCallback(async () => {
@@ -86,12 +86,12 @@ export function StudentFillInWorkspace({
   }
 
   async function handleDownloadAttachment() {
-    if (!meta?.attachmentFileName) return;
+    if (!meta?.hasAttachments) return;
     setDownloading('attachment');
     try {
-      await studentApi.downloadFillInAttachment(
+      await studentApi.downloadFillInAttachmentsZip(
         examId,
-        meta.attachmentFileName,
+        meta.attachmentZipFileName ?? '填空题附件.zip',
       );
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : '下载附件失败');
@@ -137,7 +137,7 @@ export function StudentFillInWorkspace({
               ) : (
                 <Download className="size-4" aria-hidden />
               )}
-              下载 Excel/CSV 附件
+              下载附件（ZIP）
             </Button>
           ) : null}
           {!readOnly ? (

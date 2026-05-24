@@ -2,7 +2,11 @@ import type { FastifyInstance } from 'fastify';
 import { randomUUID } from 'node:crypto';
 
 import { resolveAdminTeacherId } from '../../../lib/admin-context.js';
-import { importFillInBatch } from '../../../lib/fillin/import-batch.js';
+import { assertFillInAttachmentsWithinLimits } from '../../../lib/fillin/attachment-limits.js';
+import {
+  importFillInBatch,
+  type FillInImportAttachmentInput,
+} from '../../../lib/fillin/import-batch.js';
 import { prisma } from '../../../lib/prisma.js';
 import {
   assertValidSpreadsheetUpload,
@@ -15,7 +19,13 @@ import {
 } from '../../../lib/upload/word-file.js';
 import { requireAdminSession } from '../../../plugins/admin-guard.js';
 
-async function collectMultipartFiles(
+type MultipartFile = {
+  filename: string;
+  mimetype: string;
+  buffer: Buffer;
+};
+
+async function collectMultipartImportFiles(
   request: {
     files: () => AsyncIterableIterator<{
       fieldname: string;
@@ -24,22 +34,63 @@ async function collectMultipartFiles(
       toBuffer: () => Promise<Buffer>;
     }>;
   },
-): Promise<Map<string, { filename: string; mimetype: string; buffer: Buffer }>> {
-  const map = new Map<string, { filename: string; mimetype: string; buffer: Buffer }>();
+): Promise<{
+  singles: Map<string, MultipartFile>;
+  attachmentFiles: MultipartFile[];
+}> {
+  const singles = new Map<string, MultipartFile>();
+  const attachmentFiles: MultipartFile[] = [];
   for await (const part of request.files()) {
-    if (part.fieldname) {
-      map.set(part.fieldname, {
-        filename: part.filename,
-        mimetype: part.mimetype,
-        buffer: await part.toBuffer(),
-      });
+    if (!part.fieldname) continue;
+    const file: MultipartFile = {
+      filename: part.filename,
+      mimetype: part.mimetype,
+      buffer: await part.toBuffer(),
+    };
+    if (
+      part.fieldname === 'attachmentFiles' ||
+      part.fieldname === 'attachmentFile'
+    ) {
+      attachmentFiles.push(file);
+      continue;
     }
+    singles.set(part.fieldname, file);
   }
-  return map;
+  return { singles, attachmentFiles };
 }
 
 function stripWordTitle(filename: string): string {
   return filename.replace(/\.(docx?|doc)$/i, '').trim() || filename;
+}
+
+function parseAttachmentInputs(
+  files: MultipartFile[],
+):
+  | { ok: true; attachments: FillInImportAttachmentInput[] }
+  | { ok: false; message: string } {
+  const limits = assertFillInAttachmentsWithinLimits(files);
+  if (!limits.ok) return limits;
+
+  const attachments: FillInImportAttachmentInput[] = [];
+  for (const file of files) {
+    const check = assertValidSpreadsheetUpload(
+      file.filename,
+      file.mimetype,
+      file.buffer,
+    );
+    if (!check.ok) {
+      return {
+        ok: false,
+        message: `${file.filename}：${check.message}`,
+      };
+    }
+    attachments.push({
+      fileName: file.filename,
+      buffer: file.buffer,
+      ext: check.ext as SpreadsheetExt,
+    });
+  }
+  return { ok: true, attachments };
 }
 
 export async function registerAdminFillInBatchesImportRoutes(
@@ -59,10 +110,10 @@ export async function registerAdminFillInBatchesImportRoutes(
     async (request, reply) => {
       const teacherId = await resolveAdminTeacherId(request);
 
-      const files = await collectMultipartFiles(request);
-      const word = files.get('wordFile');
-      const excel = files.get('excelFile');
-      const attachment = files.get('attachmentFile');
+      const { singles, attachmentFiles } =
+        await collectMultipartImportFiles(request);
+      const word = singles.get('wordFile');
+      const excel = singles.get('excelFile');
 
       if (!word) {
         return reply.status(400).send({
@@ -120,34 +171,13 @@ export async function registerAdminFillInBatchesImportRoutes(
         });
       }
 
-      let attachmentInput:
-        | { fileName: string; buffer: Buffer; ext: SpreadsheetExt }
-        | undefined;
-      if (attachment) {
-        const attachmentCheck = assertValidSpreadsheetUpload(
-          attachment.filename,
-          attachment.mimetype,
-          attachment.buffer,
-        );
-        if (!attachmentCheck.ok) {
-          return reply.status(400).send({
-            ok: false,
-            code: 'INVALID_ATTACHMENT_FILE',
-            message: attachmentCheck.message,
-          });
-        }
-        if (attachment.buffer.length > getMaxPracticalXlsxBytes()) {
-          return reply.status(400).send({
-            ok: false,
-            code: 'INVALID_ATTACHMENT_FILE',
-            message: `附件不能超过 ${Math.round(getMaxPracticalXlsxBytes() / 1024 / 1024)}MB`,
-          });
-        }
-        attachmentInput = {
-          fileName: attachment.filename,
-          buffer: attachment.buffer,
-          ext: attachmentCheck.ext,
-        };
+      const attachmentParse = parseAttachmentInputs(attachmentFiles);
+      if (!attachmentParse.ok) {
+        return reply.status(400).send({
+          ok: false,
+          code: 'INVALID_ATTACHMENT_FILE',
+          message: attachmentParse.message,
+        });
       }
 
       const batchId = randomUUID();
@@ -162,7 +192,7 @@ export async function registerAdminFillInBatchesImportRoutes(
         wordBuffer: word.buffer,
         excelFileName: excel.filename,
         excelBuffer: excel.buffer,
-        attachment: attachmentInput,
+        attachments: attachmentParse.attachments,
       });
 
       if (!result.ok) {
@@ -181,7 +211,8 @@ export async function registerAdminFillInBatchesImportRoutes(
         importedCount: result.importedCount,
         wordFileName: result.wordFileName,
         excelFileName: result.excelFileName,
-        attachmentFileName: result.attachmentFileName,
+        attachmentCount: result.attachmentCount,
+        attachmentFileNames: result.attachmentFileNames,
       });
     },
   );

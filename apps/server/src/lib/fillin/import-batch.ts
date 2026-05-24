@@ -1,6 +1,7 @@
 import type { PrismaClient } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 
+import { generateFillInWordPreview } from './generate-word-preview.js';
 import {
   buildFillInBlanksFromAnswerSheet,
   buildStudentAnswerSheetExcel,
@@ -11,12 +12,18 @@ import type { SpreadsheetExt } from '../upload/spreadsheet-file.js';
 import { spreadsheetExt } from '../upload/spreadsheet-file.js';
 import type { WordUploadExt } from '../upload/word-file.js';
 import {
-  fillInBatchAttachmentKey,
+  fillInBatchAttachmentItemKey,
   fillInBatchExcelKey,
   fillInBatchStudentExcelKey,
   fillInBatchWordKey,
   writeStorageFile,
 } from '../storage/index.js';
+
+export type FillInImportAttachmentInput = {
+  fileName: string;
+  buffer: Buffer;
+  ext: SpreadsheetExt;
+};
 
 export type FillInImportResult =
   | {
@@ -26,7 +33,8 @@ export type FillInImportResult =
       importedCount: number;
       wordFileName: string;
       excelFileName: string;
-      attachmentFileName: string | null;
+      attachmentCount: number;
+      attachmentFileNames: string[];
     }
   | {
       ok: false;
@@ -44,11 +52,7 @@ export async function importFillInBatch(
     wordBuffer: Buffer;
     excelFileName: string;
     excelBuffer: Buffer;
-    attachment?: {
-      fileName: string;
-      buffer: Buffer;
-      ext: SpreadsheetExt;
-    };
+    attachments?: FillInImportAttachmentInput[];
   },
 ): Promise<FillInImportResult> {
   const { rows, errors: parseErrors } = await parseAnswerSheetRows(input.excelBuffer);
@@ -75,18 +79,33 @@ export async function importFillInBatch(
   const studentExcelKey = fillInBatchStudentExcelKey(input.batchId);
 
   await writeStorageFile(wordKey, input.wordBuffer);
+  await generateFillInWordPreview(
+    input.batchId,
+    input.wordBuffer,
+    input.wordFileName,
+  );
   await writeStorageFile(excelKey, input.excelBuffer);
   await writeStorageFile(studentExcelKey, studentExcelBuffer);
 
-  let attachmentFileName: string | null = null;
-  let attachmentStorageKey: string | null = null;
-  if (input.attachment) {
-    attachmentFileName = input.attachment.fileName;
-    attachmentStorageKey = fillInBatchAttachmentKey(
-      input.batchId,
-      input.attachment.ext,
-    );
-    await writeStorageFile(attachmentStorageKey, input.attachment.buffer);
+  const attachments = input.attachments ?? [];
+  const storedAttachments: {
+    id: string;
+    fileName: string;
+    storageKey: string;
+    sortOrder: number;
+  }[] = [];
+
+  for (let i = 0; i < attachments.length; i += 1) {
+    const file = attachments[i]!;
+    const id = randomUUID();
+    const storageKey = fillInBatchAttachmentItemKey(input.batchId, id, file.ext);
+    await writeStorageFile(storageKey, file.buffer);
+    storedAttachments.push({
+      id,
+      fileName: file.fileName,
+      storageKey,
+      sortOrder: i,
+    });
   }
 
   await prisma.$transaction(async (tx) => {
@@ -100,11 +119,23 @@ export async function importFillInBatch(
         excelFileName: input.excelFileName,
         excelStorageKey: excelKey,
         studentExcelStorageKey: studentExcelKey,
-        attachmentFileName,
-        attachmentStorageKey,
+        attachmentFileName: null,
+        attachmentStorageKey: null,
         importedCount: blanks.length,
       },
     });
+
+    for (const att of storedAttachments) {
+      await tx.fillInBatchAttachment.create({
+        data: {
+          id: att.id,
+          batchId: input.batchId,
+          fileName: att.fileName,
+          storageKey: att.storageKey,
+          sortOrder: att.sortOrder,
+        },
+      });
+    }
 
     for (const blank of blanks) {
       await tx.question.create({
@@ -129,6 +160,7 @@ export async function importFillInBatch(
     importedCount: blanks.length,
     wordFileName: input.wordFileName,
     excelFileName: input.excelFileName,
-    attachmentFileName,
+    attachmentCount: storedAttachments.length,
+    attachmentFileNames: storedAttachments.map((a) => a.fileName),
   };
 }

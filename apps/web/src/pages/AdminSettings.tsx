@@ -51,6 +51,7 @@ function formatClearSummary(deleted: {
 
 export default function AdminSettings() {
   const [showSeatBoard, setShowSeatBoard] = useState(true);
+  const [appVersion, setAppVersion] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [clearDialogOpen, setClearDialogOpen] = useState(false);
@@ -62,6 +63,7 @@ export default function AdminSettings() {
     try {
       const settings = await fetchAdminSettings();
       setShowSeatBoard(settings.showSeatBoard);
+      setAppVersion(settings.appVersion ?? null);
     } catch (err) {
       toast.error(getApiLoadErrorMessage(err) || '无法加载设置。');
     } finally {
@@ -112,6 +114,9 @@ export default function AdminSettings() {
         <h1 className="text-xl font-semibold leading-tight text-foreground">设置</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           考场相关配置将在此维护。
+          {appVersion ? (
+            <span className="mt-1 block text-xs">当前版本 {appVersion}</span>
+          ) : null}
         </p>
       </div>
 

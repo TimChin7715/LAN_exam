@@ -5,6 +5,7 @@ import {
   CLEAR_ALL_DATA_CONFIRM_PHRASE,
   clearAllTeacherData,
 } from '../../../lib/admin/clear-teacher-data.js';
+import { getAppVersion } from '../../../lib/app-version.js';
 import { resolveAdminTeacherId } from '../../../lib/admin-context.js';
 import { prisma } from '../../../lib/prisma.js';
 import { requireAdminSession } from '../../../plugins/admin-guard.js';
@@ -40,6 +41,7 @@ export async function registerAdminSettingsRoutes(
       return reply.send({
         ok: true,
         showSeatBoard: teacher.showSeatBoard,
+        appVersion: getAppVersion(),
       });
     },
   );

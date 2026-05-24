@@ -6,7 +6,7 @@
 
 | 环境 | 是否联网 | 操作 |
 | --- | --- | --- |
-| 发版机构 / 开发机 | 可以 | `fetch-runtimes.ps1` 下载 Node、PostgreSQL、VC++ → `package.ps1` 生成 `LAN-Exam-Setup.exe` |
+| 发版机构 / 开发机 | 可以 | `fetch-runtimes.ps1` 下载 Node、PostgreSQL、VC++ → `package.ps1` 生成 `LAN-Exam-Setup-v<版本>.exe` |
 | 考场管理机 | 不可以 | U 盘拷贝安装包 → 双击 Setup → 桌面快捷方式打开管理台 |
 
 安装包**自包含**：Node、PostgreSQL 便携版、`vc_redist.x64.exe`、应用与迁移脚本。现场**禁止**引导考官访问微软官网或在线下载依赖。
@@ -20,10 +20,12 @@ cd E:\programs\LAN_exam
 .\scripts\windows\package.ps1
 ```
 
+发版前在仓库根目录维护 **`VERSION`**（如 `1.6.0`），`package.ps1` 会据此命名安装包并写入绿色目录。
+
 产出：
 
-- `dist\LAN-Exam-Setup.exe`（验收必选）
-- `dist\lan-exam-win\`（绿色目录，可备份）
+- `dist\LAN-Exam-Setup-v<版本>.exe`（例如 `LAN-Exam-Setup-v1.6.0.exe`，验收必选）
+- `dist\lan-exam-win\`（含同版本 `VERSION` 文件，可备份）
 
 可选仅组装应用（不下载运行时）：
 
@@ -33,7 +35,7 @@ cd E:\programs\LAN_exam
 
 ## 考场安装（无外网）
 
-1. 将 `LAN-Exam-Setup.exe` 拷入 U 盘，复制到管理机（默认安装路径 `D:\LAN-Exam`）。
+1. 将 `LAN-Exam-Setup-v<版本>.exe` 拷入 U 盘，复制到管理机（默认安装路径 `D:\LAN-Exam`）。
 2. 双击安装程序；向导会：
    - 本地静默安装捆绑的 VC++ 运行库
    - 生成 `.env`（含随机 `SESSION_SECRET`）
@@ -182,7 +184,7 @@ D:\LAN-Exam\
 └── .env
 ```
 
-关闭托盘窗口只会**最小化到托盘**，服务继续运行；仅托盘“退出系统”才调用 `stop.bat` 停止服务。
+关闭托盘窗口只会**最小化到托盘**，服务继续运行；仅托盘“退出系统”才调用 `stop.bat` 停止 Node 与 Postgres（`scripts\stop-postgres.ps1` 会先 `pg_ctl stop`，失败则结束本机 5434 监听进程）。若退出后仍见 `postgres.exe`，查看 `logs\stop.log`。
 
 ## 日志与排障入口
 

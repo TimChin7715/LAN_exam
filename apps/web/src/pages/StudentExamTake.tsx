@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 
+import { ObjectiveOptionTiles } from '@/components/student/ObjectiveOptionTiles';
 import { StudentFillInWorkspace } from '@/components/student/StudentFillInWorkspace';
 import { StudentPracticalSection } from '@/components/student/StudentPracticalSection';
 import {
@@ -13,16 +14,16 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Label } from '@/components/ui/label';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Spinner } from '@/components/ui/spinner';
+import {
+  collectSubmitBlockers,
+  formatSubmitBlockerMessage,
+} from '@/lib/exam-submit-validation';
 import { formatStemForDisplay, questionTypeLabel } from '@/lib/qbank';
 import {
   ApiError,
@@ -40,12 +41,6 @@ import {
   type PracticalPaperMeta,
 } from '@/lib/student';
 import { cn } from '@/lib/utils';
-
-const EXAM_PAGE_LABELS: Record<ExamContentModule, string> = {
-  OBJECTIVE: '客观题',
-  FILL: '填空题',
-  PRACTICAL: '操作题',
-};
 
 type AnswerState = Record<string, string>;
 type DirtyAnswerState = Record<string, string>;
@@ -92,7 +87,6 @@ export default function StudentExamTake() {
   const [submitting, setSubmitting] = useState(false);
   const [logoutOpen, setLogoutOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
-  const [activePage, setActivePage] = useState<ExamContentModule>('OBJECTIVE');
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const saveInFlightRef = useRef<Promise<void> | null>(null);
   const dirtyAnswersRef = useRef<DirtyAnswerState>({});
@@ -334,13 +328,6 @@ export default function StudentExamTake() {
     updateAnswer(examQuestionId, joinMultiKeys(next));
   }
 
-  function canSubmit(): boolean {
-    if (needsPractical(contentModules) && !readOnly && !practical?.hasAnswerDraft) {
-      return false;
-    }
-    return true;
-  }
-
   const fillItems = useMemo(
     () => items.filter((item) => item.type === 'FILL'),
     [items],
@@ -349,20 +336,6 @@ export default function StudentExamTake() {
     () => items.filter((item) => item.type !== 'FILL'),
     [items],
   );
-
-  const examPages = useMemo(() => {
-    const pages: ExamContentModule[] = [];
-    if (hasExamModule(contentModules, 'OBJECTIVE')) pages.push('OBJECTIVE');
-    if (hasExamModule(contentModules, 'FILL')) pages.push('FILL');
-    if (hasExamModule(contentModules, 'PRACTICAL')) pages.push('PRACTICAL');
-    return pages;
-  }, [contentModules]);
-
-  useEffect(() => {
-    setActivePage((current) =>
-      examPages.includes(current) ? current : (examPages[0] ?? 'OBJECTIVE'),
-    );
-  }, [examPages]);
 
   const goToExamSubmitted = useCallback(() => {
     if (!examId) return;
@@ -385,19 +358,45 @@ export default function StudentExamTake() {
     }
   }
 
-  async function handleSubmit() {
+  async function tryOpenSubmitDialog() {
     if (!examId || readOnly) return;
-    if (!canSubmit()) {
-      toast.error('请先上传操作题作答文档后再提交。');
+
+    const flushed = await flushDirtyAnswers();
+    if (!flushed) {
       return;
     }
 
+    const blockers = collectSubmitBlockers({
+      items,
+      answers,
+      contentModules,
+      practical,
+    });
+    if (!blockers.canSubmit) {
+      toast.error(formatSubmitBlockerMessage(blockers));
+      return;
+    }
+
+    setSubmitOpen(true);
+  }
+
+  async function handleSubmit() {
+    if (!examId || readOnly) return;
+
     setSubmitting(true);
     try {
-      const flushed = await flushDirtyAnswers();
-      if (!flushed) {
+      const blockers = collectSubmitBlockers({
+        items,
+        answers,
+        contentModules,
+        practical,
+      });
+      if (!blockers.canSubmit) {
+        setSubmitOpen(false);
+        toast.error(formatSubmitBlockerMessage(blockers));
         return;
       }
+
       await studentApi.submitExam(examId);
       setSubmitOpen(false);
       goToExamSubmitted();
@@ -405,6 +404,10 @@ export default function StudentExamTake() {
       if (err instanceof ApiError) {
         if (err.code === STUDENT_EXAM_ENDED_CODE) {
           goToExamEnded();
+          return;
+        }
+        if (err.code === 'INCOMPLETE_ANSWERS') {
+          toast.error(err.message || '尚有题目未作答，请完成后再提交。');
           return;
         }
         if (err.status === 409) {
@@ -442,13 +445,10 @@ export default function StudentExamTake() {
     );
   }
 
-  const pageMaxWidth =
-    activePage === 'FILL' && hasExamModule(contentModules, 'FILL')
-      ? 'max-w-[96rem]'
-      : 'max-w-3xl';
-
-  const isFillPage =
-    activePage === 'FILL' && hasExamModule(contentModules, 'FILL');
+  const hasObjectiveModule = hasExamModule(contentModules, 'OBJECTIVE');
+  const hasFillModule = hasExamModule(contentModules, 'FILL');
+  const hasPracticalModule = needsPractical(contentModules);
+  const pageMaxWidth = hasFillModule ? 'max-w-[96rem]' : 'max-w-3xl';
 
   return (
     <>
@@ -487,19 +487,16 @@ export default function StudentExamTake() {
 
       <div
         className={cn(
-          'mx-auto w-full p-4 pb-24',
+          'mx-auto w-full space-y-10 p-4 pb-8',
           !readOnly && 'pt-14',
           pageMaxWidth,
-          isFillPage
-            ? 'flex h-svh max-h-svh flex-col gap-3 overflow-hidden'
-            : 'space-y-6',
         )}
       >
       {readOnly ? (
-        <Alert className={isFillPage ? 'shrink-0' : undefined}>
+        <Alert>
           <AlertDescription>
             您已提交本场考试，答卷为只读。
-            {needsPractical(contentModules)
+            {hasPracticalModule
               ? ' 操作题文件已提交，等待阅卷。'
               : ''}
           </AlertDescription>
@@ -507,66 +504,18 @@ export default function StudentExamTake() {
       ) : null}
 
       {saveLabel ? (
-        <p
-          className={cn(
-            'text-sm text-muted-foreground',
-            isFillPage && 'shrink-0',
-          )}
-        >
-          {saveLabel}
-        </p>
+        <p className="text-sm text-muted-foreground">{saveLabel}</p>
       ) : null}
 
-      {examPages.length > 0 ? (
-        <nav
-          className={cn(
-            'grid gap-1 rounded-lg border bg-muted/50 p-1',
-            isFillPage && 'shrink-0',
-          )}
-          style={{
-            gridTemplateColumns: `repeat(${examPages.length}, minmax(0, 1fr))`,
-          }}
-          aria-label="试题分页"
-        >
-          {examPages.map((page) => (
-            <button
-              key={page}
-              type="button"
-              aria-current={activePage === page ? 'page' : undefined}
-              className={cn(
-                'rounded-md px-3 py-2.5 text-sm font-medium transition-colors',
-                activePage === page
-                  ? 'bg-background text-foreground shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground',
-              )}
-              onClick={() => setActivePage(page)}
-            >
-              {EXAM_PAGE_LABELS[page]}
-            </button>
-          ))}
-        </nav>
-      ) : null}
-
-      {isFillPage ? (
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-          <StudentFillInWorkspace
-            examId={examId}
-            meta={fillIn}
-            items={fillItems}
-            answers={answers}
-            readOnly={readOnly}
-            showResult={false}
-            onAnswerChange={updateAnswer}
-          />
-        </div>
-      ) : null}
-
-      {activePage === 'OBJECTIVE' &&
+      {hasObjectiveModule &&
       needsQuestionItems(contentModules) &&
       objectiveItems.length > 0 ? (
-        <div className="space-y-6">
-          <h2 className="text-lg font-semibold text-foreground">
-            客观题作答
+        <section className="space-y-6" aria-labelledby="objective-section-title">
+          <h2
+            id="objective-section-title"
+            className="text-lg font-semibold text-foreground"
+          >
+            客观题
           </h2>
           {objectiveItems.map((item, index) => {
             const submissionItem = item as ExamSubmissionItem;
@@ -605,113 +554,124 @@ export default function StudentExamTake() {
                       <p className="text-sm text-muted-foreground">
                         多选题须选出全部正确选项才得分。
                       </p>
-                      {item.options.map((opt) => {
-                        const selected = parseMultiKeys(
-                          answers[item.examQuestionId] ?? '',
-                        );
-                        const checked = selected.includes(opt.key);
-                        return (
-                          <div
-                            key={opt.key}
-                            className="flex items-center gap-2"
-                          >
-                            <Checkbox
-                              id={`${item.examQuestionId}-${opt.key}`}
-                              checked={checked}
-                              disabled={readOnly}
-                              onCheckedChange={(value) =>
-                                toggleMulti(
-                                  item.examQuestionId,
-                                  opt.key,
-                                  value === true,
-                                )
-                              }
-                            />
-                            <Label
-                              htmlFor={`${item.examQuestionId}-${opt.key}`}
-                              className="text-base font-normal"
-                            >
-                              {opt.key}. {opt.text}
-                            </Label>
-                          </div>
-                        );
-                      })}
+                      <ObjectiveOptionTiles
+                        examQuestionId={item.examQuestionId}
+                        options={item.options}
+                        multiple
+                        selectedKeys={answers[item.examQuestionId] ?? ''}
+                        readOnly={readOnly}
+                        onSelect={(key) => updateAnswer(item.examQuestionId, key)}
+                        onToggle={(key, checked) =>
+                          toggleMulti(item.examQuestionId, key, checked)
+                        }
+                      />
                     </div>
                   ) : (
-                    <RadioGroup
-                      value={answers[item.examQuestionId] ?? ''}
-                      onValueChange={(value) =>
-                        updateAnswer(item.examQuestionId, value)
+                    <ObjectiveOptionTiles
+                      examQuestionId={item.examQuestionId}
+                      options={item.options}
+                      multiple={false}
+                      selectedKeys={answers[item.examQuestionId] ?? ''}
+                      readOnly={readOnly}
+                      onSelect={(key) => updateAnswer(item.examQuestionId, key)}
+                      onToggle={(key, checked) =>
+                        toggleMulti(item.examQuestionId, key, checked)
                       }
-                      disabled={readOnly}
-                    >
-                      {item.options.map((opt) => (
-                        <div key={opt.key} className="flex items-center gap-2">
-                          <RadioGroupItem
-                            value={opt.key}
-                            id={`${item.examQuestionId}-${opt.key}`}
-                          />
-                          <Label
-                            htmlFor={`${item.examQuestionId}-${opt.key}`}
-                            className="text-base font-normal"
-                          >
-                            {opt.key}. {opt.text}
-                          </Label>
-                        </div>
-                      ))}
-                    </RadioGroup>
+                    />
                   )}
                 </CardContent>
               </Card>
             );
           })}
-        </div>
-      ) : activePage === 'OBJECTIVE' &&
-        hasExamModule(contentModules, 'OBJECTIVE') ? (
-        <p className="text-sm text-muted-foreground">
-          本场考试暂无客观题。
-        </p>
-      ) : null}
-
-      {activePage === 'PRACTICAL' && needsPractical(contentModules) ? (
-        practical ? (
-          <StudentPracticalSection
-            examId={examId}
-            meta={practical}
-            readOnly={readOnly}
-            submittedFileName={practicalSubmittedName}
-            onUploadSuccess={setPractical}
-          />
-        ) : (
-          <p className="text-sm text-muted-foreground">
-            操作题资料加载中或不可用。
+        </section>
+      ) : hasObjectiveModule ? (
+        <section aria-labelledby="objective-section-title">
+          <h2
+            id="objective-section-title"
+            className="text-lg font-semibold text-foreground"
+          >
+            客观题
+          </h2>
+          <p className="mt-4 text-sm text-muted-foreground">
+            本场考试暂无客观题。
           </p>
-        )
+        </section>
       ) : null}
 
-      {readOnly ? (
-        <div className="fixed inset-x-0 bottom-0 border-t bg-background p-4">
-          <div className={cn('mx-auto w-full', pageMaxWidth)}>
+      {hasFillModule ? (
+        <section
+          className="space-y-4"
+          aria-labelledby="fillin-section-title"
+        >
+          <h2
+            id="fillin-section-title"
+            className="text-lg font-semibold text-foreground"
+          >
+            填空题
+          </h2>
+          <div className="h-[min(88vh,68rem)] min-h-[18rem]">
+            <StudentFillInWorkspace
+              examId={examId}
+              meta={fillIn}
+              items={fillItems}
+              answers={answers}
+              readOnly={readOnly}
+              showResult={false}
+              onAnswerChange={updateAnswer}
+            />
+          </div>
+        </section>
+      ) : null}
+
+      {hasPracticalModule ? (
+        <section
+          className="space-y-4"
+          aria-labelledby="practical-section-title"
+        >
+          <h2
+            id="practical-section-title"
+            className="text-lg font-semibold text-foreground"
+          >
+            操作题
+          </h2>
+          {practical ? (
+            <StudentPracticalSection
+              examId={examId}
+              meta={practical}
+              readOnly={readOnly}
+              submittedFileName={practicalSubmittedName}
+              onUploadSuccess={setPractical}
+            />
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              操作题资料加载中或不可用。
+            </p>
+          )}
+        </section>
+      ) : null}
+
+      <div className="border-t border-border pt-6">
+        {readOnly ? (
+          <Button
+            type="button"
+            variant="secondary"
+            className="w-full"
+            size="lg"
+            onClick={() => setLogoutOpen(true)}
+          >
+            退出登录
+          </Button>
+        ) : (
+          <>
             <Button
               type="button"
-              variant="secondary"
               className="w-full"
               size="lg"
-              onClick={() => setLogoutOpen(true)}
+              onClick={() => void tryOpenSubmitDialog()}
             >
-              退出登录
+              提交试卷
             </Button>
-          </div>
-        </div>
-      ) : (
-        <div className="fixed inset-x-0 bottom-0 border-t bg-background p-4">
-          <div className={cn('mx-auto w-full', pageMaxWidth)}>
             <AlertDialog open={submitOpen} onOpenChange={setSubmitOpen}>
-              <AlertDialogTrigger asChild>
-                <Button className="w-full" size="lg" disabled={!canSubmit()}>
-                  提交试卷
-                </Button>
-              </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
                   <AlertDialogTitle>确认提交？</AlertDialogTitle>
@@ -733,9 +693,9 @@ export default function StudentExamTake() {
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
-          </div>
-        </div>
-      )}
+          </>
+        )}
+      </div>
       </div>
     </>
   );

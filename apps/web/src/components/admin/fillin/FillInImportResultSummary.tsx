@@ -20,6 +20,12 @@ export function FillInImportResultSummary({
         <p>成功导入 {result.importedCount} 道填空题</p>
         <p className="text-muted-foreground">Word：{result.wordFileName}</p>
         <p className="text-muted-foreground">Excel：{result.excelFileName}</p>
+        {result.attachmentCount > 0 ? (
+          <p className="text-muted-foreground">
+            附件：{result.attachmentCount} 个（
+            {result.attachmentFileNames.join('、')}）
+          </p>
+        ) : null}
         {onDismiss ? (
           <Button type="button" variant="outline" size="sm" onClick={onDismiss}>
             知道了

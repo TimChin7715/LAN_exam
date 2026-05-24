@@ -2,6 +2,7 @@ import multipart from '@fastify/multipart';
 import rateLimit from '@fastify/rate-limit';
 import Fastify from 'fastify';
 
+import { getAppVersion } from './lib/app-version.js';
 import { getListenHost, getListenPort, shouldServeWeb } from './lib/env.js';
 import { getMultipartPluginLimits } from './lib/upload-limits.js';
 import { prisma } from './lib/prisma.js';
@@ -73,7 +74,7 @@ await registerAdminExamsExportFillInScreenshotsRoutes(app);
 
 app.get('/health', async () => {
   await prisma.$queryRaw`SELECT 1`;
-  return { status: 'ok' };
+  return { status: 'ok', version: getAppVersion() };
 });
 
 if (serveWeb) {

@@ -1,6 +1,10 @@
 import { useCallback, useState } from 'react';
 import { Download } from 'lucide-react';
 
+import {
+  FillInAttachmentsDropzone,
+  validateFillInAttachmentFiles,
+} from '@/components/admin/fillin/FillInAttachmentsDropzone';
 import { ImportFileDropzone } from '@/components/admin/shared/ImportFileDropzone';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -8,14 +12,12 @@ import {
   downloadFillInTemplate,
   importFillInBatch,
   validateDocxFile,
-  validateFillInAttachmentFile,
   validateFillInExcelFile,
   type FillInImportFailure,
   type FillInImportSuccess,
 } from '@/lib/fillin';
 import {
   ANSWER_SHEET_ACCEPT,
-  SPREADSHEET_ACCEPT,
   WORD_ACCEPT,
 } from '@/lib/upload-formats';
 
@@ -33,7 +35,7 @@ export function FillInImportForm({
   disabled,
 }: FillInImportFormProps) {
   const [wordFile, setWordFile] = useState<File | null>(null);
-  const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
+  const [attachmentFiles, setAttachmentFiles] = useState<File[]>([]);
   const [excelFile, setExcelFile] = useState<File | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [downloading, setDownloading] = useState(false);
@@ -53,21 +55,6 @@ export function FillInImportForm({
     }
     setValidationError(null);
     setWordFile(file);
-  }, []);
-
-  const pickAttachment = useCallback((file: File | null) => {
-    if (!file) {
-      setAttachmentFile(null);
-      return;
-    }
-    const msg = validateFillInAttachmentFile(file);
-    if (msg) {
-      setAttachmentFile(null);
-      setValidationError(msg);
-      return;
-    }
-    setValidationError(null);
-    setAttachmentFile(file);
   }, []);
 
   const pickExcel = useCallback((file: File | null) => {
@@ -96,12 +83,17 @@ export function FillInImportForm({
 
   async function handleImport() {
     if (!wordFile || !excelFile || importing) return;
+    const attachmentMsg = validateFillInAttachmentFiles(attachmentFiles);
+    if (attachmentMsg) {
+      setValidationError(attachmentMsg);
+      return;
+    }
     setImporting(true);
     try {
       const result = await importFillInBatch(
         wordFile,
         excelFile,
-        attachmentFile,
+        attachmentFiles,
       );
       if (!result.ok) {
         onFailure(result);
@@ -109,7 +101,7 @@ export function FillInImportForm({
       }
       onSuccess(result);
       setWordFile(null);
-      setAttachmentFile(null);
+      setAttachmentFiles([]);
       setExcelFile(null);
       setValidationError(null);
     } catch {
@@ -122,10 +114,37 @@ export function FillInImportForm({
   function handleDrop(slot: FileSlot, e: React.DragEvent) {
     e.preventDefault();
     setDragOver(null);
+    if (slot === 'attachment') {
+      const dropped = Array.from(e.dataTransfer.files);
+      if (dropped.length === 0) return;
+      const msg = validateFillInAttachmentFiles(
+        [...attachmentFiles, ...dropped].slice(0, 10),
+      );
+      if (msg) {
+        setValidationError(msg);
+        return;
+      }
+      setValidationError(null);
+      const merged = [...attachmentFiles];
+      for (const file of dropped) {
+        if (merged.length >= 10) break;
+        if (
+          !merged.some(
+            (f) =>
+              f.name === file.name &&
+              f.size === file.size &&
+              f.lastModified === file.lastModified,
+          )
+        ) {
+          merged.push(file);
+        }
+      }
+      setAttachmentFiles(merged);
+      return;
+    }
     const dropped = e.dataTransfer.files[0];
     if (!dropped) return;
     if (slot === 'word') pickWord(dropped);
-    else if (slot === 'attachment') pickAttachment(dropped);
     else pickExcel(dropped);
   }
 
@@ -164,14 +183,12 @@ export function FillInImportForm({
           onDragLeave={() => setDragOver(null)}
           onDrop={(e) => handleDrop('word', e)}
         />
-        <ImportFileDropzone
-          label="Excel / CSV 附件"
-          hint="支持 .xls、.xlsx 或 .csv，选填；学员作答时可下载"
-          accept={SPREADSHEET_ACCEPT}
-          file={attachmentFile}
+        <FillInAttachmentsDropzone
+          files={attachmentFiles}
           disabled={disabled || importing}
           dragOver={dragOver === 'attachment'}
-          onPick={pickAttachment}
+          onChange={setAttachmentFiles}
+          onValidationError={setValidationError}
           onDragOver={(e) => {
             e.preventDefault();
             setDragOver('attachment');

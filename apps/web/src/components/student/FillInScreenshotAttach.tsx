@@ -1,12 +1,16 @@
 import { useRef, useState } from 'react';
-import { ImagePlus, Trash2, Upload } from 'lucide-react';
+import { Lightbulb, Trash2, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import { ApiError, studentApi, type FillInScreenshotInfo } from '@/lib/student';
+import { cn } from '@/lib/utils';
 
 export const MAX_FILLIN_SCREENSHOTS_PER_BLANK = 5;
+
+/** 底部截图区常态高度（与单张缩略图 h-16 一致） */
+const SCREENSHOT_ZONE_MIN_H = 'min-h-16';
 
 type FillInScreenshotAttachProps = {
   examId: string;
@@ -83,42 +87,7 @@ export function FillInScreenshotAttach({
   }
 
   return (
-    <div
-      className="mt-2 space-y-2"
-      onPaste={handlePaste}
-    >
-      {screenshots.length > 0 ? (
-        <ul className="flex flex-wrap gap-2">
-          {screenshots.map((shot) => (
-            <li
-              key={shot.id}
-              className="relative h-14 w-14 shrink-0 overflow-hidden rounded border bg-muted/30"
-            >
-              <img
-                src={shot.previewUrl}
-                alt=""
-                className="h-full w-full object-cover"
-              />
-              {!readOnly ? (
-                <button
-                  type="button"
-                  className="absolute right-0 top-0 flex size-5 items-center justify-center rounded-bl bg-destructive text-destructive-foreground"
-                  disabled={deletingId === shot.id}
-                  aria-label="删除截图"
-                  onClick={() => void handleDelete(shot.id)}
-                >
-                  {deletingId === shot.id ? (
-                    <Spinner className="size-3" />
-                  ) : (
-                    <Trash2 className="size-3" aria-hidden />
-                  )}
-                </button>
-              ) : null}
-            </li>
-          ))}
-        </ul>
-      ) : null}
-
+    <div className="flex flex-col gap-2" onPaste={handlePaste}>
       {!readOnly ? (
         <div className="flex flex-wrap items-center gap-2">
           <input
@@ -147,13 +116,66 @@ export function FillInScreenshotAttach({
             )}
             上传截图
           </Button>
-          <span className="text-xs text-muted-foreground">
-            <ImagePlus className="mr-0.5 inline size-3.5" aria-hidden />
-            可粘贴截图
-            {atLimit ? `（已满 ${MAX_FILLIN_SCREENSHOTS_PER_BLANK} 张）` : null}
+          <span className="inline-flex items-center gap-1.5 text-sm font-medium text-amber-600 dark:text-amber-400">
+            <Lightbulb className="size-4 shrink-0" aria-hidden />
+            可直接粘贴截图
+            {atLimit ? (
+              <span className="text-amber-600/80 dark:text-amber-400/80">
+                {`（已满 ${MAX_FILLIN_SCREENSHOTS_PER_BLANK} 张）`}
+              </span>
+            ) : null}
           </span>
         </div>
       ) : null}
+
+      <div
+        className={cn(
+          'border-t border-border/60 pt-2',
+          SCREENSHOT_ZONE_MIN_H,
+          screenshots.length === 0 && 'flex items-stretch',
+        )}
+      >
+        {screenshots.length > 0 ? (
+          <ul className="flex flex-wrap gap-2">
+            {screenshots.map((shot) => (
+              <li
+                key={shot.id}
+                className="relative h-16 w-16 shrink-0 overflow-hidden rounded border bg-muted/30"
+              >
+                <img
+                  src={shot.previewUrl}
+                  alt=""
+                  className="h-full w-full object-cover"
+                />
+                {!readOnly ? (
+                  <button
+                    type="button"
+                    className="absolute right-0 top-0 flex size-5 items-center justify-center rounded-bl bg-destructive text-destructive-foreground"
+                    disabled={deletingId === shot.id}
+                    aria-label="删除截图"
+                    onClick={() => void handleDelete(shot.id)}
+                  >
+                    {deletingId === shot.id ? (
+                      <Spinner className="size-3" />
+                    ) : (
+                      <Trash2 className="size-3" aria-hidden />
+                    )}
+                  </button>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <div
+            className={cn(
+              'flex w-full flex-1 items-center justify-center rounded-md border border-dashed border-border/80 bg-muted/25 px-2 text-xs text-muted-foreground',
+              SCREENSHOT_ZONE_MIN_H,
+            )}
+          >
+            {readOnly ? '暂无截图' : '截图将显示在此处'}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
