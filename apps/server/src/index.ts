@@ -1,3 +1,4 @@
+import compress from '@fastify/compress';
 import multipart from '@fastify/multipart';
 import rateLimit from '@fastify/rate-limit';
 import Fastify from 'fastify';
@@ -44,6 +45,7 @@ const app = Fastify({
 
 await app.register(sessionPlugin);
 await registerAdminLoopbackGuard(app);
+await app.register(compress);
 await app.register(rateLimit, { global: false });
 await app.register(multipart, {
   limits: getMultipartPluginLimits(),

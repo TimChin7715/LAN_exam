@@ -1,8 +1,11 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 
+import { examSubmitGate } from '../../../lib/concurrency/gates.js';
+import { ServerBusyError } from '../../../lib/concurrency/server-busy-error.js';
 import { submitExam } from '../../../lib/exam/submit.js';
 import { SubmitExamError } from '../../../lib/exam/types.js';
+import { SERVER_BUSY_CODE, SERVER_BUSY_MESSAGE } from '../../../lib/errors.js';
 import {
   ensureStudentRosterEntryId,
   requireStudentSession,
@@ -42,16 +45,27 @@ export async function registerStudentExamSubmitRoutes(
       }
 
       try {
-        const result = await submitExam({
-          examId: parsed.data.examId,
-          rosterEntryId,
-        });
+        const result = await examSubmitGate.run(() =>
+          submitExam({
+            examId: parsed.data.examId,
+            rosterEntryId,
+          }),
+        );
         return reply.send({
           ok: true,
           totalScore: result.totalScore,
           submittedAt: result.submittedAt,
         });
       } catch (err) {
+        if (err instanceof ServerBusyError) {
+          return reply
+            .status(503)
+            .header('Retry-After', '5')
+            .send({
+              code: SERVER_BUSY_CODE,
+              message: SERVER_BUSY_MESSAGE,
+            });
+        }
         if (err instanceof SubmitExamError) {
           return reply.status(err.statusCode).send({
             code: err.code,

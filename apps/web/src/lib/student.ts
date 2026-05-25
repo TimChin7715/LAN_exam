@@ -1,4 +1,6 @@
 import { ApiError, apiFetch } from '@/lib/api';
+import { fetchWithRetry } from '@/lib/fetch-with-retry';
+import { hashString } from '@/lib/hash-string';
 
 export type StudentProfile = {
   fullName: string;
@@ -67,6 +69,25 @@ export const STUDENT_EXAM_ENDED_CODE = 'EXAM_ENDED';
 export const STUDENT_WAITING_POLL_INTERVAL_MS = 8000;
 export const STUDENT_ACTIVE_EXAM_POLL_INTERVAL_MS = 12000;
 export const STUDENT_SUBMITTED_POLL_INTERVAL_MS = 15000;
+
+export const STUDENT_ENTER_EXAM_JITTER_BASE_MS = 8000;
+export const STUDENT_ENTER_EXAM_JITTER_RANDOM_MS = 2000;
+
+export const SERVER_BUSY_CODE = 'SERVER_BUSY';
+
+export function computeEnterExamDelayMs(nationalId: string): number {
+  const base = hashString(nationalId) % STUDENT_ENTER_EXAM_JITTER_BASE_MS;
+  const extra = Math.floor(Math.random() * STUDENT_ENTER_EXAM_JITTER_RANDOM_MS);
+  return base + extra;
+}
+
+export type ExamPaperResponse = {
+  examId: string;
+  contentModules: ExamContentModule[];
+  items: ExamPaperItem[];
+  practical: PracticalPaperMeta | null;
+  fillIn: FillInPaperMeta | null;
+};
 
 export const STUDENT_AUTH_ERROR_MESSAGE =
   '姓名或身份证号不正确，请检查后重试。';
@@ -182,16 +203,15 @@ export const studentApi = {
       skipAuthRedirect: true,
     }),
 
-  examPaper: (examId: string) =>
-    apiFetch<{
-      examId: string;
-      contentModules: ExamContentModule[];
-      items: ExamPaperItem[];
-      practical: PracticalPaperMeta | null;
-      fillIn: FillInPaperMeta | null;
-    }>(`/api/student/exam/paper?examId=${encodeURIComponent(examId)}`, {
-      skipAuthRedirect: true,
-    }),
+  examPaper: (examId: string, options?: { onRetry?: (attempt: number) => void }) =>
+    fetchWithRetry(
+      () =>
+        apiFetch<ExamPaperResponse>(
+          `/api/student/exam/paper?examId=${encodeURIComponent(examId)}`,
+          { skipAuthRedirect: true },
+        ),
+      { onRetry: options?.onRetry },
+    ),
 
   saveAnswers: (examId: string, answers: { examQuestionId: string; selectedKeys: string }[]) =>
     apiFetch<{ ok: true }>('/api/student/exam/answers', {

@@ -7,7 +7,10 @@ $ErrorActionPreference = 'Stop'
 $root = Resolve-Path (Join-Path $PSScriptRoot '..\..')
 if (-not $OutDir) {
     $OutDir = Join-Path $root 'dist\lan-exam-win'
+} elseif (-not [System.IO.Path]::IsPathRooted($OutDir)) {
+    $OutDir = Join-Path $root $OutDir
 }
+$OutDir = [System.IO.Path]::GetFullPath($OutDir)
 
 $appDir = [System.IO.Path]::GetFullPath((Join-Path $OutDir 'app'))
 $bundleDir = [System.IO.Path]::GetFullPath((Join-Path $appDir 'server-bundle'))
@@ -64,8 +67,17 @@ Get-ChildItem $serverDist | Where-Object { $_.Name -ne 'lan-exam-win' } | ForEac
 
 Write-Host "==> add Prisma CLI + tsx for install-time migrate/seed"
 Push-Location $bundleDir
-npm install --no-package-lock --save-dev prisma@^6.8.2 tsx@^4.19.4
-if ($LASTEXITCODE -ne 0) { throw 'npm install prisma/tsx failed' }
+$npmOk = $false
+for ($attempt = 1; $attempt -le 3; $attempt++) {
+    npm install --no-package-lock --save-dev prisma@^6.8.2 tsx@^4.19.4
+    if ($LASTEXITCODE -eq 0) {
+        $npmOk = $true
+        break
+    }
+    Write-Warning "npm install prisma/tsx attempt $attempt failed; retrying..."
+    Start-Sleep -Seconds 5
+}
+if (-not $npmOk) { throw 'npm install prisma/tsx failed after 3 attempts' }
 Pop-Location
 
 $schema = Join-Path $appDir 'prisma\schema.prisma'

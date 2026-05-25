@@ -46,6 +46,11 @@ export default function StudentExamEnded() {
         const status = await studentApi.examStatus();
         if (cancelled) return;
 
+        if (status.status === 'none') {
+          navigate('/exam/waiting', { replace: true });
+          return;
+        }
+
         if (status.status === 'ENDED') {
           if (examIdParam && status.examId !== examIdParam) {
             navigate(

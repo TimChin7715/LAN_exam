@@ -1,16 +1,12 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 
+import { examPaperGate } from '../../../lib/concurrency/gates.js';
+import { ServerBusyError } from '../../../lib/concurrency/server-busy-error.js';
 import { assertStudentExamAccess } from '../../../lib/exam/access.js';
-import {
-  hasContentModule,
-  requiresFillInBatch,
-  requiresPracticalBatch,
-} from '../../../lib/exam/content-mode.js';
+import { buildExamPaperResponse } from '../../../lib/exam/load-exam-paper.js';
 import { ExamAccessError } from '../../../lib/exam/types.js';
-import { safeFillInAttachmentsZipFilename } from '../../../lib/fillin/build-attachments-zip.js';
-import { listFillInBatchAttachments } from '../../../lib/fillin/load-batch-attachments.js';
-import { prisma } from '../../../lib/prisma.js';
+import { SERVER_BUSY_CODE, SERVER_BUSY_MESSAGE } from '../../../lib/errors.js';
 import {
   ensureStudentRosterEntryId,
   requireStudentSession,
@@ -55,143 +51,39 @@ export async function registerStudentExamPaperRoutes(
         throw err;
       }
 
-      const exam = await prisma.exam.findUnique({
-        where: { id: examId },
-        select: {
-          contentModules: true,
-          fillInBatch: {
-            select: {
-              id: true,
-              title: true,
-              wordFileName: true,
-              excelFileName: true,
-            },
-          },
-          practicalBatch: {
-            select: {
-              title: true,
-              wordFileName: true,
-              excelFileName: true,
-            },
-          },
-        },
-      });
-
-      if (!exam) {
-        return reply.status(404).send({
-          code: 'EXAM_NOT_FOUND',
-          message: '考试不存在',
-        });
+      if (!examPaperGate.tryAcquire()) {
+        return reply
+          .status(503)
+          .header('Retry-After', '2')
+          .send({
+            code: SERVER_BUSY_CODE,
+            message: SERVER_BUSY_MESSAGE,
+          });
       }
 
-      const examQuestions = await prisma.examQuestion.findMany({
-        where: { examId },
-        orderBy: { sortOrder: 'asc' },
-        select: {
-          id: true,
-          sortOrder: true,
-          question: {
-            select: {
-              id: true,
-              type: true,
-              stem: true,
-              points: true,
-              knowledgePoints: true,
-              explanation: true,
-              options: {
-                orderBy: { sortOrder: 'asc' },
-                select: {
-                  id: true,
-                  key: true,
-                  text: true,
-                  sortOrder: true,
-                },
-              },
-            },
-          },
-        },
-      });
-
-      const drafts = await prisma.answerDraft.findMany({
-        where: { examId, rosterEntryId },
-        select: {
-          examQuestionId: true,
-          selectedKeys: true,
-        },
-      });
-
-      const draftByQuestionId = new Map(
-        drafts.map((d) => [d.examQuestionId, d.selectedKeys]),
-      );
-
-      let practical: {
-        batchTitle: string;
-        wordFileName: string;
-        excelFileName: string;
-        hasAnswerDraft: boolean;
-        answerFileName: string | null;
-        answerUpdatedAt: string | null;
-      } | null = null;
-
-      if (requiresPracticalBatch(exam.contentModules) && exam.practicalBatch) {
-        const practicalDraft = await prisma.practicalAnswerDraft.findUnique({
-          where: { examId_rosterEntryId: { examId, rosterEntryId } },
-          select: { docxFileName: true, updatedAt: true },
-        });
-        practical = {
-          batchTitle: exam.practicalBatch.title,
-          wordFileName: exam.practicalBatch.wordFileName,
-          excelFileName: exam.practicalBatch.excelFileName,
-          hasAnswerDraft: Boolean(practicalDraft),
-          answerFileName: practicalDraft?.docxFileName ?? null,
-          answerUpdatedAt: practicalDraft?.updatedAt.toISOString() ?? null,
-        };
+      try {
+        const paper = await buildExamPaperResponse(examId, rosterEntryId);
+        if (!paper) {
+          return reply.status(404).send({
+            code: 'EXAM_NOT_FOUND',
+            message: '考试不存在',
+          });
+        }
+        return reply.send(paper);
+      } catch (err) {
+        if (err instanceof ServerBusyError) {
+          return reply
+            .status(503)
+            .header('Retry-After', '2')
+            .send({
+              code: SERVER_BUSY_CODE,
+              message: err.message,
+            });
+        }
+        throw err;
+      } finally {
+        examPaperGate.release();
       }
-
-      let fillIn: {
-        batchTitle: string;
-        wordFileName: string;
-        excelFileName: string;
-        hasAttachments: boolean;
-        attachmentZipFileName: string | null;
-      } | null = null;
-
-      if (requiresFillInBatch(exam.contentModules) && exam.fillInBatch) {
-        const batchAttachments = await listFillInBatchAttachments(
-          prisma,
-          exam.fillInBatch.id,
-        );
-        fillIn = {
-          batchTitle: exam.fillInBatch.title,
-          wordFileName: exam.fillInBatch.wordFileName,
-          excelFileName: exam.fillInBatch.excelFileName,
-          hasAttachments: batchAttachments.length > 0,
-          attachmentZipFileName:
-            batchAttachments.length > 0
-              ? safeFillInAttachmentsZipFilename(exam.fillInBatch.title)
-              : null,
-        };
-      }
-
-      return reply.send({
-        examId,
-        contentModules: exam.contentModules,
-        items: examQuestions.map((eq) => ({
-          examQuestionId: eq.id,
-          sortOrder: eq.sortOrder,
-          type: eq.question.type,
-          stem: eq.question.stem,
-          points: eq.question.points,
-          fillQuestionNo:
-            eq.question.type === 'FILL' ? eq.question.knowledgePoints : null,
-          fillBlankIndex:
-            eq.question.type === 'FILL' ? eq.question.explanation : null,
-          options: eq.question.options,
-          selectedKeys: draftByQuestionId.get(eq.id) ?? '',
-        })),
-        practical,
-        fillIn,
-      });
     },
   );
 }

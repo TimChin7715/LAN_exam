@@ -5,6 +5,11 @@ import {
   requiresPracticalBatch,
   requiresQuestionSubmission,
 } from './content-mode.js';
+import {
+  getCachedScoreableQuestions,
+  type ScoreableExamQuestion,
+} from './exam-paper-cache.js';
+import { loadExamPaperStatic } from './load-exam-paper.js';
 import { finalizePracticalSubmission } from './submit-practical.js';
 import { finalizeFillInScreenshots } from '../fillin/finalize-screenshots.js';
 import { scoreQuestion } from './score-question.js';
@@ -42,6 +47,7 @@ export async function submitExam(
         '您已提交过本场考试，无法再次提交。',
       );
     }
+    await loadExamPaperStatic(examId);
   }
 
   if (requiresPracticalBatch(modules)) {
@@ -86,41 +92,23 @@ export async function submitExam(
   );
 }
 
-async function submitScoredQuestionsPart(
-  tx: Prisma.TransactionClient,
-  examId: string,
-  rosterEntryId: string,
-): Promise<{ totalScore: number; submittedAt: Date }> {
-  const examQuestions = await tx.examQuestion.findMany({
-    where: { examId },
-    orderBy: { sortOrder: 'asc' },
-    include: {
-      question: {
-        include: {
-          options: { orderBy: { sortOrder: 'asc' } },
-        },
-      },
-    },
-  });
-
-  if (examQuestions.length === 0) {
-    throw new SubmitExamError(
-      400,
-      'NO_QUESTIONS',
-      '本场考试没有试题，无法提交。',
-    );
-  }
-
-  const drafts = await tx.answerDraft.findMany({
-    where: { examId, rosterEntryId },
-    select: { examQuestionId: true, selectedKeys: true },
-  });
-
-  const draftByQuestionId = new Map(
-    drafts.map((d) => [d.examQuestionId, d.selectedKeys]),
-  );
-
-  assertAnswersComplete(examQuestions, draftByQuestionId);
+function scoreFromCachedQuestions(
+  scoreable: ScoreableExamQuestion[],
+  draftByQuestionId: Map<string, string>,
+): {
+  totalScore: number;
+  answerCreates: {
+    examQuestionId: string;
+    selectedKeys: string;
+    isCorrect: boolean;
+    pointsAwarded: number;
+  }[];
+} {
+  const questionsForCheck = scoreable.map((q) => ({
+    id: q.examQuestionId,
+    question: { type: q.type },
+  }));
+  assertAnswersComplete(questionsForCheck, draftByQuestionId);
 
   let totalScore = 0;
   const answerCreates: {
@@ -130,26 +118,113 @@ async function submitScoredQuestionsPart(
     pointsAwarded: number;
   }[] = [];
 
-  for (const eq of examQuestions) {
-    const optionKeys = eq.question.options.map((o) => o.key);
-    const selectedRaw = draftByQuestionId.get(eq.id) ?? '';
+  for (const q of scoreable) {
+    const selectedRaw = draftByQuestionId.get(q.examQuestionId) ?? '';
     const scored = scoreQuestion(
       {
-        type: eq.question.type,
-        answerKeys: eq.question.answerKeys,
-        points: eq.question.points,
-        multiScoringRule: eq.question.multiScoringRule,
-        optionKeys,
+        type: q.type,
+        answerKeys: q.answerKeys,
+        points: q.points,
+        multiScoringRule: q.multiScoringRule,
+        optionKeys: q.optionKeys,
       },
       selectedRaw,
     );
     totalScore += scored.pointsAwarded;
     answerCreates.push({
-      examQuestionId: eq.id,
+      examQuestionId: q.examQuestionId,
       selectedKeys: scored.selectedKeys,
       isCorrect: scored.isCorrect,
       pointsAwarded: scored.pointsAwarded,
     });
+  }
+
+  return { totalScore, answerCreates };
+}
+
+async function submitScoredQuestionsPart(
+  tx: Prisma.TransactionClient,
+  examId: string,
+  rosterEntryId: string,
+): Promise<{ totalScore: number; submittedAt: Date }> {
+  const drafts = await tx.answerDraft.findMany({
+    where: { examId, rosterEntryId },
+    select: { examQuestionId: true, selectedKeys: true },
+  });
+
+  const draftByQuestionId = new Map(
+    drafts.map((d) => [d.examQuestionId, d.selectedKeys]),
+  );
+
+  const cached = getCachedScoreableQuestions(examId);
+  let totalScore: number;
+  let answerCreates: {
+    examQuestionId: string;
+    selectedKeys: string;
+    isCorrect: boolean;
+    pointsAwarded: number;
+  }[];
+
+  if (cached && cached.length > 0) {
+    ({ totalScore, answerCreates } = scoreFromCachedQuestions(
+      cached,
+      draftByQuestionId,
+    ));
+  } else {
+    const examQuestions = await tx.examQuestion.findMany({
+      where: { examId },
+      orderBy: { sortOrder: 'asc' },
+      include: {
+        question: {
+          include: {
+            options: { orderBy: { sortOrder: 'asc' } },
+          },
+        },
+      },
+    });
+
+    if (examQuestions.length === 0) {
+      throw new SubmitExamError(
+        400,
+        'NO_QUESTIONS',
+        '本场考试没有试题，无法提交。',
+      );
+    }
+
+    assertAnswersComplete(examQuestions, draftByQuestionId);
+
+    totalScore = 0;
+    answerCreates = [];
+
+    for (const eq of examQuestions) {
+      const optionKeys = eq.question.options.map((o) => o.key);
+      const selectedRaw = draftByQuestionId.get(eq.id) ?? '';
+      const scored = scoreQuestion(
+        {
+          type: eq.question.type,
+          answerKeys: eq.question.answerKeys,
+          points: eq.question.points,
+          multiScoringRule: eq.question.multiScoringRule,
+          optionKeys,
+        },
+        selectedRaw,
+      );
+      totalScore += scored.pointsAwarded;
+      answerCreates.push({
+        examQuestionId: eq.id,
+        selectedKeys: scored.selectedKeys,
+        isCorrect: scored.isCorrect,
+        pointsAwarded: scored.pointsAwarded,
+      });
+    }
+  }
+
+  if (answerCreates.length === 0) {
+    throw new SubmitExamError(
+      400,
+      'NO_QUESTIONS',
+      '本场考试没有试题，无法提交。',
+    );
   }
 
   const submission = await tx.submission.create({

@@ -1,5 +1,6 @@
 import type { PrismaClient } from '@prisma/client';
 
+import { clearExamPaperCache } from '../exam/exam-paper-cache.js';
 import { deleteStorageTree } from '../storage/index.js';
 
 export const CLEAR_ALL_DATA_CONFIRM_PHRASE = '清除全部数据';
@@ -73,6 +74,8 @@ export async function clearAllTeacherData(
       removeStoragePrefix(`practical-batches/${b.id}`),
     ),
   ]);
+
+  clearExamPaperCache();
 
   return result;
 }

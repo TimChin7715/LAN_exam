@@ -66,6 +66,111 @@ function formatPaperItemLabel(
   return index >= 0 ? `第 ${index + 1} 题` : '未知题';
 }
 
+function formatCircleLabel(
+  item: ExamPaperItem,
+  objectiveIndex: number,
+  fillMultiBlankCounts: Map<string, number>,
+): string {
+  if (item.type === 'FILL') {
+    const qNo = parseFillQuestionNo(item.fillQuestionNo) ?? '—';
+    const groupKey = item.fillQuestionNo ?? item.examQuestionId;
+    const multiBlank = (fillMultiBlankCounts.get(groupKey) ?? 0) > 1;
+    const blankSuffix =
+      multiBlank && item.fillBlankIndex ? `-${item.fillBlankIndex}` : '';
+    return `${qNo}${blankSuffix}`;
+  }
+  return String(objectiveIndex);
+}
+
+export type AnswerProgressSection = 'objective' | 'fill' | 'practical';
+
+export type AnswerProgressRow = {
+  key: string;
+  section: AnswerProgressSection;
+  label: string;
+  circleLabel: string;
+  answered: boolean;
+};
+
+export type AnswerProgressSummary = {
+  rows: AnswerProgressRow[];
+  answeredCount: number;
+  totalCount: number;
+  allAnswered: boolean;
+};
+
+function paperItemSection(item: ExamPaperItem): 'objective' | 'fill' {
+  return item.type === 'FILL' ? 'fill' : 'objective';
+}
+
+function buildPaperProgressRows(input: {
+  items: ExamPaperItem[];
+  answers: Record<string, string>;
+  contentModules: ExamContentModule[];
+}): AnswerProgressRow[] {
+  const { items, answers, contentModules } = input;
+  const sorted = [...items].sort((a, b) => a.sortOrder - b.sortOrder);
+  const objectiveSorted = sorted.filter((item) => item.type !== 'FILL');
+  const fillMultiBlankCounts = buildFillMultiBlankCounts(items);
+
+  const rows: AnswerProgressRow[] = [];
+  let objectiveIndex = 0;
+  for (const item of sorted) {
+    if (!shouldCheckPaperItem(item, contentModules)) continue;
+    const answered = isPaperItemAnswered(
+      item,
+      answers[item.examQuestionId] ?? '',
+    );
+    if (item.type !== 'FILL') {
+      objectiveIndex += 1;
+    }
+    rows.push({
+      key: item.examQuestionId,
+      section: paperItemSection(item),
+      label: formatPaperItemLabel(item, objectiveSorted, fillMultiBlankCounts),
+      circleLabel:
+        item.type === 'FILL'
+          ? formatCircleLabel(item, 0, fillMultiBlankCounts)
+          : formatCircleLabel(item, objectiveIndex, fillMultiBlankCounts),
+      answered,
+    });
+  }
+  return rows;
+}
+
+export function buildAnswerProgressSummary(input: {
+  items: ExamPaperItem[];
+  answers: Record<string, string>;
+  contentModules: ExamContentModule[];
+  practical: PracticalPaperMeta | null;
+}): AnswerProgressSummary {
+  const { items, answers, contentModules, practical } = input;
+
+  const rows = buildPaperProgressRows({ items, answers, contentModules });
+
+  if (needsPractical(contentModules)) {
+    const answered = Boolean(practical?.hasAnswerDraft);
+    rows.push({
+      key: 'practical',
+      section: 'practical',
+      label: '操作题',
+      circleLabel: '操',
+      answered,
+    });
+  }
+
+  const answeredCount = rows.filter((row) => row.answered).length;
+  const totalCount = rows.length;
+  const blockers = collectSubmitBlockers(input);
+
+  return {
+    rows,
+    answeredCount,
+    totalCount,
+    allAnswered: blockers.canSubmit,
+  };
+}
+
 export type SubmitBlockers = {
   canSubmit: boolean;
   missingPractical: boolean;
@@ -78,22 +183,12 @@ export function collectSubmitBlockers(input: {
   contentModules: ExamContentModule[];
   practical: PracticalPaperMeta | null;
 }): SubmitBlockers {
-  const { items, answers, contentModules, practical } = input;
+  const { contentModules, practical } = input;
 
-  const objectiveSorted = [...items]
-    .filter((item) => item.type !== 'FILL')
-    .sort((a, b) => a.sortOrder - b.sortOrder);
-  const fillMultiBlankCounts = buildFillMultiBlankCounts(items);
-
-  const missingQuestionLabels: string[] = [];
-  for (const item of items) {
-    if (!shouldCheckPaperItem(item, contentModules)) continue;
-    if (!isPaperItemAnswered(item, answers[item.examQuestionId] ?? '')) {
-      missingQuestionLabels.push(
-        formatPaperItemLabel(item, objectiveSorted, fillMultiBlankCounts),
-      );
-    }
-  }
+  const rows = buildPaperProgressRows(input);
+  const missingQuestionLabels = rows
+    .filter((row) => !row.answered)
+    .map((row) => row.label);
 
   const missingPractical =
     needsPractical(contentModules) && !practical?.hasAnswerDraft;

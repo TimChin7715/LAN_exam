@@ -1,5 +1,5 @@
 import { Loader2 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { Button } from '@/components/ui/button';
@@ -13,6 +13,7 @@ import {
 import { formatExamDateTime } from '@/lib/exam';
 import {
   ApiError,
+  computeEnterExamDelayMs,
   STUDENT_WAITING_POLL_INTERVAL_MS,
   studentApi,
   type StudentProfile,
@@ -24,6 +25,18 @@ export default function StudentWaiting() {
   const [loading, setLoading] = useState(true);
   const [loggingOut, setLoggingOut] = useState(false);
   const [waitingHint, setWaitingHint] = useState<string | null>(null);
+  const [enteringExam, setEnteringExam] = useState(false);
+  const navigateScheduledRef = useRef(false);
+  const enterTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (enterTimeoutRef.current) {
+        clearTimeout(enterTimeoutRef.current);
+        enterTimeoutRef.current = null;
+      }
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -53,15 +66,26 @@ export default function StudentWaiting() {
 
     let intervalId: ReturnType<typeof setInterval> | undefined;
 
+    const scheduleEnterExam = (examId: string) => {
+      if (navigateScheduledRef.current) return;
+      navigateScheduledRef.current = true;
+      setEnteringExam(true);
+      setWaitingHint(null);
+
+      const delayMs = computeEnterExamDelayMs(profile.nationalId);
+      enterTimeoutRef.current = setTimeout(() => {
+        navigate(`/exam/take?examId=${encodeURIComponent(examId)}`, {
+          replace: true,
+        });
+      }, delayMs);
+    };
+
     const poll = async () => {
-      if (document.hidden) return;
+      if (document.hidden || navigateScheduledRef.current) return;
       try {
         const status = await studentApi.examStatus();
         if (status.status === 'IN_PROGRESS') {
-          setWaitingHint(null);
-          navigate(`/exam/take?examId=${encodeURIComponent(status.examId)}`, {
-            replace: true,
-          });
+          scheduleEnterExam(status.examId);
         } else if (status.status === 'ENDED') {
           setWaitingHint(null);
           navigate(`/exam/ended?examId=${encodeURIComponent(status.examId)}`, {
@@ -160,14 +184,16 @@ export default function StudentWaiting() {
             </div>
           </dl>
           <p className="text-center text-base text-muted-foreground">
-            {waitingHint ??
-              '监考教师开始考试后，本页将在开考时间自动进入答题界面。'}
+            {enteringExam
+              ? '考试已开始，正在为您加载试卷，请稍候…'
+              : (waitingHint ??
+                '监考教师开始考试后，本页将在开考时间自动进入答题界面。')}
           </p>
           <Button
             type="button"
             variant="outline"
             className="w-full"
-            disabled={loggingOut}
+            disabled={loggingOut || enteringExam}
             onClick={() => void handleLogout()}
           >
             {loggingOut ? (

@@ -5,6 +5,8 @@ import {
   requiresPracticalBatch,
   requiresQuestionSubmission,
 } from '../../../lib/exam/content-mode.js';
+import { resetStudentExamSubmission } from '../../../lib/exam/reset-student-submission.js';
+import { RetakeExamError } from '../../../lib/exam/types.js';
 import { prisma } from '../../../lib/prisma.js';
 import {
   contentTypeForWordFilename,
@@ -255,6 +257,37 @@ export async function registerAdminExamsSubmissionsRoutes(
           `attachment; filename*=UTF-8''${encodeURIComponent(practical.docxFileName)}`,
         )
         .send(buffer);
+    },
+  );
+
+  app.post(
+    '/api/admin/exams/:id/submissions/:rosterEntryId/retake',
+    { preHandler: requireAdminSession },
+    async (request, reply) => {
+      const teacherId = await resolveAdminTeacherId(request);
+
+      const { id, rosterEntryId } = request.params as {
+        id: string;
+        rosterEntryId: string;
+      };
+
+      try {
+        await resetStudentExamSubmission({
+          examId: id,
+          rosterEntryId,
+          teacherId,
+        });
+        return reply.send({ ok: true });
+      } catch (err) {
+        if (err instanceof RetakeExamError) {
+          return reply.status(err.statusCode).send({
+            ok: false,
+            code: err.code,
+            message: err.message,
+          });
+        }
+        throw err;
+      }
     },
   );
 }

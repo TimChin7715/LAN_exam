@@ -33,3 +33,15 @@ export class SubmitExamError extends Error {
     this.code = code;
   }
 }
+
+export class RetakeExamError extends Error {
+  readonly statusCode: number;
+  readonly code: string;
+
+  constructor(statusCode: number, code: string, message: string) {
+    super(message);
+    this.name = 'RetakeExamError';
+    this.statusCode = statusCode;
+    this.code = code;
+  }
+}

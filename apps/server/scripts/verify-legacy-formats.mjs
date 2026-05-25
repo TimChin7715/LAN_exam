@@ -45,6 +45,12 @@ console.log('parseRoster xls entries:', roster.rows.length);
 const fillinBuf = fs.readFileSync(fillinXlsx);
 const fillinRows = await parseAnswerSheetRows(fillinBuf);
 console.log('parseAnswerSheet xlsx blanks:', fillinRows.rows.length, 'errors:', fillinRows.errors.length);
+if (fillinRows.errors.length > 0 || fillinRows.rows.length > 0) {
+  console.error(
+    'FAIL: fill-in template should have 0 importable rows and 0 errors',
+  );
+  process.exit(1);
+}
 
 if (fs.existsSync(fillinDocx)) {
   const wordBuf = fs.readFileSync(fillinDocx);

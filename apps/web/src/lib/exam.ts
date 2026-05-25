@@ -277,6 +277,16 @@ export async function fetchExamSubmissions(
   return data.items;
 }
 
+export async function retakeExamSubmission(
+  examId: string,
+  rosterEntryId: string,
+): Promise<void> {
+  await apiFetch<{ ok: true }>(
+    `/api/admin/exams/${encodeURIComponent(examId)}/submissions/${encodeURIComponent(rosterEntryId)}/retake`,
+    { method: 'POST' },
+  );
+}
+
 export async function downloadExamExport(examId: string, title: string): Promise<void> {
   const response = await fetch(
     `/api/admin/exams/${encodeURIComponent(examId)}/export`,

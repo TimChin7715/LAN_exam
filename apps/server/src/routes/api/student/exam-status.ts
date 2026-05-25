@@ -63,6 +63,19 @@ export async function registerStudentExamStatusRoutes(
         }
       }
 
+      const draftExam = await prisma.exam.findFirst({
+        where: {
+          rosterBatchId: entry.batchId,
+          status: 'DRAFT',
+        },
+        orderBy: { createdAt: 'desc' },
+        select: { id: true },
+      });
+
+      if (draftExam) {
+        return reply.send({ status: 'none' as const });
+      }
+
       const endedExam = await prisma.exam.findFirst({
         where: {
           rosterBatchId: entry.batchId,

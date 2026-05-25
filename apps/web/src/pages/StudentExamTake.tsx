@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 
 import { ObjectiveOptionTiles } from '@/components/student/ObjectiveOptionTiles';
+import { StudentExamAnswerOverview } from '@/components/student/StudentExamAnswerOverview';
 import { StudentFillInWorkspace } from '@/components/student/StudentFillInWorkspace';
 import { StudentPracticalSection } from '@/components/student/StudentPracticalSection';
 import {
@@ -21,6 +22,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Spinner } from '@/components/ui/spinner';
 import {
+  buildAnswerProgressSummary,
   collectSubmitBlockers,
   formatSubmitBlockerMessage,
 } from '@/lib/exam-submit-validation';
@@ -30,6 +32,7 @@ import {
   hasExamModule,
   needsPractical,
   needsQuestionItems,
+  SERVER_BUSY_CODE,
   STUDENT_ACTIVE_EXAM_POLL_INTERVAL_MS,
   STUDENT_ALREADY_SUBMITTED_MESSAGE,
   STUDENT_EXAM_ENDED_CODE,
@@ -91,6 +94,7 @@ export default function StudentExamTake() {
   const saveInFlightRef = useRef<Promise<void> | null>(null);
   const dirtyAnswersRef = useRef<DirtyAnswerState>({});
   const isMountedRef = useRef(true);
+  const paperRetryToastShownRef = useRef(false);
 
   useEffect(() => {
     return () => {
@@ -143,7 +147,15 @@ export default function StudentExamTake() {
         }
       }
 
-      const paper = await studentApi.examPaper(examId);
+      const paper = await studentApi.examPaper(examId, {
+        onRetry: () => {
+          if (!paperRetryToastShownRef.current) {
+            paperRetryToastShownRef.current = true;
+            toast.message('加载排队中，请稍候…');
+          }
+        },
+      });
+      paperRetryToastShownRef.current = false;
       resetPendingSaveState();
       setContentModules(paper.contentModules);
       setItems(paper.items);
@@ -385,6 +397,11 @@ export default function StudentExamTake() {
 
     setSubmitting(true);
     try {
+      const flushed = await flushDirtyAnswers();
+      if (!flushed) {
+        return;
+      }
+
       const blockers = collectSubmitBlockers({
         items,
         answers,
@@ -413,6 +430,10 @@ export default function StudentExamTake() {
         if (err.status === 409) {
           toast.error(STUDENT_ALREADY_SUBMITTED_MESSAGE);
           goToExamSubmitted();
+        } else if (err.code === SERVER_BUSY_CODE) {
+          toast.error(
+            err.message || '交卷排队已满，请稍候再点「确认提交」。',
+          );
         } else {
           toast.error(err.message || '提交试卷失败。');
         }
@@ -428,6 +449,17 @@ export default function StudentExamTake() {
     if (saveStatus === 'saved') return '答案已保存';
     return null;
   }, [contentModules, readOnly, saveStatus]);
+
+  const answerProgress = useMemo(
+    () =>
+      buildAnswerProgressSummary({
+        items,
+        answers,
+        contentModules,
+        practical,
+      }),
+    [items, answers, contentModules, practical],
+  );
 
   if (!examId) {
     return (
@@ -485,10 +517,21 @@ export default function StudentExamTake() {
         </div>
       ) : null}
 
+      {!loading && answerProgress.totalCount > 0 ? (
+        <StudentExamAnswerOverview
+          summary={answerProgress}
+          contentModules={contentModules}
+          readOnly={readOnly}
+        />
+      ) : null}
+
       <div
         className={cn(
           'mx-auto w-full space-y-10 p-4 pb-8',
           !readOnly && 'pt-14',
+          hasObjectiveModule &&
+            answerProgress.totalCount > 0 &&
+            'pt-28 sm:pt-32',
           pageMaxWidth,
         )}
       >
@@ -688,7 +731,9 @@ export default function StudentExamTake() {
                     disabled={submitting}
                     onClick={() => void handleSubmit()}
                   >
-                    {submitting ? '提交中...' : '确认提交'}
+                    {submitting
+                      ? '交卷处理中，请勿关闭页面…'
+                      : '确认提交'}
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>

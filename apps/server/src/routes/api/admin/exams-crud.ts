@@ -10,6 +10,7 @@ import {
   requiresFillInBatch,
   requiresObjectiveBatch,
 } from '../../../lib/exam/content-mode.js';
+import { invalidateExamPaperCache } from '../../../lib/exam/exam-paper-cache.js';
 import { materializeExamQuestionSets } from '../../../lib/exam/materialize-questions.js';
 import { assignExamSeats } from '../../../lib/seat/assign-seats.js';
 import { prisma } from '../../../lib/prisma.js';
@@ -390,6 +391,10 @@ export async function registerAdminExamsCrudRoutes(
         },
         { timeout: 30_000 },
       );
+
+      if (questionSetsChanged || fillInBatchChanged || modulesChanged) {
+        invalidateExamPaperCache(id);
+      }
 
       return reply.send({ ok: true });
     },

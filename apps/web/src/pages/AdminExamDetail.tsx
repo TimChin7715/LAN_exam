@@ -41,6 +41,7 @@ import {
   formatExamScheduleRange,
   getExam,
   handleExamApiError,
+  retakeExamSubmission,
   startExam,
   type ExamDetail,
   type ExamSeatBoard,
@@ -51,6 +52,8 @@ import { fetchAdminSettings } from '@/lib/admin-settings';
 import { ApiError } from '@/lib/api';
 import { maskNationalId } from '@/lib/roster';
 import type { PreviewQuestion } from '@/lib/qbank';
+
+const ADMIN_SUBMISSIONS_POLL_INTERVAL_MS = 10_000;
 
 export default function AdminExamDetail() {
   const { examId } = useParams<{ examId: string }>();
@@ -64,6 +67,7 @@ export default function AdminExamDetail() {
   const [actionLoading, setActionLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [exportingScreenshots, setExportingScreenshots] = useState(false);
+  const [retakingEntryId, setRetakingEntryId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!examId) return;
@@ -82,9 +86,63 @@ export default function AdminExamDetail() {
     }
   }, [examId]);
 
+  const refreshSubmissions = useCallback(async () => {
+    if (!examId) return;
+    try {
+      const submissionItems = await fetchExamSubmissions(examId);
+      setSubmissions(submissionItems);
+    } catch {
+      /* 轮询失败不打扰考官 */
+    }
+  }, [examId]);
+
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (!examId || exam?.status !== 'IN_PROGRESS') return;
+
+    let intervalId: ReturnType<typeof setInterval> | undefined;
+
+    const poll = () => {
+      if (document.hidden) return;
+      void refreshSubmissions();
+    };
+
+    const startPolling = () => {
+      if (intervalId !== undefined) return;
+      void poll();
+      intervalId = setInterval(() => {
+        void poll();
+      }, ADMIN_SUBMISSIONS_POLL_INTERVAL_MS);
+    };
+
+    const stopPolling = () => {
+      if (intervalId === undefined) return;
+      clearInterval(intervalId);
+      intervalId = undefined;
+    };
+
+    const onVisibility = () => {
+      if (document.hidden) {
+        stopPolling();
+      } else {
+        startPolling();
+      }
+    };
+
+    if (!document.hidden) {
+      startPolling();
+    }
+
+    document.addEventListener('visibilitychange', onVisibility);
+
+    return () => {
+      stopPolling();
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [examId, exam?.status, refreshSubmissions]);
 
   useEffect(() => {
     let cancelled = false;
@@ -182,6 +240,20 @@ export default function AdminExamDetail() {
       handleExamApiError(err, '结束考试失败。');
     } finally {
       setActionLoading(false);
+    }
+  }
+
+  async function handleRetake(rosterEntryId: string, fullName: string) {
+    if (!examId) return;
+    setRetakingEntryId(rosterEntryId);
+    try {
+      await retakeExamSubmission(examId, rosterEntryId);
+      toast.success(`${fullName} 已允许重考，需重新答题。`);
+      await load();
+    } catch (err) {
+      handleExamApiError(err, '重考操作失败。');
+    } finally {
+      setRetakingEntryId(null);
     }
   }
 
@@ -365,6 +437,7 @@ export default function AdminExamDetail() {
                 {hasExamModule(exam.contentModules, 'PRACTICAL') ? (
                   <TableHead>操作题</TableHead>
                 ) : null}
+                <TableHead>操作</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -410,6 +483,49 @@ export default function AdminExamDetail() {
                       )}
                     </TableCell>
                   ) : null}
+                  <TableCell>
+                    {row.submitted && exam.status === 'IN_PROGRESS' ? (
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            disabled={retakingEntryId === row.rosterEntryId}
+                          >
+                            {retakingEntryId === row.rosterEntryId
+                              ? '处理中…'
+                              : '重考'}
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>
+                              确认允许 {row.fullName} 重考？
+                            </AlertDialogTitle>
+                            <AlertDialogDescription>
+                              将清空该考生本次提交记录与作答文件，考生需重新答题后再提交。此操作不可恢复已提交的成绩记录。
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>取消</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() =>
+                                void handleRetake(
+                                  row.rosterEntryId,
+                                  row.fullName,
+                                )
+                              }
+                            >
+                              确认重考
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>

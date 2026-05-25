@@ -87,10 +87,20 @@ def run(
     exit_code = stdout.channel.recv_exit_status()
     out = stdout.read().decode("utf-8", errors="replace")
     err = stderr.read().decode("utf-8", errors="replace")
-    if out:
-        print(out.rstrip())
-    if err:
-        print(err.rstrip(), file=sys.stderr)
+    def emit(text: str, stream: object) -> None:
+        if not text:
+            return
+        line = text.rstrip() + "\n"
+        buf = getattr(stream, "buffer", None)
+        if buf is not None:
+            buf.write(line.encode("utf-8", errors="replace"))
+            buf.flush()
+            return
+        enc = getattr(stream, "encoding", None) or "utf-8"
+        stream.write(line.encode(enc, errors="replace").decode(enc))
+
+    emit(out, sys.stdout)
+    emit(err, sys.stderr)
     return exit_code, out, err
 
 
@@ -141,6 +151,10 @@ def cmd_deploy(client: paramiko.SSHClient, user: str) -> int:
 
     run(client, f"mkdir -p {remote_dir}")
     run(client, f"tar -xzf {remote_tar} -C {remote_dir}", timeout=300)
+    run(
+        client,
+        f"find {remote_dir}/scripts/linux -type f -name '*.sh' -exec sed -i 's/\\r$//' {{}} +",
+    )
     code, _, _ = run(client, remote_deploy_cmd(remote_dir), timeout=3600)
     if code != 0:
         return code

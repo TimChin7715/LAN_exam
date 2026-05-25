@@ -4,6 +4,8 @@ import type { FastifyInstance } from 'fastify';
 import fp from 'fastify-plugin';
 import { Pool } from 'pg';
 
+import { getSessionPgPoolMax } from '../lib/env.js';
+
 const PgSession = connectPgSimple(session);
 
 export function sessionSecret(): string {
@@ -44,7 +46,10 @@ export const sessionPlugin = fp(async (app: FastifyInstance) => {
   await app.register(cookie.default);
   await app.register(express.default);
 
-  const pool = new Pool({ connectionString: databaseUrl });
+  const pool = new Pool({
+    connectionString: databaseUrl,
+    max: getSessionPgPoolMax(),
+  });
 
   app.addHook('onClose', async () => {
     await pool.end();

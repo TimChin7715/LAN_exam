@@ -1,4 +1,5 @@
 import { prisma } from '../prisma.js';
+import { invalidateExamPaperCache } from './exam-paper-cache.js';
 import { ExamTransitionError } from './types.js';
 
 export async function startExam(
@@ -138,5 +139,8 @@ export async function endExam(
       };
     },
     { timeout: 30_000 },
-  );
+  ).then((result) => {
+    invalidateExamPaperCache(examId);
+    return result;
+  });
 }

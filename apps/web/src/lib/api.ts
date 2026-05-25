@@ -13,6 +13,7 @@ export class ApiError extends Error {
     message: string,
     public status: number,
     public code?: string,
+    public retryAfterSec?: number,
   ) {
     super(message);
     this.name = 'ApiError';
@@ -112,7 +113,17 @@ export async function apiFetch<T>(
         : typeof payload?.error === 'string'
           ? payload.error
           : '无法连接服务器，请检查网络或联系机房管理员。';
-    throw new ApiError(message, response.status, code);
+    const retryAfterRaw = response.headers.get('Retry-After');
+    const retryAfterSec =
+      retryAfterRaw !== null ? Number.parseInt(retryAfterRaw, 10) : undefined;
+    throw new ApiError(
+      message,
+      response.status,
+      code,
+      Number.isFinite(retryAfterSec) && retryAfterSec! > 0
+        ? retryAfterSec
+        : undefined,
+    );
   }
 
   return payload as T;
