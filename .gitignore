@@ -12,6 +12,7 @@ dist
 # Local deploy artifacts (password-based upload / release pack)
 lan-exam-src.tgz
 *.deploy.tgz
+docker-images/*.tar
 docker-compose.override.yml
 *.log
 .DS_Store

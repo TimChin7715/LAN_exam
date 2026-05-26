@@ -81,13 +81,20 @@ pnpm build
 
 未设置时代码与 `.env.example` 默认均为 **disabled**。若只改后端不改 `VITE_*`，会出现前端仍显示登录页而后端已免登录的不一致。
 
-## 可选：Docker Compose 开发 / 验收
+## 可选：Docker 部署 / 验收
 
-Compose 全栈（免登录、单端口 5180）见 [docs/DEPLOY.md](./docs/DEPLOY.md)：
+**快速上手**（构建镜像、Compose 启动、离线导入、故障排查）：[docs/DEPLOY-DOCKER.md](./docs/DEPLOY-DOCKER.md)
 
 ```bash
-docker compose up --build
+# 构建镜像（可选，compose up --build 也会自动构建）
+./scripts/docker/build-image.sh   # 或 Windows: .\scripts\docker\build-image.ps1
+
+# 一键启动 Postgres + 应用（5180）
+cp .env.docker.example .env   # 建议修改 SESSION_SECRET
+docker compose up -d --build
 ```
+
+详细运维（反向代理、上传限制、考后导出）见 [docs/DEPLOY.md](./docs/DEPLOY.md)。
 
 启动后：
 

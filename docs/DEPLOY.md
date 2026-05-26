@@ -1,5 +1,7 @@
 # Compose / 反向代理部署手册（LAN Exam）
 
+**Docker 快速上手**（构建镜像、一键启动、离线导入）：见 [DEPLOY-DOCKER.md](./DEPLOY-DOCKER.md)。
+
 本文档用于 **Docker Compose 全栈部署、开发验收环境、反向代理运维**。  
 **考场推荐方案不是 Docker**，而是 Windows 离线安装包；现场操作见 [DEPLOY-WINDOWS-NATIVE.md](./DEPLOY-WINDOWS-NATIVE.md)。
 
