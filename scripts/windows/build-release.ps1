@@ -120,6 +120,7 @@ New-Item -ItemType Directory -Path (Join-Path $OutDir 'scripts') -Force | Out-Nu
 Copy-Item (Join-Path $templates 'install-db.ps1') (Join-Path $OutDir 'scripts\install-db.ps1') -Force
 Copy-Item (Join-Path $templates 'stop-postgres.ps1') (Join-Path $OutDir 'scripts\stop-postgres.ps1') -Force
 Copy-Item (Join-Path $templates 'write-env.ps1') (Join-Path $OutDir 'scripts\write-env.ps1') -Force
+Copy-Item (Join-Path $templates 'start-node.ps1') (Join-Path $OutDir 'scripts\start-node.ps1') -Force
 
 $envExample = @"
 ADMIN_AUTH_MODE=disabled

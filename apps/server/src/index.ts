@@ -1,3 +1,7 @@
+import { loadInstallDotenv } from './lib/load-install-env.js';
+
+loadInstallDotenv();
+
 import compress from '@fastify/compress';
 import multipart from '@fastify/multipart';
 import rateLimit from '@fastify/rate-limit';

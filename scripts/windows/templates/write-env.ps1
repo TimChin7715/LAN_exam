@@ -16,4 +16,5 @@ NODE_ENV=production
 SERVE_WEB=true
 WEB_DIST_PATH=
 "@
-Set-Content -Path (Join-Path $InstallHome '.env') -Value $content -Encoding UTF8
+$utf8NoBom = [System.Text.UTF8Encoding]::new($false)
+[System.IO.File]::WriteAllText((Join-Path $InstallHome '.env'), $content, $utf8NoBom)

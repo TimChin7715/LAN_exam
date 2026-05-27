@@ -10,7 +10,8 @@ const serverDistDir = path.dirname(fileURLToPath(import.meta.url));
 const defaultWebDist = path.resolve(serverDistDir, '../../../web/dist');
 
 export function resolveWebDistRoot(): string {
-  return process.env.WEB_DIST_PATH ?? defaultWebDist;
+  const configured = process.env.WEB_DIST_PATH?.trim();
+  return configured ? configured : defaultWebDist;
 }
 
 export async function registerWebStatic(app: FastifyInstance): Promise<void> {
