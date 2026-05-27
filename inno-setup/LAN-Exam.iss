@@ -19,7 +19,7 @@
 AppName=局域网考试系统
 AppVersion={#AppVersion}
 AppVerName=局域网考试系统 {#AppVersion}
-DefaultDirName=D:\LAN-Exam
+DefaultDirName={sd}\LAN-Exam
 DefaultGroupName=局域网考试系统
 VersionInfoVersion={#AppVersionFull}
 VersionInfoProductVersion={#AppVersion}

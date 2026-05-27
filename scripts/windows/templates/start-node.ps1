@@ -60,15 +60,30 @@ $utf8NoBom = [System.Text.UTF8Encoding]::new($false)
 $stamp = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss')
 [System.IO.File]::AppendAllText($logFile, "`n=== start $stamp ===`n", $utf8NoBom)
 
-# Child inherits the environment set above; append server output to app.log.
-$cmdLine = "start `"LAN-Exam-Node`" /MIN `"$node`" server-bundle\dist\index.js >> `"$logFile`" 2>&1"
-Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', $cmdLine -WorkingDirectory $appDir -WindowStyle Hidden | Out-Null
+# Start Node directly (avoid nested cmd.exe — blocked in some elevated/install contexts).
+$proc = Start-Process -FilePath $node `
+    -ArgumentList @('server-bundle\dist\index.js') `
+    -WorkingDirectory $appDir `
+    -WindowStyle Minimized `
+    -PassThru
+if (-not $proc) {
+    throw 'Failed to start Node process'
+}
 
-Start-Sleep -Seconds 4
+Start-Sleep -Seconds 5
+if ($proc.HasExited) {
+    [System.IO.File]::AppendAllText(
+        $logFile,
+        "[start-node] Node exited immediately (code $($proc.ExitCode))`n",
+        $utf8NoBom
+    )
+    throw "Node exited immediately (code $($proc.ExitCode)). See $logFile"
+}
+
 $listening = Get-NetTCPConnection -LocalPort 5180 -State Listen -ErrorAction SilentlyContinue |
     Select-Object -First 1
 if ($listening) {
-    Write-Host '[start-node] Node listening on :5180'
+    Write-Host '[start-node] Node listening on :5180 (PID' $proc.Id ')'
     exit 0
 }
 
@@ -76,6 +91,6 @@ $tail = ''
 if (Test-Path $logFile) {
     $tail = (Get-Content $logFile -Tail 20 -ErrorAction SilentlyContinue | Out-String).Trim()
 }
-$msg = "Node did not open port 5180 within 4s. See $logFile"
+$msg = "Node did not open port 5180 within 5s (PID $($proc.Id)). See $logFile"
 if ($tail) { $msg += "`n--- app.log (last lines) ---`n$tail" }
 throw $msg
