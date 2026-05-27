@@ -13,7 +13,7 @@ import {
   type ExamPaperStaticPracticalMeta,
   type ScoreableExamQuestion,
 } from './exam-paper-cache.js';
-import { safeFillInAttachmentsZipFilename } from '../fillin/build-attachments-zip.js';
+import { resolveFillInAttachmentDownloadFilename } from '../fillin/build-attachments-zip.js';
 import { listFillInBatchAttachments } from '../fillin/load-batch-attachments.js';
 import { prisma } from '../prisma.js';
 
@@ -113,9 +113,10 @@ async function loadStaticFromDb(
       excelFileName: exam.fillInBatch.excelFileName,
       hasAttachments: batchAttachments.length > 0,
       attachmentZipFileName:
-        batchAttachments.length > 0
-          ? safeFillInAttachmentsZipFilename(exam.fillInBatch.title)
-          : null,
+        resolveFillInAttachmentDownloadFilename(
+          batchAttachments,
+          exam.fillInBatch.title,
+        ),
     };
   }
 

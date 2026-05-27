@@ -103,7 +103,7 @@ export function fillInBatchAttachmentKey(
 export function fillInBatchAttachmentItemKey(
   batchId: string,
   attachmentId: string,
-  ext: 'xls' | 'xlsx' | 'csv',
+  ext: string,
 ): string {
   return `fill-in-batches/${batchId}/attachments/${attachmentId}.${ext}`;
 }

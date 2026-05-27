@@ -22,6 +22,29 @@ export class RosterBatchInUseError extends Error {
   }
 }
 
+export class RosterEntryInUseError extends Error {
+  constructor(
+    public examTitles: string[],
+    message = '该考生已有答卷，无法修改或删除',
+  ) {
+    super(message);
+    this.name = 'RosterEntryInUseError';
+  }
+}
+
+export class RosterEntryDuplicateError extends Error {
+  constructor(message = '该批次中已存在相同姓名与身份证号的考生') {
+    super(message);
+    this.name = 'RosterEntryDuplicateError';
+  }
+}
+
+export type RosterEntryInput = {
+  fullName: string;
+  organization: string;
+  nationalId: string;
+};
+
 export type ImportRowError = {
   row: number;
   column?: string;
@@ -173,6 +196,100 @@ export async function deleteRosterBatch(id: string): Promise<void> {
         ? payload.error
         : '无法删除名单，请稍后重试。';
     throw new ApiError(message, response.status);
+  }
+}
+
+async function parseRosterMutationError(
+  response: Response,
+  payload: Record<string, unknown> | null,
+): Promise<never> {
+  if (response.status === 401 || response.status === 403) {
+    handleAuthResponse(response.status, payload);
+    throw new ApiError('Unauthorized', response.status);
+  }
+
+  if (response.status === 409 && payload?.code === 'ENTRY_HAS_SUBMISSIONS') {
+    const titles = Array.isArray(payload.examTitles)
+      ? (payload.examTitles as string[])
+      : [];
+    throw new RosterEntryInUseError(
+      titles,
+      typeof payload.message === 'string'
+        ? payload.message
+        : '该考生已有答卷，无法修改或删除',
+    );
+  }
+
+  if (response.status === 409 && payload?.code === 'DUPLICATE_ENTRY') {
+    throw new RosterEntryDuplicateError(
+      typeof payload.message === 'string' ? payload.message : undefined,
+    );
+  }
+
+  const message =
+    typeof payload?.message === 'string'
+      ? payload.message
+      : '操作失败，请稍后重试。';
+  throw new ApiError(message, response.status);
+}
+
+export async function createRosterEntry(
+  batchId: string,
+  body: RosterEntryInput,
+): Promise<RosterListItem> {
+  const response = await fetch(
+    `/api/admin/roster-batches/${encodeURIComponent(batchId)}/entries`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(body),
+    },
+  );
+
+  const payload = (await response.json()) as Record<string, unknown>;
+  if (!response.ok || !payload.entry) {
+    await parseRosterMutationError(response, payload);
+  }
+
+  return payload.entry as RosterListItem;
+}
+
+export async function updateRosterEntry(
+  id: string,
+  body: RosterEntryInput,
+): Promise<RosterListItem> {
+  const response = await fetch(
+    `/api/admin/roster-entries/${encodeURIComponent(id)}`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(body),
+    },
+  );
+
+  const payload = (await response.json()) as Record<string, unknown>;
+  if (!response.ok || !payload.entry) {
+    await parseRosterMutationError(response, payload);
+  }
+
+  return payload.entry as RosterListItem;
+}
+
+export async function deleteRosterEntry(id: string): Promise<void> {
+  const response = await fetch(
+    `/api/admin/roster-entries/${encodeURIComponent(id)}`,
+    { method: 'DELETE', credentials: 'include' },
+  );
+
+  const contentType = response.headers.get('content-type') ?? '';
+  const payload = contentType.includes('application/json')
+    ? ((await response.json()) as Record<string, unknown>)
+    : null;
+
+  if (!response.ok) {
+    await parseRosterMutationError(response, payload);
   }
 }
 

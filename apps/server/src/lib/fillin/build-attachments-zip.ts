@@ -3,7 +3,15 @@ import type { Readable } from 'node:stream';
 import { PassThrough } from 'node:stream';
 
 import { dedupeZipEntryNames } from './dedupe-zip-entry-names.js';
+import type { FillInBatchAttachmentRow } from './load-batch-attachments.js';
+import {
+  archiveExtFromStorageKey,
+  contentTypeForArchiveFilename,
+  isArchiveFilename,
+} from '../upload/archive-file.js';
 import { readStorageFile } from '../storage/index.js';
+
+export { contentTypeForArchiveFilename };
 
 export type FillInAttachmentZipEntry = {
   fileName: string;
@@ -32,4 +40,25 @@ export async function streamFillInAttachmentsZip(
 export function safeFillInAttachmentsZipFilename(title: string): string {
   const base = title.replace(/[\\/:*?"<>|]/g, '_').trim() || '填空题';
   return `${base}-附件.zip`;
+}
+
+/** 仅一个压缩包附件时学员端直接下载该文件（不套外层 ZIP）。 */
+export function getSingleStoredArchiveAttachment(
+  attachments: FillInBatchAttachmentRow[],
+): FillInBatchAttachmentRow | null {
+  if (attachments.length !== 1) return null;
+  const only = attachments[0]!;
+  if (isArchiveFilename(only.fileName)) return only;
+  if (archiveExtFromStorageKey(only.storageKey)) return only;
+  return null;
+}
+
+export function resolveFillInAttachmentDownloadFilename(
+  attachments: FillInBatchAttachmentRow[],
+  batchTitle: string,
+): string | null {
+  if (attachments.length === 0) return null;
+  const singleArchive = getSingleStoredArchiveAttachment(attachments);
+  if (singleArchive) return singleArchive.fileName;
+  return safeFillInAttachmentsZipFilename(batchTitle);
 }

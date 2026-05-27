@@ -80,13 +80,17 @@ export default function AdminRosterBatchDetail() {
             </h1>
             <p className="text-base text-muted-foreground">
               共 {batch.itemCount} 人 · 上传于 {formatImportedAt(batch.createdAt)}
+              · 可在此增删改考生信息
             </p>
           </>
         ) : null}
       </div>
 
       {!loading && !error && batch ? (
-        <RosterListSection batchId={batchId} />
+        <RosterListSection
+          batchId={batchId}
+          onEntriesChanged={() => void loadBatch()}
+        />
       ) : null}
     </div>
   );

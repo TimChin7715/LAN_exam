@@ -6,7 +6,7 @@ import {
   MAX_FILLIN_BATCH_ATTACHMENTS,
   validateFillInAttachmentFile,
 } from '@/lib/fillin';
-import { SPREADSHEET_ACCEPT } from '@/lib/upload-formats';
+import { FILLIN_ATTACHMENT_ACCEPT } from '@/lib/upload-formats';
 
 export const MAX_FILLIN_ATTACHMENTS_TOTAL_MB = 50;
 
@@ -88,11 +88,11 @@ export function FillInAttachmentsDropzone({
 
   return (
     <div className="space-y-2">
-      <p className="text-sm font-medium text-foreground">Excel / CSV 附件</p>
+      <p className="text-sm font-medium text-foreground">表格或压缩包附件</p>
       <div
         role="button"
         tabIndex={0}
-        aria-label="Excel / CSV 附件"
+        aria-label="表格或压缩包附件"
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
@@ -119,8 +119,9 @@ export function FillInAttachmentsDropzone({
           {files.length > 0 ? `已选择 ${files.length} 个文件` : '点击或拖拽上传'}
         </p>
         <p className="text-center text-sm text-muted-foreground">
-          支持 .xls、.xlsx 或 .csv，选填；最多 {MAX_FILLIN_BATCH_ATTACHMENTS} 个，合计不超过{' '}
-          {MAX_FILLIN_ATTACHMENTS_TOTAL_MB}MB；学员端打包为 ZIP 下载
+          支持 .xls / .xlsx / .csv 或 .zip / .rar / .7z / .tar.gz / .tgz / .gz，选填；最多{' '}
+          {MAX_FILLIN_BATCH_ATTACHMENTS} 个，合计不超过 {MAX_FILLIN_ATTACHMENTS_TOTAL_MB}
+          MB；多个附件时学员端打包 ZIP 下载，仅一个压缩包时直接下载该文件
         </p>
         {files.length > 0 && files.length < MAX_FILLIN_BATCH_ATTACHMENTS ? (
           <Button
@@ -139,7 +140,7 @@ export function FillInAttachmentsDropzone({
           ref={inputRef}
           id={inputId}
           type="file"
-          accept={SPREADSHEET_ACCEPT}
+          accept={FILLIN_ATTACHMENT_ACCEPT}
           multiple
           className="sr-only"
           disabled={disabled}

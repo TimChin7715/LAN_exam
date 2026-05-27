@@ -44,7 +44,7 @@ export class FillInBatchInUseError extends Error {
 
 export {
   validateAnswerSheetFile as validateFillInExcelFile,
-  validateSpreadsheetFile as validateFillInAttachmentFile,
+  validateFillInAttachmentFile,
   validateWordFile as validateDocxFile,
 } from '@/lib/upload-formats';
 

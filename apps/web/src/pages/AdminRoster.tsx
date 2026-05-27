@@ -121,7 +121,7 @@ export default function AdminRoster() {
           名单管理
         </h1>
         <p className="text-base text-muted-foreground">
-          每次上传一个 Excel 文件将生成一份独立名单。请使用官方模板批量导入，须填写单位；姓名与身份证号须与证件一致（除首尾空格外须完全一致）。
+          每次上传一个 Excel 文件将生成一份独立名单。请使用官方模板批量导入，须填写单位；姓名与身份证号须与证件一致（除首尾空格外须完全一致）。导入后可在名单详情中继续添加、编辑或删除考生。
         </p>
       </div>
 

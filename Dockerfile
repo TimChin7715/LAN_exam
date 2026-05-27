@@ -17,7 +17,9 @@ FROM deps AS build
 WORKDIR /app
 COPY apps/web apps/web
 COPY apps/server apps/server
+ARG VITE_ADMIN_ALLOW_REMOTE=false
 ENV VITE_ADMIN_AUTH_MODE=disabled
+ENV VITE_ADMIN_ALLOW_REMOTE=${VITE_ADMIN_ALLOW_REMOTE}
 RUN pnpm exec prisma generate \
   && pnpm --filter @lan-exam/web build \
   && pnpm --filter @lan-exam/server build

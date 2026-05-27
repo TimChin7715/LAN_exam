@@ -5,6 +5,7 @@ import {
   applyFillInAnswerColumnTextFormat,
   writeFillInAnswerCell,
 } from './excel-answer-column.js';
+import { parseNonNegativeScore } from '../parse-score.js';
 import {
   getCellByHeader,
   headerIndexMap,
@@ -89,9 +90,13 @@ export async function parseAnswerSheetRows(
       errors.push({ row: rowNumber, column: '答案', message: '答案不能为空' });
       continue;
     }
-    const points = parseInt(pointsText, 10);
-    if (!Number.isFinite(points) || points < 0) {
-      errors.push({ row: rowNumber, column: '分值', message: '分值须为非负整数' });
+    const points = parseNonNegativeScore(pointsText);
+    if (points === null) {
+      errors.push({
+        row: rowNumber,
+        column: '分值',
+        message: '分值须为非负数字（上限 1000）',
+      });
       continue;
     }
     if (splitAcceptedAnswers(answerText).length === 0) {
@@ -172,7 +177,7 @@ function addFillInInstructionsSheet(wb: ExcelJS.Workbook): void {
       text: '• 答案：必填。多个可接受答案用英文竖线 | 分隔（全角 ｜ 也可）。',
     },
     {
-      text: '• 分值：非负整数。客观填空部分将按此分值自动计分。',
+      text: '• 分值：非负数字（可为小数，如 2.5）。客观填空部分将按此分值自动计分。',
     },
     {
       text: '• 答案列已设为文本格式，避免日期、前导零等被 Excel 自动改写。',

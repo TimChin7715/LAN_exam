@@ -17,6 +17,7 @@ import { registerAdminRosterImportRoutes } from './routes/api/admin/roster-impor
 import { registerAdminRosterListRoutes } from './routes/api/admin/roster-list.js';
 import { registerAdminRosterTemplateRoutes } from './routes/api/admin/roster-template.js';
 import { registerAdminRosterBatchesRoutes } from './routes/api/admin/roster-batches.js';
+import { registerAdminRosterEntriesRoutes } from './routes/api/admin/roster-entries.js';
 import { registerAdminQuestionBatchesRoutes } from './routes/api/admin/question-batches.js';
 import { registerAdminFillInBatchesImportRoutes } from './routes/api/admin/fill-in-batches-import.js';
 import { registerAdminFillInBatchesRoutes } from './routes/api/admin/fill-in-batches.js';
@@ -66,6 +67,7 @@ await registerAdminFillInBatchesRoutes(app);
 await registerAdminPracticalBatchesImportRoutes(app);
 await registerAdminPracticalBatchesRoutes(app);
 await registerAdminRosterBatchesRoutes(app);
+await registerAdminRosterEntriesRoutes(app);
 await registerAdminExamsCrudRoutes(app);
 await registerAdminSettingsRoutes(app);
 await registerAdminExamSeatsRoutes(app);

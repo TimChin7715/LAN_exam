@@ -17,7 +17,27 @@ $envFile = Join-Path $InstallHome '.env'
 function Write-InstallLog {
     param([string]$Path, [object]$Output)
     if ($null -eq $Output) { return }
-    @($Output) | Out-File -FilePath $Path -Append -Encoding utf8
+    $text = (@($Output) | ForEach-Object { "$_" }) -join [Environment]::NewLine
+    if (-not $text) { return }
+    $utf8NoBom = [System.Text.UTF8Encoding]::new($false)
+    [System.IO.File]::AppendAllText($Path, $text + [Environment]::NewLine, $utf8NoBom)
+}
+
+function Start-PostgresIfNeeded {
+    $listening = netstat -ano | Select-String '127.0.0.1:5434' | Select-String 'LISTENING'
+    if ($listening) { return }
+
+    if (-not (Test-Path (Join-Path $pgData 'PG_VERSION'))) {
+        throw 'Postgres data not initialized. initdb should have run first.'
+    }
+
+    Write-Host '[install-db] Starting Postgres on 127.0.0.1:5434...'
+    $pgCtl = Join-Path $pgBin 'pg_ctl.exe'
+    $pgLog = Join-Path $logDir 'postgres.log'
+    & $pgCtl -D $pgData -l $pgLog -o '-p 5434 -h 127.0.0.1' start | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        throw "pg_ctl start failed (exit $LASTEXITCODE). See $pgLog"
+    }
 }
 
 function Invoke-InstallNode {
@@ -75,32 +95,45 @@ if (-not $env:DATABASE_URL) {
 }
 $env:ADMIN_AUTH_MODE = 'disabled'
 
+$installLog = Join-Path $logDir 'install.log'
+if (Test-Path $installLog) { Remove-Item $installLog -Force }
+Write-InstallLog -Path $installLog -Output '[install-db] install started'
+
 if (-not (Test-Path (Join-Path $pgData 'PG_VERSION'))) {
     Write-Host '[install-db] initdb...'
-    & (Join-Path $pgBin 'initdb.exe') -D $pgData -U postgres -E UTF8 --locale=C `
-        *> (Join-Path $logDir 'initdb.log')
+    $initdbLog = Join-Path $logDir 'initdb.log'
+    $initdbOutput = & (Join-Path $pgBin 'initdb.exe') -D $pgData -U postgres -E UTF8 --locale=C 2>&1
+    Write-InstallLog -Path $initdbLog -Output $initdbOutput
+    if ($LASTEXITCODE -ne 0) {
+        throw "initdb failed (exit $LASTEXITCODE). See $initdbLog"
+    }
 }
 
-& (Join-Path $InstallHome 'start.bat')
+# Only start Postgres during DB setup — Node needs lan_exam role + migrations first.
+Start-PostgresIfNeeded
 Wait-PostgresReady
-
-$installLog = Join-Path $logDir 'install.log'
 $psql = Join-Path $pgBin 'psql.exe'
 $hasUser = (& $psql -h 127.0.0.1 -p 5434 -U postgres -d postgres -tAc `
     "SELECT 1 FROM pg_roles WHERE rolname='lan_exam'" 2>$null | Out-String).Trim()
 if ($hasUser -ne '1') {
     Write-Host '[install-db] creating role lan_exam...'
-    & $psql -h 127.0.0.1 -p 5434 -U postgres -d postgres -c `
-        "CREATE USER lan_exam WITH PASSWORD 'lan_exam';" `
-        2>&1 | Out-File $installLog -Append
+    $createUserOutput = & $psql -h 127.0.0.1 -p 5434 -U postgres -d postgres -c `
+        "CREATE USER lan_exam WITH PASSWORD 'lan_exam';" 2>&1
+    Write-InstallLog -Path $installLog -Output $createUserOutput
+    if ($LASTEXITCODE -ne 0) {
+        throw "CREATE USER lan_exam failed (exit $LASTEXITCODE). See $installLog"
+    }
 }
 $hasDb = (& $psql -h 127.0.0.1 -p 5434 -U postgres -d postgres -tAc `
     "SELECT 1 FROM pg_database WHERE datname='lan_exam'" 2>$null | Out-String).Trim()
 if ($hasDb -ne '1') {
     Write-Host '[install-db] creating database lan_exam...'
-    & $psql -h 127.0.0.1 -p 5434 -U postgres -d postgres -c `
-        "CREATE DATABASE lan_exam OWNER lan_exam;" `
-        2>&1 | Out-File $installLog -Append
+    $createDbOutput = & $psql -h 127.0.0.1 -p 5434 -U postgres -d postgres -c `
+        "CREATE DATABASE lan_exam OWNER lan_exam;" 2>&1
+    Write-InstallLog -Path $installLog -Output $createDbOutput
+    if ($LASTEXITCODE -ne 0) {
+        throw "CREATE DATABASE lan_exam failed (exit $LASTEXITCODE). See $installLog"
+    }
 }
 
 $bundle = Join-Path $app 'server-bundle'
@@ -136,4 +169,11 @@ try {
     Pop-Location
 }
 
+Write-Host '[install-db] Starting application server...'
+& (Join-Path $InstallHome 'start.bat')
+if ($LASTEXITCODE -ne 0) {
+    throw "start.bat failed (exit $LASTEXITCODE)"
+}
+
+Write-InstallLog -Path $installLog -Output '[install-db] install completed'
 Write-Host '[install-db] Done.'

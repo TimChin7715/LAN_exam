@@ -1,5 +1,6 @@
 import type { MultiScoringRule, QuestionType } from '@prisma/client';
 
+import { parsePositiveScore } from '../parse-score.js';
 import { mapTypeText } from './parse-workbook.js';
 import { normalizeAnswerKeys } from './normalize-answer.js';
 import type { ParsedQuestion, RawRow, RowError } from './types.js';
@@ -101,12 +102,12 @@ function validateRow(row: RawRow): { question?: ParsedQuestion; errors: RowError
     });
   }
 
-  const points = parsePositiveInt(row.pointsRaw, 1, 1, 1000);
+  const points = parsePositiveScore(row.pointsRaw);
   if (points === null) {
     errors.push({
       row: row.rowNumber,
       column: '分值',
-      message: '分值须为正整数',
+      message: '分值须为大于 0 的数字（上限 1000）',
     });
   }
 

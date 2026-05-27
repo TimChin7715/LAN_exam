@@ -62,6 +62,20 @@ describe('parseAnswerSheetRows', () => {
     assert.equal(rows[0]!.questionNo, 2);
   });
 
+  it('accepts decimal points', async () => {
+    const wb = new ExcelJS.Workbook();
+    const sheet = wb.addWorksheet(FILLIN_SHEET);
+    sheet.addRow([...FILLIN_HEADERS]);
+    applyFillInAnswerColumnTextFormat(sheet);
+    addFillInAnswerSheetRow(sheet, 1, '答案A', 2.5);
+    const buffer = Buffer.from(await wb.xlsx.writeBuffer());
+
+    const { rows, errors } = await parseAnswerSheetRows(buffer);
+    assert.equal(errors.length, 0, JSON.stringify(errors));
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0]!.points, 2.5);
+  });
+
   it('official import template has no importable rows', async () => {
     const buffer = await buildFillInImportTemplateExcel();
     const { rows, errors } = await parseAnswerSheetRows(buffer);

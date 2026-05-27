@@ -9,9 +9,10 @@ import {
 } from '../../../lib/fillin/import-batch.js';
 import { prisma } from '../../../lib/prisma.js';
 import {
-  assertValidSpreadsheetUpload,
-  type SpreadsheetExt,
-} from '../../../lib/upload/spreadsheet-file.js';
+  assertValidArchiveUpload,
+  FILLIN_ATTACHMENT_FORMAT_HINT,
+} from '../../../lib/upload/archive-file.js';
+import { assertValidSpreadsheetUpload } from '../../../lib/upload/spreadsheet-file.js';
 import {
   assertValidWordUpload,
   getMaxPracticalXlsxBytes,
@@ -73,22 +74,38 @@ function parseAttachmentInputs(
 
   const attachments: FillInImportAttachmentInput[] = [];
   for (const file of files) {
-    const check = assertValidSpreadsheetUpload(
+    const sheetCheck = assertValidSpreadsheetUpload(
       file.filename,
       file.mimetype,
       file.buffer,
     );
-    if (!check.ok) {
-      return {
-        ok: false,
-        message: `${file.filename}：${check.message}`,
-      };
+    if (sheetCheck.ok) {
+      attachments.push({
+        fileName: file.filename,
+        buffer: file.buffer,
+        ext: sheetCheck.ext,
+      });
+      continue;
     }
-    attachments.push({
-      fileName: file.filename,
-      buffer: file.buffer,
-      ext: check.ext as SpreadsheetExt,
-    });
+
+    const archiveCheck = assertValidArchiveUpload(
+      file.filename,
+      file.mimetype,
+      file.buffer,
+    );
+    if (archiveCheck.ok) {
+      attachments.push({
+        fileName: file.filename,
+        buffer: file.buffer,
+        ext: archiveCheck.ext,
+      });
+      continue;
+    }
+
+    return {
+      ok: false,
+      message: `${file.filename}：${FILLIN_ATTACHMENT_FORMAT_HINT}`,
+    };
   }
   return { ok: true, attachments };
 }
@@ -183,17 +200,28 @@ export async function registerAdminFillInBatchesImportRoutes(
       const batchId = randomUUID();
       const title = stripWordTitle(word.filename);
 
-      const result = await importFillInBatch(prisma, {
-        teacherId,
-        batchId,
-        title,
-        wordFileName: word.filename,
-        wordExt: wordCheck.ext,
-        wordBuffer: word.buffer,
-        excelFileName: excel.filename,
-        excelBuffer: excel.buffer,
-        attachments: attachmentParse.attachments,
-      });
+      let result;
+      try {
+        result = await importFillInBatch(prisma, {
+          teacherId,
+          batchId,
+          title,
+          wordFileName: word.filename,
+          wordExt: wordCheck.ext,
+          wordBuffer: word.buffer,
+          excelFileName: excel.filename,
+          excelBuffer: excel.buffer,
+          attachments: attachmentParse.attachments,
+        });
+      } catch (err) {
+        request.log.error({ err, event: 'fill_in_import_failed' }, 'Fill-in import failed');
+        return reply.status(500).send({
+          ok: false,
+          code: 'IMPORT_FAILED',
+          message:
+            '导入失败。若刚升级过系统，请在本机执行数据库迁移（pnpm db:migrate）后重试；并确认答题卡「答题卡」工作表已填写有效数据。',
+        });
+      }
 
       if (!result.ok) {
         return reply.status(400).send({

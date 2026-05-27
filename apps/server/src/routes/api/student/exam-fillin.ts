@@ -13,6 +13,8 @@ import {
 import { loadFillInWordPreviewHtml } from '../../../lib/fillin/preview-word.js';
 import { prisma } from '../../../lib/prisma.js';
 import {
+  contentTypeForArchiveFilename,
+  getSingleStoredArchiveAttachment,
   safeFillInAttachmentsZipFilename,
   streamFillInAttachmentsZip,
 } from '../../../lib/fillin/build-attachments-zip.js';
@@ -337,6 +339,21 @@ export async function registerStudentExamFillInRoutes(
           code: 'NOT_FOUND',
           message: '本场考试无填空题附件',
         });
+      }
+
+      const singleArchive = getSingleStoredArchiveAttachment(attachments);
+      if (singleArchive) {
+        const buffer = await readStorageFile(singleArchive.storageKey);
+        return reply
+          .header(
+            'Content-Type',
+            contentTypeForArchiveFilename(singleArchive.fileName),
+          )
+          .header(
+            'Content-Disposition',
+            `attachment; filename*=UTF-8''${encodeURIComponent(singleArchive.fileName)}`,
+          )
+          .send(buffer);
       }
 
       const filename = safeFillInAttachmentsZipFilename(exam.fillInBatch.title);

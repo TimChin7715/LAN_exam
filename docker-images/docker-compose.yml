@@ -17,13 +17,13 @@ services:
       - postgres_data:/var/lib/postgresql/data
 
   app:
-    build: .
     image: lan-exam:${LAN_EXAM_IMAGE_TAG:-latest}
     ports:
       - '${WEB_HOST_PORT:-5180}:5180'
     environment:
       ADMIN_AUTH_MODE: disabled
-      ADMIN_API_LOOPBACK_ONLY: 'true'
+      # 离线 Docker 验收包：允许局域网访问管理台（勿用于考场 Windows 安装包）
+      ADMIN_API_LOOPBACK_ONLY: 'false'
       LOCAL_ADMIN_USERNAME: local_exam_admin
       WEB_PORT: '5180'
       LISTEN_HOST: '0.0.0.0'

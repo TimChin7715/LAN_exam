@@ -59,7 +59,7 @@ model Question {
   type             QuestionType
   stem             String
   answerKeys       String
-  points           Int                 @default(1)
+  points           Float               @default(1)
   difficulty       Int                 @default(1)
   explanation      String?
   knowledgePoints  String?
@@ -238,7 +238,7 @@ model Submission {
   exam          Exam        @relation(fields: [examId], references: [id], onDelete: Cascade)
   rosterEntryId String
   rosterEntry   RosterEntry @relation(fields: [rosterEntryId], references: [id])
-  totalScore    Int
+  totalScore    Float
   submittedAt   DateTime    @default(now())
   answers       Answer[]
   fillInScreenshots FillInScreenshot[]
@@ -288,7 +288,7 @@ model Answer {
   examQuestion   ExamQuestion @relation(fields: [examQuestionId], references: [id], onDelete: Cascade)
   selectedKeys   String
   isCorrect      Boolean
-  pointsAwarded  Int
+  pointsAwarded  Float
 
   @@unique([submissionId, examQuestionId])
 }

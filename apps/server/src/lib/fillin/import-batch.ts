@@ -8,7 +8,7 @@ import {
   parseAnswerSheetRows,
 } from './parse-answer-sheet.js';
 import type { RowError } from './types.js';
-import type { SpreadsheetExt } from '../upload/spreadsheet-file.js';
+import type { FillInAttachmentExt } from '../upload/archive-file.js';
 import { spreadsheetExt } from '../upload/spreadsheet-file.js';
 import type { WordUploadExt } from '../upload/word-file.js';
 import {
@@ -22,7 +22,7 @@ import {
 export type FillInImportAttachmentInput = {
   fileName: string;
   buffer: Buffer;
-  ext: SpreadsheetExt;
+  ext: FillInAttachmentExt;
 };
 
 export type FillInImportResult =
@@ -64,7 +64,13 @@ export async function importFillInBatch(
   if (blanks.length === 0) {
     return {
       ok: false,
-      errors: [{ row: 0, message: '答题卡中没有可导入的空位' }],
+      errors: [
+        {
+          row: 0,
+          message:
+            '答题卡中没有可导入的空位。请确认：① 工作表名为「答题卡」；② 已删除【示例】/【说明】行；③ 每行填写题号、答案与分值。',
+        },
+      ],
     };
   }
 
