@@ -73,6 +73,9 @@ export const STUDENT_SUBMITTED_POLL_INTERVAL_MS = 15000;
 export const STUDENT_ENTER_EXAM_JITTER_BASE_MS = 8000;
 export const STUDENT_ENTER_EXAM_JITTER_RANDOM_MS = 2000;
 
+export const STUDENT_EXAM_SYNC_INTERVAL_MS = 60000;
+export const STUDENT_EXAM_SYNC_JITTER_MS = 15000;
+
 export const SERVER_BUSY_CODE = 'SERVER_BUSY';
 
 export function computeEnterExamDelayMs(nationalId: string): number {
@@ -80,6 +83,18 @@ export function computeEnterExamDelayMs(nationalId: string): number {
   const extra = Math.floor(Math.random() * STUDENT_ENTER_EXAM_JITTER_RANDOM_MS);
   return base + extra;
 }
+
+export function computeExamSyncInitialDelayMs(nationalId: string): number {
+  const jitter = hashString(nationalId) % STUDENT_EXAM_SYNC_JITTER_MS;
+  return jitter;
+}
+
+export type ExamSyncProgressResponse = {
+  ok: true;
+  syncedAt: string;
+  answerCount: number;
+  maxDraftUpdatedAt: string | null;
+};
 
 export type ExamPaperResponse = {
   examId: string;
@@ -219,6 +234,21 @@ export const studentApi = {
       body: JSON.stringify({ examId, answers }),
       skipAuthRedirect: true,
     }),
+
+  syncProgress: (
+    examId: string,
+    answers: { examQuestionId: string; selectedKeys: string }[],
+    options?: { onRetry?: (attempt: number) => void },
+  ) =>
+    fetchWithRetry(
+      () =>
+        apiFetch<ExamSyncProgressResponse>('/api/student/exam/sync-progress', {
+          method: 'POST',
+          body: JSON.stringify({ examId, answers }),
+          skipAuthRedirect: true,
+        }),
+      { onRetry: options?.onRetry },
+    ),
 
   submitExam: (examId: string) =>
     apiFetch<{ ok: true; totalScore: number | null; submittedAt: string }>(

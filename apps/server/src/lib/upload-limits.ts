@@ -1,4 +1,8 @@
 import {
+  MAX_FILLIN_ATTACHMENTS_TOTAL_BYTES,
+  MAX_FILLIN_BATCH_ATTACHMENTS,
+} from './fillin/attachment-limits.js';
+import {
   getMaxPracticalDocxBytes,
   getMaxPracticalXlsxBytes,
 } from './storage/docx-file.js';
@@ -19,6 +23,7 @@ export function getMultipartMaxFileSizeBytes(): number {
     getMaxPracticalDocxBytes(),
     getMaxPracticalXlsxBytes(),
     DEFAULT_IMPORT_XLSX_BYTES,
+    MAX_FILLIN_ATTACHMENTS_TOTAL_BYTES,
   );
 }
 
@@ -29,7 +34,7 @@ export function getMultipartPluginLimits(): {
   fieldSize: number;
 } {
   return {
-    files: 5,
+    files: Math.max(5, MAX_FILLIN_BATCH_ATTACHMENTS + 2),
     fileSize: getMultipartMaxFileSizeBytes(),
     fields: 20,
     fieldSize: 1024 * 1024,

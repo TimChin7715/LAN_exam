@@ -52,7 +52,7 @@ if (-not (Test-Path (Join-Path $pgData 'PG_VERSION'))) {
 $pgCtl = Join-Path $pgBin 'pg_ctl.exe'
 if (Test-Path $pgCtl) {
     Write-StopLog '[stop-postgres] pg_ctl -w -t 60 stop fast ...'
-    $out = & $pgCtl -D $pgData -w -t 60 stop fast 2>&1
+    $out = & $pgCtl -D $pgData -w -t 60 stop -m fast 2>&1
     foreach ($line in @($out)) {
         if ($null -ne $line -and "$line".Trim()) {
             Write-StopLog "  $line"
@@ -68,18 +68,18 @@ Stop-OurPostgresProcesses
 $stillListening = @(Get-ListenerPidsOn5434)
 if ($stillListening.Count -gt 0) {
     Write-StopLog "[stop-postgres] 127.0.0.1:5434 still listening, force stop PIDs: $($stillListening -join ', ')"
-    foreach ($pid in $stillListening) {
+    foreach ($listeningPid in $stillListening) {
         try {
-            $proc = Get-Process -Id $pid -ErrorAction SilentlyContinue
+            $proc = Get-Process -Id $listeningPid -ErrorAction SilentlyContinue
             $note = if ($proc) {
-                try { $proc.ProcessName + ' ' + $proc.Path } catch { "PID $pid" }
+                try { $proc.ProcessName + ' ' + $proc.Path } catch { "PID $listeningPid" }
             } else {
-                "PID $pid"
+                "PID $listeningPid"
             }
             Write-StopLog "  Stop-Process $note"
-            Stop-Process -Id $pid -Force -ErrorAction SilentlyContinue
+            Stop-Process -Id $listeningPid -Force -ErrorAction SilentlyContinue
         } catch {
-            Write-StopLog "  Failed to stop PID ${pid}: $($_.Exception.Message)"
+            Write-StopLog "  Failed to stop PID ${listeningPid}: $($_.Exception.Message)"
         }
     }
     Start-Sleep -Seconds 1

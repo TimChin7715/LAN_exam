@@ -1,6 +1,8 @@
 import type { FastifyInstance } from 'fastify';
 
-import { examAnswersBodySchema } from '../../../lib/exam/answer-draft-schemas.js';
+import { examSyncGate } from '../../../lib/concurrency/gates.js';
+import { ServerBusyError } from '../../../lib/concurrency/server-busy-error.js';
+import { examSyncProgressBodySchema } from '../../../lib/exam/answer-draft-schemas.js';
 import { assertStudentExamAccess } from '../../../lib/exam/access.js';
 import {
   AnswerDraftPersistError,
@@ -9,21 +11,22 @@ import {
   persistAnswerDrafts,
 } from '../../../lib/exam/persist-answer-drafts.js';
 import { ExamAccessError } from '../../../lib/exam/types.js';
+import { SERVER_BUSY_CODE, SERVER_BUSY_MESSAGE } from '../../../lib/errors.js';
 import {
   ensureStudentRosterEntryId,
   requireStudentSession,
 } from '../../../plugins/student-guard.js';
 
-export async function registerStudentExamAnswersRoutes(
+export async function registerStudentExamSyncProgressRoutes(
   app: FastifyInstance,
 ): Promise<void> {
-  app.put(
-    '/api/student/exam/answers',
+  app.post(
+    '/api/student/exam/sync-progress',
     {
       preHandler: requireStudentSession,
       config: {
         rateLimit: {
-          max: 60,
+          max: 8,
           timeWindow: '1 minute',
         },
       },
@@ -35,7 +38,7 @@ export async function registerStudentExamAnswersRoutes(
       }
       const rosterEntryId = rosterOrReply;
 
-      const parsed = examAnswersBodySchema.safeParse(request.body);
+      const parsed = examSyncProgressBodySchema.safeParse(request.body);
       if (!parsed.success) {
         return reply.status(400).send({
           code: 'VALIDATION_ERROR',
@@ -59,13 +62,32 @@ export async function registerStudentExamAnswersRoutes(
       }
 
       try {
-        await assertCanPersistAnswerDrafts(
-          examId,
-          rosterEntryId,
-          normalizedAnswers,
-        );
-        await persistAnswerDrafts(examId, rosterEntryId, normalizedAnswers);
+        const result = await examSyncGate.run(async () => {
+          await assertCanPersistAnswerDrafts(
+            examId,
+            rosterEntryId,
+            normalizedAnswers,
+          );
+          return persistAnswerDrafts(examId, rosterEntryId, normalizedAnswers);
+        });
+
+        const syncedAt = new Date().toISOString();
+        return reply.send({
+          ok: true,
+          syncedAt,
+          answerCount: result.answerCount,
+          maxDraftUpdatedAt: result.maxDraftUpdatedAt,
+        });
       } catch (err) {
+        if (err instanceof ServerBusyError) {
+          return reply
+            .status(503)
+            .header('Retry-After', '5')
+            .send({
+              code: SERVER_BUSY_CODE,
+              message: SERVER_BUSY_MESSAGE,
+            });
+        }
         if (err instanceof AnswerDraftPersistError) {
           return reply.status(err.statusCode).send({
             code: err.code,
@@ -74,8 +96,6 @@ export async function registerStudentExamAnswersRoutes(
         }
         throw err;
       }
-
-      return reply.send({ ok: true });
     },
   );
 }

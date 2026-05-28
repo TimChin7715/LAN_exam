@@ -14,9 +14,26 @@ $OutDir = [System.IO.Path]::GetFullPath($OutDir)
 
 $appDir = [System.IO.Path]::GetFullPath((Join-Path $OutDir 'app'))
 $bundleDir = [System.IO.Path]::GetFullPath((Join-Path $appDir 'server-bundle'))
-# pnpm deploy treats paths containing "dist" as relative to apps/server/dist — stage elsewhere first
-$bundleStage = [System.IO.Path]::GetFullPath((Join-Path $root '.build\server-bundle'))
 $templates = Join-Path $PSScriptRoot 'templates'
+
+function Remove-DirForce {
+    param([string]$Path)
+    if (-not (Test-Path -LiteralPath $Path)) { return }
+    for ($attempt = 1; $attempt -le 3; $attempt++) {
+        try {
+            Remove-Item -LiteralPath $Path -Recurse -Force -ErrorAction Stop
+            return
+        }
+        catch {
+            if ($attempt -eq 3) { break }
+            Start-Sleep -Seconds 2
+        }
+    }
+    cmd /c "rmdir /s /q `"$Path`"" | Out-Null
+    if (Test-Path -LiteralPath $Path) {
+        throw "Could not remove locked directory: $Path (close Node/IDE using server-bundle, then retry)"
+    }
+}
 
 $releaseVersion = & (Join-Path $PSScriptRoot 'get-release-version.ps1') -Root $root
 Write-Host "==> build-release: root=$root out=$OutDir version=$releaseVersion"
@@ -24,10 +41,10 @@ Write-Host "==> build-release: root=$root out=$OutDir version=$releaseVersion"
 foreach ($stale in @(
         (Join-Path $root 'apps\server\dist\lan-exam-win'),
         (Join-Path $root 'apps\server\.build'),
-        $bundleStage,
+        (Join-Path $root '.build\server-bundle'),
         $bundleDir
     )) {
-    if (Test-Path $stale) { Remove-Item -Recurse -Force $stale }
+    Remove-DirForce -Path $stale
 }
 
 Push-Location $root
@@ -36,21 +53,28 @@ pnpm build
 if ($LASTEXITCODE -ne 0) { throw 'pnpm build failed' }
 Pop-Location
 
-if (Test-Path $appDir) { Remove-Item -Recurse -Force $appDir }
+if (Test-Path $appDir) { Remove-DirForce -Path $appDir }
 New-Item -ItemType Directory -Path (Join-Path $appDir 'web\dist') -Force | Out-Null
 New-Item -ItemType Directory -Path (Join-Path $appDir 'prisma') -Force | Out-Null
 
 Copy-Item -Recurse (Join-Path $root 'apps\web\dist\*') (Join-Path $appDir 'web\dist')
 Copy-Item -Recurse (Join-Path $root 'prisma\*') (Join-Path $appDir 'prisma')
 Copy-Item (Join-Path $root 'templates') (Join-Path $OutDir 'templates') -Recurse -ErrorAction SilentlyContinue
+Copy-Item -Recurse (Join-Path $templates '*') (Join-Path $OutDir 'scripts') -Force
 
-Write-Host "==> pnpm deploy @lan-exam/server -> $bundleStage"
-New-Item -ItemType Directory -Path (Split-Path $bundleStage) -Force | Out-Null
+Write-Host "==> pnpm deploy @lan-exam/server -> $bundleDir"
+New-Item -ItemType Directory -Path (Split-Path $bundleDir) -Force | Out-Null
 Push-Location $root
-pnpm --filter @lan-exam/server deploy --prod --ignore-scripts $bundleStage
+pnpm --filter @lan-exam/server deploy --prod --ignore-scripts $bundleDir
 if ($LASTEXITCODE -ne 0) { throw 'pnpm deploy failed' }
 Pop-Location
-Move-Item -Path $bundleStage -Destination $bundleDir
+& (Join-Path $PSScriptRoot 'repair-prisma-bundle-links.ps1') -BundleDir $bundleDir
+& (Join-Path $PSScriptRoot 'repair-pnpm-hoist-links.ps1') -BundleDir $bundleDir
+$bundleData = Join-Path $bundleDir 'data'
+if (Test-Path $bundleData) {
+    Remove-Item -LiteralPath $bundleData -Recurse -Force
+    Write-Host "==> removed dev DATA_DIR from server-bundle (not for shipping)"
+}
 foreach ($stale in @(
         (Join-Path $root 'apps\server\.build'),
         (Join-Path $root 'apps\server\dist\lan-exam-win')
@@ -65,21 +89,6 @@ Get-ChildItem $serverDist | Where-Object { $_.Name -ne 'lan-exam-win' } | ForEac
     Copy-Item -Recurse $_.FullName (Join-Path $bundleDist $_.Name) -Force
 }
 
-Write-Host "==> add Prisma CLI + tsx for install-time migrate/seed"
-Push-Location $bundleDir
-$npmOk = $false
-for ($attempt = 1; $attempt -le 3; $attempt++) {
-    npm install --no-package-lock --save-dev prisma@^6.8.2 tsx@^4.19.4
-    if ($LASTEXITCODE -eq 0) {
-        $npmOk = $true
-        break
-    }
-    Write-Warning "npm install prisma/tsx attempt $attempt failed; retrying..."
-    Start-Sleep -Seconds 5
-}
-if (-not $npmOk) { throw 'npm install prisma/tsx failed after 3 attempts' }
-Pop-Location
-
 $schema = Join-Path $appDir 'prisma\schema.prisma'
 $schemaText = [System.IO.File]::ReadAllText($schema)
 if ($schemaText -notmatch 'output\s*=') {
@@ -88,26 +97,47 @@ if ($schemaText -notmatch 'output\s*=') {
     [System.IO.File]::WriteAllText($schema, $schemaText, $utf8NoBom)
 }
 
-Write-Host "==> prisma generate ($schema)"
-$prismaCli = Join-Path $bundleDir 'node_modules\prisma\build\index.js'
-& node $prismaCli generate --schema $schema
+Write-Host "==> prisma generate ($schema) via repo pnpm"
+$bundlePrismaCli = Join-Path $bundleDir 'node_modules\prisma\build\index.js'
+if (-not (Test-Path $bundlePrismaCli)) {
+    throw "Prisma CLI missing in server-bundle after pnpm deploy — ensure apps/server lists prisma in dependencies and run pnpm install"
+}
+
+$prevEap = $ErrorActionPreference
+$ErrorActionPreference = 'Continue'
+Push-Location $root
+pnpm exec prisma generate --schema $schema 2>&1 | Out-Host
 if ($LASTEXITCODE -ne 0) { throw 'prisma generate failed' }
+Pop-Location
+$ErrorActionPreference = $prevEap
 
 $prismaClientEngine = Join-Path $bundleDir 'node_modules\.prisma\client\query_engine-windows.dll.node'
 if (-not (Test-Path $prismaClientEngine)) {
     throw "Prisma client engine missing after generate: $prismaClientEngine"
 }
 
+Write-Host '==> prefetch Prisma engine binaries (build machine needs network once)'
+$prevEap = $ErrorActionPreference
+$ErrorActionPreference = 'Continue'
+Push-Location $bundleDir
+$env:PRISMA_HIDE_UPDATE_MESSAGE = 'true'
+& node (Join-Path $bundleDir 'node_modules\prisma\build\index.js') version 2>&1 | Out-Host
+if ($LASTEXITCODE -ne 0) { throw 'prisma engine prefetch failed (check network on build machine)' }
+Pop-Location
+$ErrorActionPreference = $prevEap
+$found = Get-ChildItem (Join-Path $bundleDir 'node_modules\.pnpm') -Recurse -Filter 'schema-engine-windows.exe' -ErrorAction SilentlyContinue | Select-Object -First 1
+if (-not $found) { throw 'schema-engine-windows.exe missing after prefetch' }
+
 Write-Host '==> compile prisma/seed.cjs (offline install, no tsx on target machine)'
 $seedCjs = Join-Path $appDir 'prisma\seed.cjs'
 $seedTs = Join-Path $root 'prisma\seed.ts'
-Push-Location $bundleDir
-npm install --no-package-lock --no-save esbuild@0.25.12
-if ($LASTEXITCODE -ne 0) { throw 'npm install esbuild failed' }
-$esbuild = Join-Path $bundleDir 'node_modules\esbuild\bin\esbuild'
-& node $esbuild $seedTs --bundle --platform=node --format=cjs --outfile=$seedCjs --packages=external
+$prevEap = $ErrorActionPreference
+$ErrorActionPreference = 'Continue'
+Push-Location $root
+pnpm dlx esbuild@0.25.12 $seedTs --bundle --platform=node --format=cjs --outfile=$seedCjs --packages=external 2>&1 | Out-Host
 if ($LASTEXITCODE -ne 0) { throw 'esbuild seed.cjs failed' }
 Pop-Location
+$ErrorActionPreference = $prevEap
 if (-not (Test-Path $seedCjs)) {
     throw "Missing compiled seed script: $seedCjs"
 }
@@ -121,6 +151,10 @@ Copy-Item (Join-Path $templates 'install-db.ps1') (Join-Path $OutDir 'scripts\in
 Copy-Item (Join-Path $templates 'stop-postgres.ps1') (Join-Path $OutDir 'scripts\stop-postgres.ps1') -Force
 Copy-Item (Join-Path $templates 'write-env.ps1') (Join-Path $OutDir 'scripts\write-env.ps1') -Force
 Copy-Item (Join-Path $templates 'start-node.ps1') (Join-Path $OutDir 'scripts\start-node.ps1') -Force
+Copy-Item (Join-Path $templates 'ensure-db-ready.ps1') (Join-Path $OutDir 'scripts\ensure-db-ready.ps1') -Force
+Copy-Item (Join-Path $templates 'verify-install.ps1') (Join-Path $OutDir 'scripts\verify-install.ps1') -Force
+Copy-Item (Join-Path $PSScriptRoot 'repair-prisma-bundle-links.ps1') (Join-Path $OutDir 'scripts\repair-prisma-bundle-links.ps1') -Force
+Copy-Item (Join-Path $PSScriptRoot 'repair-pnpm-hoist-links.ps1') (Join-Path $OutDir 'scripts\repair-pnpm-hoist-links.ps1') -Force
 
 $envExample = @"
 ADMIN_AUTH_MODE=disabled

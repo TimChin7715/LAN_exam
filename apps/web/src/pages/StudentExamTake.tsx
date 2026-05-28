@@ -29,6 +29,7 @@ import {
 import { formatStemForDisplay, questionTypeLabel } from '@/lib/qbank';
 import {
   ApiError,
+  computeExamSyncInitialDelayMs,
   hasExamModule,
   needsPractical,
   needsQuestionItems,
@@ -36,6 +37,8 @@ import {
   STUDENT_ACTIVE_EXAM_POLL_INTERVAL_MS,
   STUDENT_ALREADY_SUBMITTED_MESSAGE,
   STUDENT_EXAM_ENDED_CODE,
+  STUDENT_EXAM_SYNC_INTERVAL_MS,
+  STUDENT_EXAM_SYNC_JITTER_MS,
   studentApi,
   type ExamContentModule,
   type ExamPaperItem,
@@ -57,6 +60,13 @@ function parseMultiKeys(raw: string): string[] {
 
 function joinMultiKeys(keys: string[]): string {
   return [...new Set(keys)].sort().join(',');
+}
+
+function formatProgressSyncedAt(iso: string): string {
+  return new Date(iso).toLocaleTimeString('zh-CN', {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
 export default function StudentExamTake() {
@@ -86,6 +96,8 @@ export default function StudentExamTake() {
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>(
     'idle',
   );
+  const [progressSyncedAt, setProgressSyncedAt] = useState<string | null>(null);
+  const [syncingProgress, setSyncingProgress] = useState(false);
   const [submitOpen, setSubmitOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [logoutOpen, setLogoutOpen] = useState(false);
@@ -93,8 +105,21 @@ export default function StudentExamTake() {
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const saveInFlightRef = useRef<Promise<void> | null>(null);
   const dirtyAnswersRef = useRef<DirtyAnswerState>({});
+  const answersRef = useRef<AnswerState>({});
+  const itemsRef = useRef<(ExamPaperItem | ExamSubmissionItem)[]>([]);
+  const nationalIdRef = useRef<string | null>(null);
+  const syncInFlightRef = useRef<Promise<void> | null>(null);
+  const syncRetryToastShownRef = useRef(false);
   const isMountedRef = useRef(true);
   const paperRetryToastShownRef = useRef(false);
+
+  useEffect(() => {
+    answersRef.current = answers;
+  }, [answers]);
+
+  useEffect(() => {
+    itemsRef.current = items;
+  }, [items]);
 
   useEffect(() => {
     return () => {
@@ -187,57 +212,6 @@ export default function StudentExamTake() {
     void loadExam();
   }, [loadExam]);
 
-  useEffect(() => {
-    if (!examId || readOnly || loading) return;
-
-    let intervalId: ReturnType<typeof setInterval> | undefined;
-
-    const poll = async () => {
-      if (document.hidden) return;
-      try {
-        const status = await studentApi.examStatus();
-        if (status.status === 'ENDED' && status.examId === examId) {
-          goToExamEnded();
-        }
-      } catch {
-        /* ignore transient poll errors */
-      }
-    };
-
-    const startPolling = () => {
-      if (intervalId !== undefined) return;
-      void poll();
-      intervalId = setInterval(
-        () => void poll(),
-        STUDENT_ACTIVE_EXAM_POLL_INTERVAL_MS,
-      );
-    };
-
-    const stopPolling = () => {
-      if (intervalId === undefined) return;
-      clearInterval(intervalId);
-      intervalId = undefined;
-    };
-
-    const onVisibility = () => {
-      if (document.hidden) {
-        stopPolling();
-      } else {
-        startPolling();
-      }
-    };
-
-    if (!document.hidden) {
-      startPolling();
-    }
-    document.addEventListener('visibilitychange', onVisibility);
-
-    return () => {
-      stopPolling();
-      document.removeEventListener('visibilitychange', onVisibility);
-    };
-  }, [examId, goToExamEnded, loading, readOnly]);
-
   const persistDirtyAnswers = useCallback(async () => {
     if (readOnly || !examId) return;
     if (saveInFlightRef.current) {
@@ -312,6 +286,178 @@ export default function StudentExamTake() {
       return false;
     }
   }, [examId, persistDirtyAnswers, readOnly]);
+
+  const runProgressSync = useCallback(async () => {
+    if (readOnly || !examId || !needsQuestionItems(contentModules)) {
+      return;
+    }
+
+    const payload = itemsRef.current
+      .map((item) => ({
+        examQuestionId: item.examQuestionId,
+        selectedKeys: (answersRef.current[item.examQuestionId] ?? '').trim(),
+      }))
+      .filter((item) => item.selectedKeys.length > 0);
+
+    if (payload.length === 0) {
+      return;
+    }
+
+    if (syncInFlightRef.current) {
+      await syncInFlightRef.current;
+      return;
+    }
+
+    const syncTask = (async () => {
+      if (isMountedRef.current) {
+        setSyncingProgress(true);
+      }
+      try {
+        const result = await studentApi.syncProgress(examId, payload, {
+          onRetry: () => {
+            if (!syncRetryToastShownRef.current) {
+              syncRetryToastShownRef.current = true;
+              toast.message('进度同步排队中，请稍候…');
+            }
+          },
+        });
+        syncRetryToastShownRef.current = false;
+        for (const item of payload) {
+          if (
+            dirtyAnswersRef.current[item.examQuestionId] === item.selectedKeys
+          ) {
+            delete dirtyAnswersRef.current[item.examQuestionId];
+          }
+        }
+        if (isMountedRef.current) {
+          setProgressSyncedAt(result.syncedAt);
+          if (Object.keys(dirtyAnswersRef.current).length === 0) {
+            setSaveStatus('saved');
+          }
+        }
+      } catch (err) {
+        if (err instanceof ApiError && err.code === STUDENT_EXAM_ENDED_CODE) {
+          goToExamEnded();
+          throw err;
+        }
+        if (err instanceof ApiError && err.code === SERVER_BUSY_CODE) {
+          toast.error(err.message || '进度同步排队已满，将稍后重试。');
+        }
+      } finally {
+        if (isMountedRef.current) {
+          setSyncingProgress(false);
+        }
+        syncInFlightRef.current = null;
+      }
+    })();
+
+    syncInFlightRef.current = syncTask;
+    await syncTask;
+  }, [contentModules, examId, goToExamEnded, readOnly]);
+
+  useEffect(() => {
+    if (!examId || readOnly || loading || !needsQuestionItems(contentModules)) {
+      return;
+    }
+
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    let intervalId: ReturnType<typeof setInterval> | undefined;
+    let cancelled = false;
+
+    const scheduleRepeating = () => {
+      intervalId = setInterval(
+        () => void runProgressSync(),
+        STUDENT_EXAM_SYNC_INTERVAL_MS,
+      );
+    };
+
+    const startSyncLoop = () => {
+      const nationalId = nationalIdRef.current ?? '';
+      const initialDelay = nationalId
+        ? computeExamSyncInitialDelayMs(nationalId)
+        : Math.floor(Math.random() * STUDENT_EXAM_SYNC_JITTER_MS);
+
+      timeoutId = setTimeout(() => {
+        if (cancelled) return;
+        void runProgressSync();
+        scheduleRepeating();
+      }, initialDelay);
+    };
+
+    if (nationalIdRef.current) {
+      startSyncLoop();
+    } else {
+      void studentApi
+        .me()
+        .then((profile) => {
+          if (cancelled) return;
+          nationalIdRef.current = profile.nationalId;
+          startSyncLoop();
+        })
+        .catch(() => {
+          if (!cancelled) startSyncLoop();
+        });
+    }
+
+    return () => {
+      cancelled = true;
+      if (timeoutId !== undefined) clearTimeout(timeoutId);
+      if (intervalId !== undefined) clearInterval(intervalId);
+    };
+  }, [contentModules, examId, loading, readOnly, runProgressSync]);
+
+  useEffect(() => {
+    if (!examId || readOnly || loading) return;
+
+    let intervalId: ReturnType<typeof setInterval> | undefined;
+
+    const poll = async () => {
+      if (document.hidden) return;
+      try {
+        const status = await studentApi.examStatus();
+        if (status.status === 'ENDED' && status.examId === examId) {
+          goToExamEnded();
+        }
+      } catch {
+        /* ignore transient poll errors */
+      }
+    };
+
+    const startPolling = () => {
+      if (intervalId !== undefined) return;
+      void poll();
+      intervalId = setInterval(
+        () => void poll(),
+        STUDENT_ACTIVE_EXAM_POLL_INTERVAL_MS,
+      );
+    };
+
+    const stopPolling = () => {
+      if (intervalId === undefined) return;
+      clearInterval(intervalId);
+      intervalId = undefined;
+    };
+
+    const onVisibility = () => {
+      if (document.hidden) {
+        stopPolling();
+        void flushDirtyAnswers();
+      } else {
+        startPolling();
+        void runProgressSync();
+      }
+    };
+
+    if (!document.hidden) {
+      startPolling();
+    }
+    document.addEventListener('visibilitychange', onVisibility);
+
+    return () => {
+      stopPolling();
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [examId, flushDirtyAnswers, goToExamEnded, loading, readOnly, runProgressSync]);
 
   const scheduleSave = useCallback(() => {
     if (readOnly || !examId) return;
@@ -450,6 +596,15 @@ export default function StudentExamTake() {
     return null;
   }, [contentModules, readOnly, saveStatus]);
 
+  const progressSyncLabel = useMemo(() => {
+    if (readOnly || !needsQuestionItems(contentModules)) return null;
+    if (syncingProgress) return '正在同步进度至服务器…';
+    if (progressSyncedAt) {
+      return `进度已同步至服务器 ${formatProgressSyncedAt(progressSyncedAt)}`;
+    }
+    return null;
+  }, [contentModules, progressSyncedAt, readOnly, syncingProgress]);
+
   const answerProgress = useMemo(
     () =>
       buildAnswerProgressSummary({
@@ -546,8 +701,11 @@ export default function StudentExamTake() {
         </Alert>
       ) : null}
 
-      {saveLabel ? (
-        <p className="text-sm text-muted-foreground">{saveLabel}</p>
+      {saveLabel || progressSyncLabel ? (
+        <div className="space-y-1 text-sm text-muted-foreground">
+          {saveLabel ? <p>{saveLabel}</p> : null}
+          {progressSyncLabel ? <p>{progressSyncLabel}</p> : null}
+        </div>
       ) : null}
 
       {hasObjectiveModule &&

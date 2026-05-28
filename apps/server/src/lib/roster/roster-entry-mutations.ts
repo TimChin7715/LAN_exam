@@ -4,6 +4,7 @@ import {
   validateRosterEntryFields,
   type NormalizedRosterEntry,
 } from './validate-entry.js';
+import { syncAfterRosterEntryCreated } from './sync-exam-roster-side-effects.js';
 import { MAX_ROSTER_IMPORT_ROWS } from './types.js';
 
 export class RosterEntryNotFoundError extends Error {
@@ -186,6 +187,8 @@ export async function createRosterEntry(
       nationalId: input.nationalId,
     },
   });
+
+  await syncAfterRosterEntryCreated(prisma, batchId);
 
   return mapEntry(entry);
 }

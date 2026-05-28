@@ -21,5 +21,8 @@ if errorlevel 1 (
   timeout /t 3 /nobreak >nul
 )
 
+powershell -NoProfile -ExecutionPolicy Bypass -File "%LAN_EXAM_HOME%\scripts\ensure-db-ready.ps1" -InstallHome "%LAN_EXAM_HOME%"
+if errorlevel 1 exit /b %ERRORLEVEL%
+
 powershell -NoProfile -ExecutionPolicy Bypass -File "%LAN_EXAM_HOME%\scripts\start-node.ps1" -InstallHome "%LAN_EXAM_HOME%"
 exit /b %ERRORLEVEL%

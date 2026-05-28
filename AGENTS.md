@@ -60,7 +60,7 @@ Phase A / B 已落地；真机双机验收仍需在目标环境执行。
   - `/exam/take`
   - `/exam/submitted`
   - `/exam/ended`
-- 客观题与填空题作答会自动保存；填空题每空可上传或粘贴截图（佐证，不参与自动评分）；操作题需上传 `.doc` / `.docx` 作答文件后才能交卷。
+- 客观题与填空题作答会自动保存（2 秒防抖 `PUT /api/student/exam/answers`）；另每约 60 秒（按身份证号抖动）通过 `POST /api/student/exam/sync-progress` 将当前作答全量 reconcile 至服务端（`examSyncGate` FIFO 排队），便于断网/换机续考；填空题每空可上传或粘贴截图（佐证，不参与自动评分，即时上传）；操作题需上传 `.doc` / `.docx` 作答文件后才能交卷。
 - 考试结束后：
   - 已交卷学员进入 submitted / ended 只读视图
   - 未交卷学员进入 ended 提示页，不再允许继续作答
@@ -165,6 +165,7 @@ apps/server/src/
 - 导入模板下载：`lib/templates-dir.ts`；`routes/api/admin/*-template.ts` 从 `templates/` 读取。
 - 填空题截图：`lib/fillin/finalize-screenshots.ts`、`build-screenshots-zip.ts`、`screenshot-export-name.ts`；上传校验 `lib/upload/image-file.ts`（`MAX_FILLIN_SCREENSHOT_BYTES`，每空最多 5 张）；学员 API `routes/api/student/exam-fillin-screenshots.ts`；考官导出 `routes/api/admin/exams-export-fillin-screenshots.ts`。
 - 清除全部数据：`lib/admin/clear-teacher-data.ts` + `routes/api/admin/settings.ts`。
+- 考中进度同步：`lib/exam/persist-answer-drafts.ts`、`routes/api/student/exam-sync-progress.ts`（`examSyncGate`）；交互保存仍走 `exam-answers.ts`。
 - 学员状态流转重点看：
   - `routes/api/student/exam-status.ts`
   - `lib/exam/student-ended-summary.ts`

@@ -50,15 +50,32 @@ if ($requiredXlsx.Count -lt 3) {
 Write-Host '[verify] required files OK'
 
 $prismaCli = Join-Path $bundle 'node_modules\prisma\build\index.js'
-Push-Location $bundle
-& node $prismaCli -v | Out-Host
-Pop-Location
-if ($LASTEXITCODE -ne 0) { throw 'prisma CLI check failed' }
-Write-Host '[verify] prisma CLI OK'
+$enginesInPnpm = Get-ChildItem (Join-Path $bundle 'node_modules\.pnpm') -Directory -Filter '@prisma+engines@*' -ErrorAction SilentlyContinue | Select-Object -First 1
+if (-not $enginesInPnpm) {
+    throw 'Missing @prisma/engines in server-bundle (prisma CLI needs it for install.bat)'
+}
+$enginesRoot = Join-Path $enginesInPnpm.FullName 'node_modules\@prisma\engines'
+$schemaEnginePath = Join-Path $enginesRoot 'schema-engine-windows.exe'
+if (-not (Test-Path $schemaEnginePath)) {
+    $schemaEngine = Get-ChildItem (Join-Path $bundle 'node_modules\.pnpm') -Recurse -Filter 'schema-engine-windows.exe' -ErrorAction SilentlyContinue | Select-Object -First 1
+    if (-not $schemaEngine) {
+        throw 'Missing schema-engine-windows.exe (run package on a machine with network so build-release can prefetch engines)'
+    }
+}
+Write-Host '[verify] prisma CLI + engines on disk OK (offline check, no network)'
 
-$env:NODE_PATH = Join-Path $bundle 'node_modules'
-& node -e "import('@prisma/client').then(()=>console.log('[verify] @prisma/client OK')).catch(e=>{console.error(e);process.exit(1)})"
+$bundleNodeModules = Join-Path $bundle 'node_modules'
+$pnpmNodeModules = Join-Path $bundleNodeModules '.pnpm\node_modules'
+$nodePathParts = @($bundleNodeModules)
+if (Test-Path $pnpmNodeModules) { $nodePathParts += $pnpmNodeModules }
+$env:NODE_PATH = $nodePathParts -join [IO.Path]::PathSeparator
+$prevEap = $ErrorActionPreference
+$ErrorActionPreference = 'Continue'
+& node -e "import('@prisma/client').then(()=>console.log('[verify] @prisma/client OK')).catch(e=>{console.error(e);process.exit(1)})" 2>&1 | Out-Host
 if ($LASTEXITCODE -ne 0) { throw '@prisma/client import failed' }
+& node -e "try { require('archiver'); console.log('[verify] archiver OK') } catch(e) { console.error(e); process.exit(1) }" 2>&1 | Out-Host
+if ($LASTEXITCODE -ne 0) { throw 'archiver import failed (check NODE_PATH / pnpm bundle)' }
+$ErrorActionPreference = $prevEap
 
 if ($TestWithDockerDb) {
     $dbUrl = 'postgresql://lan_exam:lan_exam_dev@127.0.0.1:5434/lan_exam'

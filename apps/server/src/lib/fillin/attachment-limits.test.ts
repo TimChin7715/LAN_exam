@@ -1,8 +1,10 @@
-import { describe, expect, it } from 'vitest';
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 
 import {
   assertFillInAttachmentsWithinLimits,
   MAX_FILLIN_ATTACHMENTS_TOTAL_BYTES,
+  MAX_FILLIN_ATTACHMENTS_TOTAL_LABEL,
   MAX_FILLIN_BATCH_ATTACHMENTS,
 } from './attachment-limits.js';
 
@@ -12,9 +14,9 @@ describe('assertFillInAttachmentsWithinLimits', () => {
       buffer: Buffer.alloc(1),
     }));
     const result = assertFillInAttachmentsWithinLimits(files);
-    expect(result.ok).toBe(false);
+    assert.equal(result.ok, false);
     if (!result.ok) {
-      expect(result.message).toContain('10');
+      assert.ok(result.message.includes('10'));
     }
   });
 
@@ -23,18 +25,19 @@ describe('assertFillInAttachmentsWithinLimits', () => {
       { buffer: Buffer.alloc(MAX_FILLIN_ATTACHMENTS_TOTAL_BYTES) },
       { buffer: Buffer.alloc(1) },
     ]);
-    expect(result.ok).toBe(false);
+    assert.equal(result.ok, false);
     if (!result.ok) {
-      expect(result.message).toContain('50MB');
+      assert.ok(result.message.includes(MAX_FILLIN_ATTACHMENTS_TOTAL_LABEL));
     }
   });
 
   it('accepts within limits', () => {
-    expect(
+    assert.equal(
       assertFillInAttachmentsWithinLimits([
         { buffer: Buffer.alloc(1024) },
         { buffer: Buffer.alloc(2048) },
       ]).ok,
-    ).toBe(true);
+      true,
+    );
   });
 });

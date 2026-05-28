@@ -22,7 +22,7 @@ if exist "%LAN_EXAM_HOME%\data\pg\PG_VERSION" (
   ) else (
     set "PG_BIN=%LAN_EXAM_HOME%\runtime\postgres\bin"
     set "PGDATA=%LAN_EXAM_HOME%\data\pg"
-    "%PG_BIN%\pg_ctl.exe" -D "%PGDATA%" -w -t 60 stop fast >nul 2>&1
+    "%PG_BIN%\pg_ctl.exe" -D "%PGDATA%" -w -t 60 stop -m fast >nul 2>&1
     if errorlevel 1 set "STOP_ERR=1"
   )
 )

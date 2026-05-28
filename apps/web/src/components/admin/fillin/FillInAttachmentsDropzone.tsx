@@ -8,7 +8,8 @@ import {
 } from '@/lib/fillin';
 import { FILLIN_ATTACHMENT_ACCEPT } from '@/lib/upload-formats';
 
-export const MAX_FILLIN_ATTACHMENTS_TOTAL_MB = 50;
+export const MAX_FILLIN_ATTACHMENTS_TOTAL_BYTES = 1024 * 1024 * 1024;
+export const MAX_FILLIN_ATTACHMENTS_TOTAL_LABEL = '1GB';
 
 type FillInAttachmentsDropzoneProps = {
   files: File[];
@@ -44,8 +45,8 @@ export function validateFillInAttachmentFiles(
     return `最多选择 ${MAX_FILLIN_BATCH_ATTACHMENTS} 个附件`;
   }
   const total = totalBytes(files);
-  if (total > MAX_FILLIN_ATTACHMENTS_TOTAL_MB * 1024 * 1024) {
-    return `附件总大小不能超过 ${MAX_FILLIN_ATTACHMENTS_TOTAL_MB}MB`;
+  if (total > MAX_FILLIN_ATTACHMENTS_TOTAL_BYTES) {
+    return `附件总大小不能超过 ${MAX_FILLIN_ATTACHMENTS_TOTAL_LABEL}`;
   }
   for (const file of files) {
     const msg = validateFillInAttachmentFile(file);
@@ -120,8 +121,8 @@ export function FillInAttachmentsDropzone({
         </p>
         <p className="text-center text-sm text-muted-foreground">
           支持 .xls / .xlsx / .csv 或 .zip / .rar / .7z / .tar.gz / .tgz / .gz，选填；最多{' '}
-          {MAX_FILLIN_BATCH_ATTACHMENTS} 个，合计不超过 {MAX_FILLIN_ATTACHMENTS_TOTAL_MB}
-          MB；多个附件时学员端打包 ZIP 下载，仅一个压缩包时直接下载该文件
+          {MAX_FILLIN_BATCH_ATTACHMENTS} 个，合计不超过 {MAX_FILLIN_ATTACHMENTS_TOTAL_LABEL}
+          ；多个附件时学员端打包 ZIP 下载，仅一个压缩包时直接下载该文件
         </p>
         {files.length > 0 && files.length < MAX_FILLIN_BATCH_ATTACHMENTS ? (
           <Button

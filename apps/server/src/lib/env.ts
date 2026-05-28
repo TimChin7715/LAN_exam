@@ -86,6 +86,22 @@ export function getExamSubmitMaxQueue(): number {
   );
 }
 
+export function getExamSyncMaxConcurrent(): number {
+  return parsePositiveInt(
+    process.env.EXAM_SYNC_MAX_CONCURRENT,
+    8,
+    'EXAM_SYNC_MAX_CONCURRENT',
+  );
+}
+
+export function getExamSyncMaxQueue(): number {
+  return parseNonNegativeInt(
+    process.env.EXAM_SYNC_MAX_QUEUE,
+    256,
+    'EXAM_SYNC_MAX_QUEUE',
+  );
+}
+
 export function getSessionPgPoolMax(): number {
   return parsePositiveInt(
     process.env.SESSION_PG_POOL_MAX,

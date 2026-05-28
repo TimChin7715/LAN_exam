@@ -47,6 +47,7 @@ import {
   type ExamSeatBoard,
   type SubmissionListItem,
 } from '@/lib/exam';
+import { RosterListSection } from '@/components/admin/roster/RosterListSection';
 import { ExamSeatBoardPanel } from '@/components/exam/ExamSeatBoardPanel';
 import { fetchAdminSettings } from '@/lib/admin-settings';
 import { ApiError } from '@/lib/api';
@@ -95,6 +96,29 @@ export default function AdminExamDetail() {
       /* 轮询失败不打扰考官 */
     }
   }, [examId]);
+
+  const reloadSeats = useCallback(async () => {
+    if (!examId || !showSeatBoard) return;
+    setSeatsLoading(true);
+    setSeatsError(null);
+    try {
+      const board = await fetchExamSeats(examId);
+      setSeatBoard(board);
+    } catch (err) {
+      handleExamApiError(err, '无法加载考生座位信息。');
+      setSeatsError('无法加载考生座位信息。');
+    } finally {
+      setSeatsLoading(false);
+    }
+  }, [examId, showSeatBoard]);
+
+  const handleRosterEntriesChanged = useCallback(() => {
+    void load();
+    void refreshSubmissions();
+    if (showSeatBoard) {
+      void reloadSeats();
+    }
+  }, [load, refreshSubmissions, reloadSeats, showSeatBoard]);
 
   useEffect(() => {
     void load();
@@ -166,26 +190,8 @@ export default function AdminExamDetail() {
       setSeatsLoading(false);
       return;
     }
-    let cancelled = false;
-    (async () => {
-      setSeatsLoading(true);
-      setSeatsError(null);
-      try {
-        const board = await fetchExamSeats(examId);
-        if (!cancelled) setSeatBoard(board);
-      } catch (err) {
-        if (!cancelled) {
-          handleExamApiError(err, '无法加载考生座位信息。');
-          setSeatsError('无法加载考生座位信息。');
-        }
-      } finally {
-        if (!cancelled) setSeatsLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [examId, showSeatBoard]);
+    void reloadSeats();
+  }, [examId, showSeatBoard, reloadSeats]);
 
   async function handleStart() {
     if (!examId) return;
@@ -420,6 +426,13 @@ export default function AdminExamDetail() {
           </CardContent>
         </Card>
       ) : null}
+
+      <RosterListSection
+        batchId={exam.rosterBatch.id}
+        title="当次考试名单"
+        readOnly={exam.status === 'ENDED'}
+        onEntriesChanged={handleRosterEntriesChanged}
+      />
 
       <Card>
         <CardHeader>

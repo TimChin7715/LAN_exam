@@ -27,10 +27,20 @@ if (-not $OutDir) {
     $OutDir = Join-Path $root 'dist\lan-exam-win'
 }
 
+$releaseVersion = & (Join-Path $PSScriptRoot 'get-release-version.ps1') -Root $root
+Write-Host "==> LAN Exam package v$releaseVersion started at $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
+Write-Host '    Stages: build-release -> fetch-runtimes -> tray -> verify -> Inno (Inno may take 15-30 min with little output)'
+
+& (Join-Path $PSScriptRoot 'validate-install-scripts.ps1')
+
+Write-Host "==> [1/5] build-release $(Get-Date -Format HH:mm:ss)"
 & (Join-Path $PSScriptRoot 'build-release.ps1') -OutDir $OutDir
+Write-Host "==> [2/5] fetch-runtimes $(Get-Date -Format HH:mm:ss)"
 & (Join-Path $PSScriptRoot 'fetch-runtimes.ps1') -OutDir $OutDir
+Write-Host "==> [3/5] build-tray $(Get-Date -Format HH:mm:ss)"
 & (Join-Path $PSScriptRoot 'build-tray.ps1') -OutDir $OutDir -SkipIfMissingDotnet
 
+Write-Host "==> [4/5] verify-package $(Get-Date -Format HH:mm:ss)"
 & (Join-Path $PSScriptRoot 'verify-package.ps1') -OutDir $OutDir
 
 $iss = Join-Path $root 'inno-setup\LAN-Exam.iss'
@@ -41,7 +51,7 @@ if (-not (Test-Path $InnoSetupCompiler)) {
     exit 0
 }
 
-$releaseVersion = & (Join-Path $PSScriptRoot 'get-release-version.ps1') -Root $root
+Write-Host "==> [5/5] Inno Setup compress $(Get-Date -Format HH:mm:ss) (please wait, often 15-30 min)"
 $appVersionFull = if ($releaseVersion -match '^\d+\.\d+\.\d+\.\d+$') {
     $releaseVersion
 } else {

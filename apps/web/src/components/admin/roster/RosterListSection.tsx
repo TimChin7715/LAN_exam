@@ -48,12 +48,14 @@ function formatImportedAt(iso: string): string {
 type RosterListSectionProps = {
   batchId: string;
   title?: string;
+  readOnly?: boolean;
   onEntriesChanged?: () => void;
 };
 
 export function RosterListSection({
   batchId,
   title = '考生列表',
+  readOnly = false,
   onEntriesChanged,
 }: RosterListSectionProps) {
   const [items, setItems] = useState<RosterListItem[]>([]);
@@ -196,11 +198,18 @@ export function RosterListSection({
       <Card>
         <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <CardTitle className="text-sm font-semibold">{title}</CardTitle>
-          <Button type="button" className="min-h-11 w-full sm:w-auto" onClick={openCreate}>
-            添加考生
-          </Button>
+          {!readOnly ? (
+            <Button type="button" className="min-h-11 w-full sm:w-auto" onClick={openCreate}>
+              添加考生
+            </Button>
+          ) : null}
         </CardHeader>
         <CardContent className="space-y-4">
+          {readOnly ? (
+            <Alert>
+              <AlertDescription>考试已结束，名单仅可查看。</AlertDescription>
+            </Alert>
+          ) : null}
           <form
             className="flex flex-col gap-2 sm:flex-row sm:items-center"
             onSubmit={handleSearch}
@@ -256,7 +265,9 @@ export function RosterListSection({
               <Users className="size-10 text-muted-foreground" aria-hidden />
               <h3 className="text-xl font-semibold text-foreground">暂无考生</h3>
               <p className="max-w-md text-base text-muted-foreground">
-                可点击「添加考生」手动录入，或返回重新导入 Excel。
+                {readOnly
+                  ? '本场考试名单为空。'
+                  : '可点击「添加考生」手动录入，或返回重新导入 Excel。'}
               </p>
             </div>
           ) : isEmpty && hasQuery ? (
@@ -276,9 +287,11 @@ export function RosterListSection({
                       <TableHead scope="col">单位</TableHead>
                       <TableHead scope="col">身份证号</TableHead>
                       <TableHead scope="col">导入时间</TableHead>
-                      <TableHead scope="col" className="w-32">
-                        操作
-                      </TableHead>
+                      {!readOnly ? (
+                        <TableHead scope="col" className="w-32">
+                          操作
+                        </TableHead>
+                      ) : null}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -290,47 +303,49 @@ export function RosterListSection({
                           {maskNationalId(item.nationalId)}
                         </TableCell>
                         <TableCell>{formatImportedAt(item.createdAt)}</TableCell>
-                        <TableCell>
-                          <div className="flex flex-wrap gap-2">
-                            <Button
-                              type="button"
-                              variant="link"
-                              className="min-h-11 px-0"
-                              onClick={() => openEdit(item)}
-                            >
-                              编辑
-                            </Button>
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button
-                                  type="button"
-                                  variant="link"
-                                  className="min-h-11 px-0 text-destructive"
-                                  disabled={deletingId === item.id}
-                                >
-                                  删除
-                                </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>确认删除考生？</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    将删除「{item.fullName}」的记录。已有答卷的考生无法删除。
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>取消</AlertDialogCancel>
-                                  <AlertDialogAction
-                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                    onClick={() => void handleDelete(item.id)}
+                        {!readOnly ? (
+                          <TableCell>
+                            <div className="flex flex-wrap gap-2">
+                              <Button
+                                type="button"
+                                variant="link"
+                                className="min-h-11 px-0"
+                                onClick={() => openEdit(item)}
+                              >
+                                编辑
+                              </Button>
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button
+                                    type="button"
+                                    variant="link"
+                                    className="min-h-11 px-0 text-destructive"
+                                    disabled={deletingId === item.id}
                                   >
                                     删除
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
-                          </div>
-                        </TableCell>
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>确认删除考生？</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      将删除「{item.fullName}」的记录。已有答卷的考生无法删除。
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>取消</AlertDialogCancel>
+                                    <AlertDialogAction
+                                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                      onClick={() => void handleDelete(item.id)}
+                                    >
+                                      删除
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            </div>
+                          </TableCell>
+                        ) : null}
                       </TableRow>
                     ))}
                   </TableBody>

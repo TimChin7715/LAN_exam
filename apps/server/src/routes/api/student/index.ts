@@ -7,6 +7,7 @@ import { registerStudentExamPaperRoutes } from './exam-paper.js';
 import { registerStudentExamPracticalRoutes } from './exam-practical.js';
 import { registerStudentExamStatusRoutes } from './exam-status.js';
 import { registerStudentExamSubmitRoutes } from './exam-submit.js';
+import { registerStudentExamSyncProgressRoutes } from './exam-sync-progress.js';
 import { registerStudentExamSubmissionRoutes } from './exam-submission.js';
 import { registerStudentLogoutRoutes } from './logout.js';
 import { registerStudentMeRoutes } from './me.js';
@@ -27,6 +28,7 @@ export async function registerStudentRoutes(
   await registerStudentExamFillInScreenshotRoutes(app);
   await registerStudentExamPracticalRoutes(app);
   await registerStudentExamAnswersRoutes(app);
+  await registerStudentExamSyncProgressRoutes(app);
   await registerStudentExamSubmitRoutes(app);
   await registerStudentExamSubmissionRoutes(app);
   await registerStudentLogoutRoutes(app);
