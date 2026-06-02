@@ -37,6 +37,8 @@ export const REQUIRED_HEADERS = ['姓名', '单位', '身份证号'] as const;
 
 export const MAX_ORGANIZATION_LENGTH = 100;
 
+export const MAX_NATIONAL_ID_LENGTH = 32;
+
 export const MAX_ROSTER_IMPORT_ROWS = 2000;
 
 export const SHEET_NAME = '名单导入';

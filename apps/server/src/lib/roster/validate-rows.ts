@@ -1,4 +1,4 @@
-import { isValidNationalIdFormat } from './national-id.js';
+import { validateRosterNationalId } from './national-id.js';
 import {
   MAX_ORGANIZATION_LENGTH,
   type ParsedRosterEntry,
@@ -41,17 +41,12 @@ function validateRow(row: RawRosterRow): {
     });
   }
 
-  if (!nationalId) {
+  const nationalIdError = validateRosterNationalId(nationalId);
+  if (nationalIdError) {
     errors.push({
       row: row.rowNumber,
       column: '身份证号',
-      message: '身份证号不能为空',
-    });
-  } else if (!isValidNationalIdFormat(nationalId)) {
-    errors.push({
-      row: row.rowNumber,
-      column: '身份证号',
-      message: '身份证号格式不正确',
+      message: nationalIdError,
     });
   }
 

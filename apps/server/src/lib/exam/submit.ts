@@ -1,6 +1,9 @@
 import type { ExamContentModule, Prisma } from '@prisma/client';
 
-import { assertStudentExamAccess } from './access.js';
+import {
+  assertDeadlineSubmitAccess,
+  assertStudentExamAccess,
+} from './access.js';
 import {
   requiresPracticalBatch,
   requiresQuestionSubmission,
@@ -10,19 +13,32 @@ import {
   type ScoreableExamQuestion,
 } from './exam-paper-cache.js';
 import { loadExamPaperStatic } from './load-exam-paper.js';
-import { finalizePracticalSubmission } from './submit-practical.js';
+import {
+  finalizePracticalSubmissionIfDraft,
+} from './submit-practical.js';
 import { finalizeFillInScreenshots } from '../fillin/finalize-screenshots.js';
 import { scoreQuestion } from './score-question.js';
 import { assertAnswersComplete } from './validate-answers-complete.js';
 import { SubmitExamError } from './types.js';
 import { prisma } from '../prisma.js';
 
+export type SubmitMode = 'strict' | 'deadline';
+
 export async function submitExam(
-  input: { examId: string; rosterEntryId: string },
+  input: {
+    examId: string;
+    rosterEntryId: string;
+    mode?: SubmitMode;
+  },
 ): Promise<{ totalScore: number | null; submittedAt: Date }> {
   const { examId, rosterEntryId } = input;
+  const mode = input.mode ?? 'strict';
 
-  await assertStudentExamAccess(rosterEntryId, examId, 'submit');
+  if (mode === 'strict') {
+    await assertStudentExamAccess(rosterEntryId, examId, 'submit');
+  } else {
+    await assertDeadlineSubmitAccess(rosterEntryId, examId);
+  }
 
   const exam = await prisma.exam.findUnique({
     where: { id: examId },
@@ -74,13 +90,17 @@ export async function submitExam(
           tx,
           examId,
           rosterEntryId,
+          mode,
         );
         totalScore = result.totalScore;
         submittedAt = result.submittedAt;
       }
 
       if (requiresPracticalBatch(modules)) {
-        await finalizePracticalSubmission(tx, { examId, rosterEntryId });
+        await finalizePracticalSubmissionIfDraft(tx, {
+          examId,
+          rosterEntryId,
+        });
         if (totalScore === null) {
           submittedAt = new Date();
         }
@@ -92,9 +112,10 @@ export async function submitExam(
   );
 }
 
-function scoreFromCachedQuestions(
+export function scoreQuestionsFromDrafts(
   scoreable: ScoreableExamQuestion[],
   draftByQuestionId: Map<string, string>,
+  options: { requireComplete: boolean },
 ): {
   totalScore: number;
   answerCreates: {
@@ -104,11 +125,13 @@ function scoreFromCachedQuestions(
     pointsAwarded: number;
   }[];
 } {
-  const questionsForCheck = scoreable.map((q) => ({
-    id: q.examQuestionId,
-    question: { type: q.type },
-  }));
-  assertAnswersComplete(questionsForCheck, draftByQuestionId);
+  if (options.requireComplete) {
+    const questionsForCheck = scoreable.map((q) => ({
+      id: q.examQuestionId,
+      question: { type: q.type },
+    }));
+    assertAnswersComplete(questionsForCheck, draftByQuestionId);
+  }
 
   let totalScore = 0;
   const answerCreates: {
@@ -146,7 +169,10 @@ async function submitScoredQuestionsPart(
   tx: Prisma.TransactionClient,
   examId: string,
   rosterEntryId: string,
+  _mode: SubmitMode,
 ): Promise<{ totalScore: number; submittedAt: Date }> {
+  const requireComplete = false;
+
   const drafts = await tx.answerDraft.findMany({
     where: { examId, rosterEntryId },
     select: { examQuestionId: true, selectedKeys: true },
@@ -166,9 +192,10 @@ async function submitScoredQuestionsPart(
   }[];
 
   if (cached && cached.length > 0) {
-    ({ totalScore, answerCreates } = scoreFromCachedQuestions(
+    ({ totalScore, answerCreates } = scoreQuestionsFromDrafts(
       cached,
       draftByQuestionId,
+      { requireComplete },
     ));
   } else {
     const examQuestions = await tx.examQuestion.findMany({
@@ -191,7 +218,9 @@ async function submitScoredQuestionsPart(
       );
     }
 
-    assertAnswersComplete(examQuestions, draftByQuestionId);
+    if (requireComplete) {
+      assertAnswersComplete(examQuestions, draftByQuestionId);
+    }
 
     totalScore = 0;
     answerCreates = [];

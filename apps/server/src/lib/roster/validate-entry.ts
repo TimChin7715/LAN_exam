@@ -1,4 +1,4 @@
-import { isValidNationalIdFormat } from './national-id.js';
+import { validateRosterNationalId } from './national-id.js';
 import { MAX_ORGANIZATION_LENGTH } from './types.js';
 
 export type RosterEntryFieldInput = {
@@ -39,10 +39,9 @@ export function validateRosterEntryFields(
     });
   }
 
-  if (!nationalId) {
-    errors.push({ field: 'nationalId', message: '身份证号不能为空' });
-  } else if (!isValidNationalIdFormat(nationalId)) {
-    errors.push({ field: 'nationalId', message: '身份证号格式不正确' });
+  const nationalIdError = validateRosterNationalId(nationalId);
+  if (nationalIdError) {
+    errors.push({ field: 'nationalId', message: nationalIdError });
   }
 
   if (errors.length > 0) {

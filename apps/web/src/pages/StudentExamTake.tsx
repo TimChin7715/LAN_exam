@@ -24,8 +24,9 @@ import { Spinner } from '@/components/ui/spinner';
 import {
   buildAnswerProgressSummary,
   collectSubmitBlockers,
-  formatSubmitBlockerMessage,
+  formatSubmitConfirmDescription,
 } from '@/lib/exam-submit-validation';
+import { formatExamRemaining } from '@/lib/exam-countdown';
 import { formatStemForDisplay, questionTypeLabel } from '@/lib/qbank';
 import {
   ApiError,
@@ -98,8 +99,11 @@ export default function StudentExamTake() {
   );
   const [progressSyncedAt, setProgressSyncedAt] = useState<string | null>(null);
   const [syncingProgress, setSyncingProgress] = useState(false);
+  const [scheduledEndAt, setScheduledEndAt] = useState<string | null>(null);
+  const [remainingMs, setRemainingMs] = useState<number | null>(null);
   const [submitOpen, setSubmitOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [autoSubmitting, setAutoSubmitting] = useState(false);
   const [logoutOpen, setLogoutOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -112,6 +116,7 @@ export default function StudentExamTake() {
   const syncRetryToastShownRef = useRef(false);
   const isMountedRef = useRef(true);
   const paperRetryToastShownRef = useRef(false);
+  const autoSubmitInFlightRef = useRef(false);
 
   useEffect(() => {
     answersRef.current = answers;
@@ -187,6 +192,7 @@ export default function StudentExamTake() {
       setFillIn(paper.fillIn);
       setPractical(paper.practical);
       setPracticalSubmittedName(null);
+      setScheduledEndAt(paper.scheduledEndAt);
       setAnswers(
         Object.fromEntries(
           paper.items.map((item) => [item.examQuestionId, item.selectedKeys ?? '']),
@@ -406,6 +412,67 @@ export default function StudentExamTake() {
     };
   }, [contentModules, examId, loading, readOnly, runProgressSync]);
 
+  const goToExamSubmitted = useCallback(() => {
+    if (!examId) return;
+    navigate(`/exam/submitted?examId=${encodeURIComponent(examId)}`, {
+      replace: true,
+    });
+  }, [examId, navigate]);
+
+  const performAutoSubmit = useCallback(async () => {
+    if (!examId || readOnly || autoSubmitInFlightRef.current) return;
+    autoSubmitInFlightRef.current = true;
+    setAutoSubmitting(true);
+    toast.message('考试时间已到，正在自动提交试卷…');
+    try {
+      const flushed = await flushDirtyAnswers();
+      if (!flushed) {
+        return;
+      }
+      await studentApi.submitExam(examId);
+      goToExamSubmitted();
+    } catch (err) {
+      if (err instanceof ApiError) {
+        if (err.code === STUDENT_EXAM_ENDED_CODE) {
+          goToExamEnded();
+          return;
+        }
+        if (err.status === 409) {
+          goToExamSubmitted();
+          return;
+        }
+        if (err.code === SERVER_BUSY_CODE) {
+          toast.error(err.message || '交卷排队已满，将稍后重试。');
+        } else {
+          toast.error(err.message || '自动交卷失败，请稍候重试。');
+        }
+      }
+    } finally {
+      autoSubmitInFlightRef.current = false;
+      setAutoSubmitting(false);
+    }
+  }, [examId, flushDirtyAnswers, goToExamEnded, goToExamSubmitted, readOnly]);
+
+  useEffect(() => {
+    if (!scheduledEndAt || readOnly || loading) {
+      setRemainingMs(null);
+      return;
+    }
+
+    const endMs = new Date(scheduledEndAt).getTime();
+    const tick = () => {
+      const left = endMs - Date.now();
+      setRemainingMs(left);
+      if (left <= 0) {
+        void performAutoSubmit();
+      }
+    };
+
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [loading, performAutoSubmit, readOnly, scheduledEndAt]);
+
   useEffect(() => {
     if (!examId || readOnly || loading) return;
 
@@ -415,6 +482,10 @@ export default function StudentExamTake() {
       if (document.hidden) return;
       try {
         const status = await studentApi.examStatus();
+        if (status.status === 'DEADLINE_REACHED' && status.examId === examId) {
+          void performAutoSubmit();
+          return;
+        }
         if (status.status === 'ENDED' && status.examId === examId) {
           goToExamEnded();
         }
@@ -457,7 +528,15 @@ export default function StudentExamTake() {
       stopPolling();
       document.removeEventListener('visibilitychange', onVisibility);
     };
-  }, [examId, flushDirtyAnswers, goToExamEnded, loading, readOnly, runProgressSync]);
+  }, [
+    examId,
+    flushDirtyAnswers,
+    goToExamEnded,
+    loading,
+    performAutoSubmit,
+    readOnly,
+    runProgressSync,
+  ]);
 
   const scheduleSave = useCallback(() => {
     if (readOnly || !examId) return;
@@ -495,13 +574,6 @@ export default function StudentExamTake() {
     [items],
   );
 
-  const goToExamSubmitted = useCallback(() => {
-    if (!examId) return;
-    navigate(`/exam/submitted?examId=${encodeURIComponent(examId)}`, {
-      replace: true,
-    });
-  }, [examId, navigate]);
-
   async function handleLogout() {
     setLoggingOut(true);
     try {
@@ -524,17 +596,6 @@ export default function StudentExamTake() {
       return;
     }
 
-    const blockers = collectSubmitBlockers({
-      items,
-      answers,
-      contentModules,
-      practical,
-    });
-    if (!blockers.canSubmit) {
-      toast.error(formatSubmitBlockerMessage(blockers));
-      return;
-    }
-
     setSubmitOpen(true);
   }
 
@@ -548,18 +609,6 @@ export default function StudentExamTake() {
         return;
       }
 
-      const blockers = collectSubmitBlockers({
-        items,
-        answers,
-        contentModules,
-        practical,
-      });
-      if (!blockers.canSubmit) {
-        setSubmitOpen(false);
-        toast.error(formatSubmitBlockerMessage(blockers));
-        return;
-      }
-
       await studentApi.submitExam(examId);
       setSubmitOpen(false);
       goToExamSubmitted();
@@ -567,10 +616,6 @@ export default function StudentExamTake() {
       if (err instanceof ApiError) {
         if (err.code === STUDENT_EXAM_ENDED_CODE) {
           goToExamEnded();
-          return;
-        }
-        if (err.code === 'INCOMPLETE_ANSWERS') {
-          toast.error(err.message || '尚有题目未作答，请完成后再提交。');
           return;
         }
         if (err.status === 409) {
@@ -614,6 +659,22 @@ export default function StudentExamTake() {
         practical,
       }),
     [items, answers, contentModules, practical],
+  );
+
+  const submitBlockers = useMemo(
+    () =>
+      collectSubmitBlockers({
+        items,
+        answers,
+        contentModules,
+        practical,
+      }),
+    [items, answers, contentModules, practical],
+  );
+
+  const submitConfirmDescription = useMemo(
+    () => formatSubmitConfirmDescription(submitBlockers),
+    [submitBlockers],
   );
 
   if (!examId) {
@@ -697,6 +758,24 @@ export default function StudentExamTake() {
             {hasPracticalModule
               ? ' 操作题文件已提交，等待阅卷。'
               : ''}
+          </AlertDescription>
+        </Alert>
+      ) : null}
+
+      {scheduledEndAt && remainingMs !== null && !readOnly ? (
+        <Alert>
+          <AlertDescription>
+            {remainingMs > 0 ? (
+              <>
+                距离考试结束还剩{' '}
+                <span className="font-mono font-semibold tabular-nums text-foreground">
+                  {formatExamRemaining(remainingMs)}
+                </span>
+                ，到点将自动提交试卷。
+              </>
+            ) : (
+              '考试时间已到，正在自动提交试卷…'
+            )}
           </AlertDescription>
         </Alert>
       ) : null}
@@ -868,19 +947,17 @@ export default function StudentExamTake() {
               type="button"
               className="w-full"
               size="lg"
+              disabled={submitting || autoSubmitting}
               onClick={() => void tryOpenSubmitDialog()}
             >
-              提交试卷
+              {autoSubmitting ? '正在自动交卷…' : '提交试卷'}
             </Button>
             <AlertDialog open={submitOpen} onOpenChange={setSubmitOpen}>
               <AlertDialogContent>
                 <AlertDialogHeader>
                   <AlertDialogTitle>确认提交？</AlertDialogTitle>
                   <AlertDialogDescription>
-                    提交后将无法修改答案。
-                    {needsPractical(contentModules)
-                      ? ' 请确认已上传操作题作答文档。'
-                      : ' 请确认已全部作答。'}
+                    {submitConfirmDescription}
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -891,7 +968,9 @@ export default function StudentExamTake() {
                   >
                     {submitting
                       ? '交卷处理中，请勿关闭页面…'
-                      : '确认提交'}
+                      : submitBlockers.canSubmit
+                        ? '确认提交'
+                        : '仍要提交'}
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>

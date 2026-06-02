@@ -24,14 +24,14 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { ExamSeatBoardPanel } from '@/components/exam/ExamSeatBoardPanel';
-import { isValidNationalIdFormat } from '@/lib/national-id';
 import {
   ApiError,
   fetchStudentConfig,
   STUDENT_AUTH_ERROR_MESSAGE,
-  STUDENT_ID_FORMAT_ERROR_MESSAGE,
   studentApi,
 } from '@/lib/student';
+
+const MAX_NATIONAL_ID_LENGTH = 32;
 
 const loginSchema = z.object({
   fullName: z.string().trim().min(1, '请输入姓名'),
@@ -39,7 +39,7 @@ const loginSchema = z.object({
     .string()
     .trim()
     .min(1, '请输入身份证号')
-    .max(18, '身份证号应为 18 位'),
+    .max(MAX_NATIONAL_ID_LENGTH, `身份证号不得超过 ${MAX_NATIONAL_ID_LENGTH} 个字符`),
 });
 
 type LoginValues = z.infer<typeof loginSchema>;
@@ -75,11 +75,6 @@ export default function StudentLogin() {
     setFormError(null);
     const fullName = values.fullName.trim();
     const nationalId = values.nationalId.trim();
-
-    if (!isValidNationalIdFormat(nationalId)) {
-      setFormError(STUDENT_ID_FORMAT_ERROR_MESSAGE);
-      return;
-    }
 
     try {
       await studentApi.verify(fullName, nationalId);

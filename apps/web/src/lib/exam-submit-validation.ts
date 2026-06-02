@@ -215,3 +215,14 @@ export function formatSubmitBlockerMessage(blockers: SubmitBlockers): string {
   }
   return `${parts.join('；')}。请完成后再提交。`;
 }
+
+export function formatSubmitConfirmDescription(blockers: SubmitBlockers): string {
+  if (blockers.canSubmit) {
+    return '提交后将无法修改答案。';
+  }
+  const warning = formatSubmitBlockerMessage(blockers).replace(
+    /。请完成后再提交。$/,
+    '',
+  );
+  return `${warning}。是否仍要提交？`;
+}

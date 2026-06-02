@@ -54,3 +54,55 @@ export async function finalizePracticalSubmission(
     },
   });
 }
+
+/** Deadline / admin-end batch submit: skip when no upload draft exists. */
+export async function finalizePracticalSubmissionIfDraft(
+  tx: Prisma.TransactionClient,
+  input: { examId: string; rosterEntryId: string },
+): Promise<boolean> {
+  const draft = await tx.practicalAnswerDraft.findUnique({
+    where: {
+      examId_rosterEntryId: {
+        examId: input.examId,
+        rosterEntryId: input.rosterEntryId,
+      },
+    },
+  });
+
+  if (!draft) {
+    return false;
+  }
+
+  const existing = await tx.practicalSubmission.findUnique({
+    where: {
+      examId_rosterEntryId: {
+        examId: input.examId,
+        rosterEntryId: input.rosterEntryId,
+      },
+    },
+  });
+
+  if (existing) {
+    return true;
+  }
+
+  await tx.practicalSubmission.create({
+    data: {
+      examId: input.examId,
+      rosterEntryId: input.rosterEntryId,
+      docxStorageKey: draft.docxStorageKey,
+      docxFileName: draft.docxFileName,
+    },
+  });
+
+  await tx.practicalAnswerDraft.delete({
+    where: {
+      examId_rosterEntryId: {
+        examId: input.examId,
+        rosterEntryId: input.rosterEntryId,
+      },
+    },
+  });
+
+  return true;
+}

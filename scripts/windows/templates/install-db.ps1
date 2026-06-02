@@ -8,15 +8,53 @@ $ErrorActionPreference = 'Stop'
 $InstallHome = $InstallHome.TrimEnd('\')
 $env:LAN_EXAM_HOME = $InstallHome
 
+. (Join-Path $PSScriptRoot 'install-log.ps1')
+$ctx = Initialize-InstallLogging -InstallHome $InstallHome -ScriptName 'install-db' -InvokeSource $InvokeSource
+
 $node = Join-Path $InstallHome 'runtime\node\node.exe'
 $pgBin = Join-Path $InstallHome 'runtime\postgres\bin'
 $pgData = Join-Path $InstallHome 'data\pg'
-$logDir = Join-Path $InstallHome 'logs'
+$logDir = $ctx.Paths.LogDir
 $app = Join-Path $InstallHome 'app'
 $envFile = Join-Path $InstallHome '.env'
-$installLog = Join-Path $logDir 'install.log'
+$installLog = $ctx.Paths.InstallLog
 $debugLog = Join-Path $logDir 'debug-57b789.log'
 $completeMarker = Join-Path $InstallHome 'data\.install-db-complete'
+$installDbLockPath = Join-Path $InstallHome 'data\.install-db.lock'
+$script:InstallDbLockStream = $null
+
+function Enter-InstallDbLock {
+    $lockDir = Split-Path $installDbLockPath -Parent
+    if (-not (Test-Path $lockDir)) {
+        New-Item -ItemType Directory -Path $lockDir -Force | Out-Null
+    }
+    $deadline = (Get-Date).AddSeconds(120)
+    while ((Get-Date) -lt $deadline) {
+        try {
+            $script:InstallDbLockStream = [System.IO.File]::Open(
+                $installDbLockPath,
+                [System.IO.FileMode]::OpenOrCreate,
+                [System.IO.FileAccess]::ReadWrite,
+                [System.IO.FileShare]::None)
+            Write-InstallLogLine -Context $ctx -Level 'INFO' -Message 'acquired install-db lock'
+            return
+        }
+        catch {
+            Start-Sleep -Milliseconds 500
+        }
+    }
+    throw 'Another install-db.ps1 is already running (waited 120s). Close other installers or stop duplicate PowerShell install scripts.'
+}
+
+function Exit-InstallDbLock {
+    if ($null -eq $script:InstallDbLockStream) { return }
+    try {
+        $script:InstallDbLockStream.Close()
+        $script:InstallDbLockStream.Dispose()
+    }
+    catch { }
+    $script:InstallDbLockStream = $null
+}
 
 #region agent log
 function Write-DebugNdjson {
@@ -38,9 +76,21 @@ function Write-InstallLog {
     param([string]$Path, [object]$Output)
     if ($null -eq $Output) { return }
     $text = (@($Output) | ForEach-Object { "$_" }) -join [Environment]::NewLine
-    if (-not $text) { return }
-    $utf8NoBom = [System.Text.UTF8Encoding]::new($false)
-    [System.IO.File]::AppendAllText($Path, $text + [Environment]::NewLine, $utf8NoBom)
+    if (-not $text.Trim()) { return }
+    if ($Path -eq $ctx.Paths.InstallLog) {
+        foreach ($line in ($text -split "`r?`n")) {
+            $msg = $line.Trim()
+            if (-not $msg) { continue }
+            if ($msg -match '^\[install-db\]\s*(.+)$') { $msg = $matches[1] }
+            $level = 'INFO'
+            if ($msg -match 'FATAL|failed \(exit') { $level = 'ERROR' }
+            elseif ($msg -match 'WARNING') { $level = 'WARN' }
+            elseif ($msg -match 'install completed|start-node OK|database setup completed') { $level = 'OK' }
+            Write-InstallLogLine -Context $ctx -Level $level -Message $msg
+        }
+        return
+    }
+    [System.IO.File]::AppendAllText($Path, $text + [Environment]::NewLine, $ctx.Utf8NoBom)
 }
 
 function Get-ListenerPidsOnPort {
@@ -108,6 +158,10 @@ function Clear-InstallPorts {
     Write-Host 'install-db: Releasing ports 5180 / 5434 for install...'
     Write-InstallLog -Path $installLog -Output 'install-db: clear ports 5180,5434'
     Clear-PortForInstall -Port 5180
+    if (Test-PostgresPortListening) {
+        Write-InstallLogLine -Context $ctx -Level 'OK' -Message 'Postgres already accepting connections — skip stop-postgres'
+        return
+    }
     $stopPg = Join-Path $InstallHome 'scripts\stop-postgres.ps1'
     if (Test-Path $stopPg) {
         Write-Host 'install-db: Stopping existing LAN Exam Postgres (if any)...'
@@ -117,29 +171,61 @@ function Clear-InstallPorts {
     Clear-PortForInstall -Port 5434
 }
 
+function Test-PostgresPortListening {
+    return Test-PostgresIsReady -InstallHome $InstallHome
+}
+
+function Remove-StalePostmasterPid {
+    $pidFile = Join-Path $pgData 'postmaster.pid'
+    if (-not (Test-Path $pidFile)) { return }
+    if (Test-PostgresPortListening) { return }
+    Write-InstallLogLine -Context $ctx -Level 'WARN' -Message "removing stale postmaster.pid (no listener on 5434): $pidFile"
+    Remove-Item -LiteralPath $pidFile -Force -ErrorAction SilentlyContinue
+}
+
+function Write-PostgresLogTail {
+    param([int]$Lines = 30)
+    $pgLog = Join-Path $logDir 'postgres.log'
+    if (-not (Test-Path $pgLog)) { return }
+    $tail = Get-Content $pgLog -Tail $Lines -ErrorAction SilentlyContinue
+    Write-InstallLogOutput -Context $ctx -Label 'postgres.log tail' -Output $tail
+}
+
 function Start-PostgresIfNeeded {
-    $listening = netstat -ano | Select-String '127.0.0.1:5434' | Select-String 'LISTENING'
-    if ($listening) { return }
+    if (Test-PostgresPortListening) {
+        Write-InstallLogLine -Context $ctx -Level 'OK' -Message 'Postgres already accepting connections on 127.0.0.1:5434 (skip pg_ctl)'
+        return
+    }
 
     if (-not (Test-Path (Join-Path $pgData 'PG_VERSION'))) {
         throw 'Postgres data not initialized. initdb should have run first.'
     }
 
+    Remove-StalePostmasterPid
+
     Write-Host '[install-db] Starting Postgres on 127.0.0.1:5434...'
-    Write-InstallLog -Path $installLog -Output '[install-db] pg_ctl start'
+    Write-InstallLogLine -Context $ctx -Level 'STEP' -Message 'pg_ctl start (-Wait, server log via -l)'
     $pgCtl = Join-Path $pgBin 'pg_ctl.exe'
     $pgLog = Join-Path $logDir 'postgres.log'
-    $prevEap = $ErrorActionPreference
-    $ErrorActionPreference = 'Continue'
-    $pgStartOut = & $pgCtl -D $pgData -l $pgLog -o '-p 5434 -h 127.0.0.1' start 2>&1
-    $pgExit = $LASTEXITCODE
-    $ErrorActionPreference = $prevEap
-    Write-InstallLog -Path $installLog -Output $pgStartOut
-    $pgText = (@($pgStartOut) | Out-String)
-    if ($pgExit -ne 0 -and $pgText -notmatch 'already running|可能正在运行|already started|another server') {
+    $pgStartLog = Join-Path $logDir 'pg_ctl-start.log'
+    # Use -Wait (no PowerShell 2>&1 pipe). pg_ctl writes server output to -l $pgLog.
+    $pgProc = Start-Process -FilePath $pgCtl -ArgumentList @(
+        '-D', $pgData,
+        '-l', $pgLog,
+        '-o', '-p 5434 -h 127.0.0.1',
+        '-w',
+        'start'
+    ) -WindowStyle Hidden -PassThru -Wait
+    if (Test-Path $pgStartLog) { Remove-Item $pgStartLog -Force -ErrorAction SilentlyContinue }
+    $pgExit = if ($null -ne $pgProc) { $pgProc.ExitCode } else { -1 }
+    Write-InstallLogLine -Context $ctx -Level 'INFO' -Message "pg_ctl start exit=$pgExit"
+    if ($pgExit -ne 0 -and -not (Test-PostgresPortListening)) {
+        Write-PostgresLogTail
         throw "pg_ctl start failed (exit $pgExit). See $pgLog and $installLog"
     }
+
     Wait-PostgresReady
+    Write-InstallLogLine -Context $ctx -Level 'OK' -Message 'Postgres ready on 127.0.0.1:5434'
 }
 
 function Ensure-PrismaBundleLinks {
@@ -170,18 +256,31 @@ function Complete-InstallAndStartNode {
         New-Item -ItemType File -Path $completeMarker -Force | Out-Null
     }
     Write-InstallLog -Path $installLog -Output '[install-db] database setup completed'
-    Clear-PortForInstall -Port 5180
-    Write-Host '[install-db] Starting application server...'
     try {
-        & (Join-Path $InstallHome 'scripts\start-node.ps1') -InstallHome $InstallHome
-        Write-InstallLog -Path $installLog -Output '[install-db] start-node OK'
+        $healthOk = $false
+        try {
+            $resp = Invoke-WebRequest -Uri 'http://127.0.0.1:5180/health' -TimeoutSec 3 -UseBasicParsing
+            $healthOk = $resp.StatusCode -eq 200 -and $resp.Content -match '"status"\s*:\s*"ok"'
+        }
+        catch { $healthOk = $false }
+        if ($healthOk) {
+            Write-InstallLog -Path $installLog -Output '[install-db] start-node skipped (/health already ok)'
+        }
+        else {
+            Clear-PortForInstall -Port 5180
+            Write-Host '[install-db] Starting application server...'
+            & (Join-Path $InstallHome 'scripts\start-node.ps1') -InstallHome $InstallHome
+            Write-InstallLog -Path $installLog -Output '[install-db] start-node OK'
+        }
     }
     catch {
-        Write-InstallLog -Path $installLog -Output "[install-db] WARNING: start-node failed: $_"
+        Write-InstallLogLine -Context $ctx -Level 'FAIL' -Message "start-node failed: $_"
         Write-Warning "Database is ready but Node did not start: $_"
-        Write-Warning 'Run start.bat or LAN-Exam-Tray.exe after install.'
+        Write-Warning 'See logs\node-stdout.log and install.log. Run start.bat after fixing.'
+        throw "Application server failed to start: $_"
     }
     Write-InstallLog -Path $installLog -Output '[install-db] install completed'
+    Write-InstallLogSessionEnd -Context $ctx -Success $true
     Write-Host '[install-db] Done.'
 }
 
@@ -207,49 +306,34 @@ function Invoke-InstallNode {
 }
 
 function Wait-PostgresReady {
-    param([int]$TimeoutSeconds = 90)
-    $pgIsready = Join-Path $pgBin 'pg_isready.exe'
+    param([int]$TimeoutSeconds = 180)
     $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
     while ((Get-Date) -lt $deadline) {
-        if (Test-Path $pgIsready) {
-            & $pgIsready -h 127.0.0.1 -p 5434 -U postgres -q 2>$null
-            if ($LASTEXITCODE -eq 0) { return }
-        }
-        else {
-            $listening = netstat -ano | Select-String '127.0.0.1:5434' | Select-String 'LISTENING'
-            if ($listening) { return }
-        }
+        if (Test-PostgresIsReady -InstallHome $InstallHome) { return }
         Start-Sleep -Seconds 1
     }
     throw "Postgres did not become ready on 127.0.0.1:5434 within ${TimeoutSeconds}s. See $installLog and logs\postgres.log"
 }
 
 function Test-TeacherTable {
-    $psql = Join-Path $pgBin 'psql.exe'
-    $result = (& $psql -h 127.0.0.1 -p 5434 -U lan_exam -d lan_exam -w -X -tAc `
-        "SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='Teacher'" `
-        2>$null | Out-String).Trim()
-    return $result -eq '1'
+    return Test-LanExamTeacherTable -InstallHome $InstallHome
 }
 
-if (-not (Test-Path $logDir)) { New-Item -ItemType Directory -Path $logDir | Out-Null }
 if (-not (Test-Path $envFile)) { throw ".env not found at $envFile" }
 
-$isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole(
-    [Security.Principal.WindowsBuiltInRole]::Administrator)
 #region agent log
 Write-DebugNdjson -HypothesisId 'H6' -Location 'install-db.ps1:entry' -Message 'install-db start' -Data @{
     invokeSource = $InvokeSource
     user         = $env:USERNAME
-    isAdmin      = $isAdmin
+    isAdmin      = $ctx.IsAdmin
     installHome  = $InstallHome
 }
 #endregion
 
 try {
-    $stamp = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss')
-    Write-InstallLog -Path $installLog -Output "=== [$stamp] install-db invoke=$InvokeSource user=$env:USERNAME admin=$isAdmin ==="
-    Write-InstallLog -Path $installLog -Output '[install-db] install started'
+    Enter-InstallDbLock
+    Write-InstallLogSessionStart -Context $ctx
+    Write-InstallLogLine -Context $ctx -Level 'STEP' -Message 'install started'
 
     Get-Content $envFile | ForEach-Object {
         if ($_ -match '^\s*([^#][^=]+)=(.*)$') {
@@ -287,6 +371,7 @@ try {
 
     $env:PGCONNECT_TIMEOUT = '10'
     $psql = Join-Path $pgBin 'psql.exe'
+    Write-InstallLogLine -Context $ctx -Level 'STEP' -Message 'checking postgres role and database lan_exam'
     $hasUser = (& $psql -h 127.0.0.1 -p 5434 -U postgres -d postgres -w -X -tAc `
         "SELECT 1 FROM pg_roles WHERE rolname='lan_exam'" 2>$null | Out-String).Trim()
     #region agent log
@@ -315,10 +400,6 @@ try {
     }
 
     $bundle = Join-Path $app 'server-bundle'
-    $prismaCli = Join-Path $bundle 'node_modules\prisma\build\index.js'
-    if (-not (Test-Path $prismaCli)) {
-        throw "Prisma CLI not found at $prismaCli — rebuild the release package."
-    }
     $pnpmNodeModules = Join-Path $bundle 'node_modules\.pnpm\node_modules'
     $env:NODE_PATH = @(
         (Join-Path $bundle 'node_modules'),
@@ -337,10 +418,22 @@ try {
         return
     }
 
+    Write-InstallLogLine -Context $ctx -Level 'STEP' -Message 'repairing prisma/pnpm bundle links (may take 1-2 min on first scan)'
     Ensure-PrismaBundleLinks -Bundle $bundle
+    Write-InstallLogLine -Context $ctx -Level 'OK' -Message 'bundle links ready'
+
+    $prismaCli = Resolve-PrismaCliPath -BundleDir $bundle
+    if (-not $prismaCli) {
+        throw "Prisma CLI not readable under $bundle (broken junction after copy?). Re-run install.bat as Administrator or reinstall Setup."
+    }
+    Write-InstallLogLine -Context $ctx -Level 'INFO' -Message "prisma CLI resolved path=$prismaCli"
+    if (-not (Test-PrismaCliRunnable -NodeExe $node -PrismaCliPath $prismaCli -BundleDir $bundle)) {
+        throw "Prisma CLI not runnable at $prismaCli — run scripts\repair-prisma-bundle-links.ps1 or reinstall from LAN-Exam-Setup."
+    }
+    Write-InstallLogLine -Context $ctx -Level 'OK' -Message 'prisma CLI runnable (version check)'
 
     $schema = Join-Path $app 'prisma\schema.prisma'
-    Push-Location $app
+    Push-Location $bundle
     try {
         Invoke-InstallNode -NodeArgs @(
             $prismaCli, 'migrate', 'deploy', '--schema', $schema
@@ -380,11 +473,15 @@ catch {
     if (-not $hasTeacher) {
         if (Test-Path $completeMarker) { Remove-Item $completeMarker -Force }
     }
-    Write-InstallLog -Path $installLog -Output "[install-db] FATAL: $_"
+    Write-InstallLogException -Context $ctx -ErrorRecord $_
+    Write-InstallLogSessionEnd -Context $ctx -Success $false
     #region agent log
     Write-DebugNdjson -HypothesisId 'H1' -Location 'install-db.ps1:catch' -Message 'install-db fatal' -Data @{
         error = "$_"
     }
     #endregion
     throw
+}
+finally {
+    Exit-InstallDbLock
 }

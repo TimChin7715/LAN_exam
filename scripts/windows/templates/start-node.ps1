@@ -5,8 +5,13 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $InstallHome = $InstallHome.TrimEnd('\')
-$logDir = Join-Path $InstallHome 'logs'
-$logFile = Join-Path $logDir 'app.log'
+
+. (Join-Path $PSScriptRoot 'install-log.ps1')
+$ctx = Initialize-InstallLogging -InstallHome $InstallHome -ScriptName 'start-node' -InvokeSource 'runtime'
+
+$logDir = $ctx.Paths.LogDir
+$logFile = $ctx.Paths.AppLog
+$installLog = $ctx.Paths.InstallLog
 $debugLog = Join-Path $logDir 'debug-57b789.log'
 $envFile = Join-Path $InstallHome '.env'
 
@@ -29,6 +34,8 @@ function Write-DebugNdjson {
 if (-not (Test-Path $logDir)) {
     New-Item -ItemType Directory -Path $logDir | Out-Null
 }
+
+Write-InstallLogLine -Context $ctx -Level 'STEP' -Message 'start-node begin'
 
 if (-not (Test-Path $envFile)) {
     throw ".env not found at $envFile — reinstall or run scripts\write-env.ps1"
@@ -65,10 +72,17 @@ if (-not $secret -or $secret.Length -lt 16) {
 
 $node = Join-Path $InstallHome 'runtime\node\node.exe'
 $appDir = Join-Path $InstallHome 'app'
-$entry = Join-Path $appDir 'server-bundle\dist\index.js'
+$serverEntry = Join-Path $appDir 'server-bundle\dist\index.js'
 
-if (-not (Test-Path $node)) { throw "Node runtime not found: $node" }
-if (-not (Test-Path $entry)) { throw "Server bundle not found: $entry" }
+if (-not (Test-Path $node)) {
+    Write-InstallLogLine -Context $ctx -Level 'FAIL' -Message "Node runtime not found: $node"
+    throw "Node runtime not found: $node"
+}
+if (-not (Test-Path $serverEntry)) {
+    Write-InstallLogLine -Context $ctx -Level 'FAIL' -Message "Server bundle not found: $serverEntry"
+    throw "Server bundle not found: $serverEntry"
+}
+Write-InstallLogLine -Context $ctx -Level 'INFO' -Message "entry=$serverEntry NODE_PATH length=$($env:NODE_PATH.Length)"
 
 function Test-LanExamHealthOk {
     try {
@@ -84,6 +98,7 @@ $listenerPids = @(Get-NetTCPConnection -LocalPort 5180 -State Listen -ErrorActio
     Select-Object -ExpandProperty OwningProcess -Unique)
 if ($listenerPids.Count -gt 0) {
     if (Test-LanExamHealthOk) {
+        Write-InstallLogLine -Context $ctx -Level 'OK' -Message 'port 5180 already serving /health ok — skip start'
         Write-Host '[start-node] Port 5180 already serving LAN Exam — skip'
         exit 0
     }
@@ -113,8 +128,9 @@ $psi.WorkingDirectory = $appDir
 $psi.UseShellExecute = $false
 $psi.CreateNoWindow = $true
 $psi.RedirectStandardError = $true
-foreach ($entry in [Environment]::GetEnvironmentVariables('Process').GetEnumerator()) {
-    $psi.EnvironmentVariables[$entry.Key] = [string]$entry.Value
+# Do not redirect stdout — pino logs can fill the pipe and block Node before :5180 listens.
+foreach ($envItem in [Environment]::GetEnvironmentVariables('Process').GetEnumerator()) {
+    $psi.EnvironmentVariables[$envItem.Key] = [string]$envItem.Value
 }
 $proc = New-Object System.Diagnostics.Process
 $proc.StartInfo = $psi
@@ -147,12 +163,14 @@ if ($proc.HasExited) {
         databaseUrl = ($env:DATABASE_URL -replace ':[^:@]+@', ':***@')
     }
     #endregion
-    throw "Node exited immediately (code $($proc.ExitCode)). See $logFile"
+    Write-InstallLogLine -Context $ctx -Level 'FAIL' -Message "Node exited immediately code=$($proc.ExitCode) see=$logFile node-stderr=$stderrLog"
+    throw "Node exited immediately (code $($proc.ExitCode)). See $logFile and $installLog"
 }
 
 $listening = Get-NetTCPConnection -LocalPort 5180 -State Listen -ErrorAction SilentlyContinue |
     Select-Object -First 1
 if ($listening) {
+    Write-InstallLogLine -Context $ctx -Level 'OK' -Message "Node listening on :5180 pid=$($proc.Id)"
     Write-Host '[start-node] Node listening on :5180 (PID' $proc.Id ')'
     exit 0
 }
@@ -166,6 +184,10 @@ if ($stderrTail) {
     [System.IO.File]::WriteAllText($stderrLog, $stderrTail, $utf8NoBom)
     [System.IO.File]::AppendAllText($logFile, "--- node-stderr.log ---`n$stderrTail`n", $utf8NoBom)
 }
-$msg = "Node did not open port 5180 within 5s (PID $($proc.Id)). See $logFile"
+Write-InstallLogLine -Context $ctx -Level 'FAIL' -Message "port 5180 not listening within 5s pid=$($proc.Id)"
+if ($stderrTail) {
+    Write-InstallLogOutput -Context $ctx -Label 'node stderr' -Output $stderrTail -LogFile $installLog
+}
+$msg = "Node did not open port 5180 within 5s (PID $($proc.Id)). See $logFile and $installLog"
 if ($tail) { $msg += "`n--- app.log (last lines) ---`n$tail" }
 throw $msg

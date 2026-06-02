@@ -3,7 +3,8 @@ import { z } from 'zod';
 
 import { examSubmitGate } from '../../../lib/concurrency/gates.js';
 import { ServerBusyError } from '../../../lib/concurrency/server-busy-error.js';
-import { submitExam } from '../../../lib/exam/submit.js';
+import { submitExam, type SubmitMode } from '../../../lib/exam/submit.js';
+import { prisma } from '../../../lib/prisma.js';
 import { SubmitExamError } from '../../../lib/exam/types.js';
 import { SERVER_BUSY_CODE, SERVER_BUSY_MESSAGE } from '../../../lib/errors.js';
 import {
@@ -45,10 +46,23 @@ export async function registerStudentExamSubmitRoutes(
       }
 
       try {
+        const examRow = await prisma.exam.findUnique({
+          where: { id: parsed.data.examId },
+          select: { scheduledEndAt: true, status: true },
+        });
+        const now = new Date();
+        const mode: SubmitMode =
+          examRow?.status === 'IN_PROGRESS' &&
+          examRow.scheduledEndAt &&
+          now > examRow.scheduledEndAt
+            ? 'deadline'
+            : 'strict';
+
         const result = await examSubmitGate.run(() =>
           submitExam({
             examId: parsed.data.examId,
             rosterEntryId,
+            mode,
           }),
         );
         return reply.send({

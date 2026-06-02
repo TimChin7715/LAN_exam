@@ -60,7 +60,9 @@ Phase A / B 已落地；真机双机验收仍需在目标环境执行。
   - `/exam/take`
   - `/exam/submitted`
   - `/exam/ended`
-- 客观题与填空题作答会自动保存（2 秒防抖 `PUT /api/student/exam/answers`）；另每约 60 秒（按身份证号抖动）通过 `POST /api/student/exam/sync-progress` 将当前作答全量 reconcile 至服务端（`examSyncGate` FIFO 排队），便于断网/换机续考；填空题每空可上传或粘贴截图（佐证，不参与自动评分，即时上传）；操作题需上传 `.doc` / `.docx` 作答文件后才能交卷。
+- 客观题与填空题作答会自动保存（2 秒防抖 `PUT /api/student/exam/answers`）；另每约 60 秒（按身份证号抖动）通过 `POST /api/student/exam/sync-progress` 将当前作答全量 reconcile 至服务端（`examSyncGate` FIFO 排队），便于断网/换机续考；填空题每空可上传或粘贴截图（佐证，不参与自动评分，即时上传）；操作题可上传 `.doc` / `.docx` 作答文件。**手动交卷**：若有未作答客观/填空或尚未上传操作题，确认框会列出缺项，学员确认后仍可提交（未答按 0 分计）。
+- **到点自动交卷**：到达创建考试时设定的 `scheduledEndAt` 后，服务端定时任务（`lib/exam/deadline-scheduler.ts`）会对未交卷学员按 deadline 规则强制交卷（已保存作答计分，未答客观/填空按 0 分），并自动将考试设为 `ENDED`；学员作答页显示倒计时，到点也会主动调用交卷 API。操作题若无上传草稿则到点不交操作题卷。
+- 考官点击「结束考试」时，同样会先对未交卷学员执行上述 deadline 交卷（`lib/exam/finalize-exam-submissions.ts`），再结束考试。
 - 考试结束后：
   - 已交卷学员进入 submitted / ended 只读视图
   - 未交卷学员进入 ended 提示页，不再允许继续作答
@@ -166,6 +168,7 @@ apps/server/src/
 - 填空题截图：`lib/fillin/finalize-screenshots.ts`、`build-screenshots-zip.ts`、`screenshot-export-name.ts`；上传校验 `lib/upload/image-file.ts`（`MAX_FILLIN_SCREENSHOT_BYTES`，每空最多 5 张）；学员 API `routes/api/student/exam-fillin-screenshots.ts`；考官导出 `routes/api/admin/exams-export-fillin-screenshots.ts`。
 - 清除全部数据：`lib/admin/clear-teacher-data.ts` + `routes/api/admin/settings.ts`。
 - 考中进度同步：`lib/exam/persist-answer-drafts.ts`、`routes/api/student/exam-sync-progress.ts`（`examSyncGate`）；交互保存仍走 `exam-answers.ts`。
+- 到点/批量交卷：`lib/exam/submit.ts`（`mode: 'strict' | 'deadline'`）、`lib/exam/finalize-exam-submissions.ts`、`lib/exam/deadline-scheduler.ts`；`endExam` 前会批量收卷。
 - 学员状态流转重点看：
   - `routes/api/student/exam-status.ts`
   - `lib/exam/student-ended-summary.ts`

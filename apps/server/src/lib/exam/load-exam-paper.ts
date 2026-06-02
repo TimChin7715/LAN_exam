@@ -32,6 +32,7 @@ export type ExamPaperDrafts = {
 export type ExamPaperResponse = {
   examId: string;
   contentModules: ExamPaperStaticPayload['contentModules'];
+  scheduledEndAt: string | null;
   items: Array<
     ExamPaperStaticPayload['items'][number] & { selectedKeys: string }
   >;
@@ -230,10 +231,12 @@ export async function loadExamPaperDrafts(
 export function mergePaperResponse(
   staticPayload: ExamPaperStaticPayload,
   drafts: ExamPaperDrafts,
+  scheduledEndAt: string | null,
 ): ExamPaperResponse {
   return {
     examId: staticPayload.examId,
     contentModules: staticPayload.contentModules,
+    scheduledEndAt,
     items: staticPayload.items.map((item) => ({
       ...item,
       selectedKeys: drafts.answerDrafts.get(item.examQuestionId) ?? '',
@@ -247,10 +250,22 @@ export async function buildExamPaperResponse(
   examId: string,
   rosterEntryId: string,
 ): Promise<ExamPaperResponse | null> {
+  const examRow = await prisma.exam.findUnique({
+    where: { id: examId },
+    select: { scheduledEndAt: true },
+  });
+  if (!examRow) {
+    return null;
+  }
+
   const staticPayload = await loadExamPaperStatic(examId);
   if (!staticPayload) {
     return null;
   }
   const drafts = await loadExamPaperDrafts(examId, rosterEntryId, staticPayload);
-  return mergePaperResponse(staticPayload, drafts);
+  return mergePaperResponse(
+    staticPayload,
+    drafts,
+    examRow.scheduledEndAt?.toISOString() ?? null,
+  );
 }

@@ -1,4 +1,5 @@
 import { prisma } from '../prisma.js';
+import { finalizeExamSubmissions } from './finalize-exam-submissions.js';
 import { invalidateExamPaperCache } from './exam-paper-cache.js';
 import { ExamTransitionError } from './types.js';
 
@@ -100,6 +101,8 @@ export async function endExam(
   examId: string,
   teacherId: string,
 ): Promise<{ id: string; status: 'ENDED'; endedAt: Date }> {
+  await finalizeExamSubmissions(examId);
+
   return prisma.$transaction(
     async (tx) => {
       const exam = await tx.exam.findUnique({

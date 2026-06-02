@@ -53,14 +53,20 @@ export async function registerStudentExamStatusRoutes(
           });
         }
         if (exam.scheduledEndAt && now > exam.scheduledEndAt) {
-          // Fall through to ENDED lookup below
-        } else {
           return reply.send({
-            status: 'IN_PROGRESS' as const,
+            status: 'DEADLINE_REACHED' as const,
             examId: exam.id,
             title: exam.title,
+            scheduledEndAt: exam.scheduledEndAt.toISOString(),
           });
         }
+
+        return reply.send({
+          status: 'IN_PROGRESS' as const,
+          examId: exam.id,
+          title: exam.title,
+          scheduledEndAt: exam.scheduledEndAt?.toISOString() ?? null,
+        });
       }
 
       const draftExam = await prisma.exam.findFirst({

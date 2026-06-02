@@ -2,12 +2,12 @@ import { loadInstallDotenv } from './lib/load-install-env.js';
 
 loadInstallDotenv();
 
-import compress from '@fastify/compress';
 import multipart from '@fastify/multipart';
 import rateLimit from '@fastify/rate-limit';
 import Fastify from 'fastify';
 
 import { getAppVersion } from './lib/app-version.js';
+import { registerExamDeadlineScheduler } from './lib/exam/deadline-scheduler.js';
 import { getListenHost, getListenPort, shouldServeWeb } from './lib/env.js';
 import { getMultipartPluginLimits } from './lib/upload-limits.js';
 import { prisma } from './lib/prisma.js';
@@ -50,7 +50,6 @@ const app = Fastify({
 
 await app.register(sessionPlugin);
 await registerAdminLoopbackGuard(app);
-await app.register(compress);
 await app.register(rateLimit, { global: false });
 await app.register(multipart, {
   limits: getMultipartPluginLimits(),
@@ -89,6 +88,8 @@ if (serveWeb) {
   await registerWebStatic(app);
   app.log.info('Serving web static assets from %s', process.env.WEB_DIST_PATH ?? 'apps/web/dist');
 }
+
+registerExamDeadlineScheduler(app);
 
 app.addHook('onClose', async () => {
   await prisma.$disconnect();

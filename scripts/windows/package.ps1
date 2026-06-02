@@ -32,6 +32,7 @@ Write-Host "==> LAN Exam package v$releaseVersion started at $(Get-Date -Format 
 Write-Host '    Stages: build-release -> fetch-runtimes -> tray -> verify -> Inno (Inno may take 15-30 min with little output)'
 
 & (Join-Path $PSScriptRoot 'validate-install-scripts.ps1')
+& (Join-Path $PSScriptRoot 'cleanup-dist-artifacts.ps1') -Root $root -Version $releaseVersion
 
 Write-Host "==> [1/5] build-release $(Get-Date -Format HH:mm:ss)"
 & (Join-Path $PSScriptRoot 'build-release.ps1') -OutDir $OutDir

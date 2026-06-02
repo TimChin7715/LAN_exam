@@ -15,7 +15,7 @@ export const INVALID_STUDENT_CREDENTIALS_CODE =
   'INVALID_STUDENT_CREDENTIALS' as const;
 
 export const STUDENT_ID_FORMAT_ERROR_MESSAGE =
-  '身份证号格式不正确' as const;
+  '身份证号无效，请检查后重试' as const;
 
 export const SERVER_BUSY_CODE = 'SERVER_BUSY' as const;
 

@@ -53,7 +53,18 @@ export type StudentExamStatus =
       title: string;
       scheduledStartAt: string;
     }
-  | { status: 'IN_PROGRESS'; examId: string; title: string }
+  | {
+      status: 'IN_PROGRESS';
+      examId: string;
+      title: string;
+      scheduledEndAt: string | null;
+    }
+  | {
+      status: 'DEADLINE_REACHED';
+      examId: string;
+      title: string;
+      scheduledEndAt: string;
+    }
   | {
       status: 'ENDED';
       examId: string;
@@ -99,6 +110,7 @@ export type ExamSyncProgressResponse = {
 export type ExamPaperResponse = {
   examId: string;
   contentModules: ExamContentModule[];
+  scheduledEndAt: string | null;
   items: ExamPaperItem[];
   practical: PracticalPaperMeta | null;
   fillIn: FillInPaperMeta | null;
@@ -107,7 +119,7 @@ export type ExamPaperResponse = {
 export const STUDENT_AUTH_ERROR_MESSAGE =
   '姓名或身份证号不正确，请检查后重试。';
 
-export const STUDENT_ID_FORMAT_ERROR_MESSAGE = '身份证号格式不正确';
+export const STUDENT_ID_FORMAT_ERROR_MESSAGE = '身份证号无效，请检查后重试';
 
 export const STUDENT_ALREADY_SUBMITTED_MESSAGE =
   '您已提交过本场考试，无法再次提交。';

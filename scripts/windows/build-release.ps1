@@ -147,6 +147,7 @@ foreach ($f in @('start.bat', 'stop.bat', 'open-admin.bat', 'install.bat')) {
     Copy-Item (Join-Path $templates $f) (Join-Path $OutDir $f) -Force
 }
 New-Item -ItemType Directory -Path (Join-Path $OutDir 'scripts') -Force | Out-Null
+Copy-Item (Join-Path $templates 'install-log.ps1') (Join-Path $OutDir 'scripts\install-log.ps1') -Force
 Copy-Item (Join-Path $templates 'install-db.ps1') (Join-Path $OutDir 'scripts\install-db.ps1') -Force
 Copy-Item (Join-Path $templates 'stop-postgres.ps1') (Join-Path $OutDir 'scripts\stop-postgres.ps1') -Force
 Copy-Item (Join-Path $templates 'write-env.ps1') (Join-Path $OutDir 'scripts\write-env.ps1') -Force
@@ -176,5 +177,12 @@ $utf8NoBom = New-Object System.Text.UTF8Encoding $false
     "$releaseVersion`n",
     $utf8NoBom
 )
+
+$logsDir = Join-Path $OutDir 'logs'
+New-Item -ItemType Directory -Path $logsDir -Force | Out-Null
+$logsReadme = Join-Path $templates 'logs\README.txt'
+if (Test-Path $logsReadme) {
+    Copy-Item $logsReadme (Join-Path $logsDir 'README.txt') -Force
+}
 
 Write-Host "==> build-release complete: $OutDir (version $releaseVersion)"

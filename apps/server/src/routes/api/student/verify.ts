@@ -4,15 +4,15 @@ import { z } from 'zod';
 import {
   INVALID_STUDENT_CREDENTIALS_CODE,
   STUDENT_AUTH_ERROR_MESSAGE,
-  STUDENT_ID_FORMAT_ERROR_MESSAGE,
 } from '../../../lib/errors.js';
 import { prisma } from '../../../lib/prisma.js';
-import { isValidNationalIdFormat } from '../../../lib/roster/national-id.js';
+import { validateRosterNationalId } from '../../../lib/roster/national-id.js';
+import { MAX_NATIONAL_ID_LENGTH } from '../../../lib/roster/types.js';
 import { establishStudentSession } from '../../../lib/student-auth.js';
 
 const verifyBodySchema = z.object({
   fullName: z.string().trim().min(1).max(64),
-  nationalId: z.string().trim().min(1).max(18),
+  nationalId: z.string().trim().min(1).max(MAX_NATIONAL_ID_LENGTH),
 });
 
 export async function registerStudentVerifyRoutes(
@@ -39,10 +39,11 @@ export async function registerStudentVerifyRoutes(
 
       const { fullName, nationalId } = parsed.data;
 
-      if (!isValidNationalIdFormat(nationalId)) {
+      const nationalIdError = validateRosterNationalId(nationalId);
+      if (nationalIdError) {
         return reply.status(400).send({
           code: 'VALIDATION_ERROR',
-          message: STUDENT_ID_FORMAT_ERROR_MESSAGE,
+          message: nationalIdError,
         });
       }
 
