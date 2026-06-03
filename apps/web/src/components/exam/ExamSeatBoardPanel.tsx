@@ -5,7 +5,10 @@ import { Spinner } from '@/components/ui/spinner';
 import { ExamSeatBoard } from '@/components/exam/ExamSeatBoard';
 import { studentSeatStatusLabel } from '@/lib/seat-status';
 import type { ExamSeatBoard as AdminSeatBoard } from '@/lib/exam';
-import { fetchStudentSeatBoard, type StudentSeatBoard } from '@/lib/student';
+import {
+  fetchStudentSeatBoards,
+  type StudentSeatBoard,
+} from '@/lib/student';
 
 type ExamSeatBoardPanelProps = {
   mode: 'admin';
@@ -63,7 +66,7 @@ function AdminSeatPanel({
 }
 
 function StudentSeatPanel() {
-  const [board, setBoard] = useState<StudentSeatBoard | null>(null);
+  const [boards, setBoards] = useState<StudentSeatBoard[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -73,8 +76,8 @@ function StudentSeatPanel() {
       setLoading(true);
       setError(null);
       try {
-        const data = await fetchStudentSeatBoard();
-        if (!cancelled) setBoard(data);
+        const data = await fetchStudentSeatBoards();
+        if (!cancelled) setBoards(data);
       } catch {
         if (!cancelled) {
           setError('无法加载座位信息，请稍后刷新页面。');
@@ -106,7 +109,7 @@ function StudentSeatPanel() {
     );
   }
 
-  if (!board) {
+  if (boards.length === 0) {
     return (
       <CardShell>
         <h3 className="text-base font-semibold text-foreground">考生座位</h3>
@@ -120,19 +123,28 @@ function StudentSeatPanel() {
   return (
     <CardShell>
       <h3 className="text-base font-semibold text-foreground">考生座位</h3>
-      <div className="space-y-2">
-        <div className="flex flex-wrap items-center gap-2">
-          <p className="text-sm font-medium text-foreground">{board.title}</p>
-          <Badge variant="secondary">
-            {studentSeatStatusLabel(board.displayStatus)}
-          </Badge>
-        </div>
-        <ExamSeatBoard
-          cols={board.cols}
-          rows={board.rows}
-          items={board.items}
-          compact
-        />
+      {boards.length > 1 ? (
+        <p className="mb-3 text-sm text-muted-foreground">
+          当前有多场考试，请根据监考安排确认对应座位。
+        </p>
+      ) : null}
+      <div className="space-y-6">
+        {boards.map((board) => (
+          <div key={board.examId} className="space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-sm font-medium text-foreground">{board.title}</p>
+              <Badge variant="secondary">
+                {studentSeatStatusLabel(board.displayStatus)}
+              </Badge>
+            </div>
+            <ExamSeatBoard
+              cols={board.cols}
+              rows={board.rows}
+              items={board.items}
+              compact
+            />
+          </div>
+        ))}
       </div>
     </CardShell>
   );

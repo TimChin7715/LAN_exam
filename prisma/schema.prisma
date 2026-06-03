@@ -64,12 +64,16 @@ model Question {
   explanation      String?
   knowledgePoints  String?
   multiScoringRule MultiScoringRule?
+  /** Excel 行序（0-based）；组卷与列表按此排序，勿用 createdAt */
+  importSortOrder  Int                 @default(0)
   createdAt        DateTime            @default(now())
   options          QuestionOption[]
   examQuestions    ExamQuestion[]
 
   @@index([batchId])
+  @@index([batchId, importSortOrder])
   @@index([fillInBatchId])
+  @@index([fillInBatchId, importSortOrder])
   @@index([type])
 }
 

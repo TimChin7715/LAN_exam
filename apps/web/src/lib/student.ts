@@ -1,4 +1,5 @@
 import { ApiError, apiFetch } from '@/lib/api';
+import { downloadBlobFromUrl, downloadOnce } from '@/lib/download';
 import { fetchWithRetry } from '@/lib/fetch-with-retry';
 import { hashString } from '@/lib/hash-string';
 
@@ -47,6 +48,15 @@ export type StudentSeatBoard = {
 
 export type StudentExamStatus =
   | { status: 'none' }
+  | {
+      status: 'choose_exam';
+      exams: Array<{
+        id: string;
+        title: string;
+        scheduledStartAt: string | null;
+        scheduledEndAt: string | null;
+      }>;
+    }
   | {
       status: 'waiting';
       examId: string;
@@ -109,6 +119,7 @@ export type ExamSyncProgressResponse = {
 
 export type ExamPaperResponse = {
   examId: string;
+  title: string;
   contentModules: ExamContentModule[];
   scheduledEndAt: string | null;
   items: ExamPaperItem[];
@@ -185,7 +196,7 @@ export async function fetchStudentConfig(): Promise<{ showSeatBoard: boolean }> 
   return { showSeatBoard: data.showSeatBoard };
 }
 
-export async function fetchStudentSeatBoard(): Promise<StudentSeatBoard | null> {
+export async function fetchStudentSeatBoards(): Promise<StudentSeatBoard[]> {
   let lastError: unknown;
   for (let i = 0; i < SEAT_BOARD_RETRY_DELAYS_MS.length; i += 1) {
     const delay = SEAT_BOARD_RETRY_DELAYS_MS[i];
@@ -193,11 +204,13 @@ export async function fetchStudentSeatBoard(): Promise<StudentSeatBoard | null> 
       await new Promise((resolve) => setTimeout(resolve, delay));
     }
     try {
-      const data = await apiFetch<{ ok: true; board: StudentSeatBoard | null }>(
-        '/api/student/seat-boards',
-        { skipAuthRedirect: true },
-      );
-      return data.board;
+      const data = await apiFetch<{
+        ok: true;
+        board: StudentSeatBoard | null;
+        boards: StudentSeatBoard[];
+      }>('/api/student/seat-boards', { skipAuthRedirect: true });
+      if (data.boards.length > 0) return data.boards;
+      return data.board ? [data.board] : [];
     } catch (err) {
       lastError = err;
       if (!isRetryableSeatBoardError(err) || i === SEAT_BOARD_RETRY_DELAYS_MS.length - 1) {
@@ -206,6 +219,12 @@ export async function fetchStudentSeatBoard(): Promise<StudentSeatBoard | null> 
     }
   }
   throw lastError;
+}
+
+/** @deprecated use fetchStudentSeatBoards when multiple exams may run concurrently */
+export async function fetchStudentSeatBoard(): Promise<StudentSeatBoard | null> {
+  const boards = await fetchStudentSeatBoards();
+  return boards[0] ?? null;
 }
 
 export const studentApi = {
@@ -218,6 +237,18 @@ export const studentApi = {
 
   me: () =>
     apiFetch<StudentProfile>('/api/student/me', { skipAuthRedirect: true }),
+
+  selectExam: (examId: string) =>
+    apiFetch<{
+      ok: true;
+      examId: string;
+      title: string;
+      changed: boolean;
+    }>('/api/student/exam/select', {
+      method: 'POST',
+      body: JSON.stringify({ examId }),
+      skipAuthRedirect: true,
+    }),
 
   examStatus: () =>
     apiFetch<StudentExamStatus>('/api/student/exam/status', {
@@ -275,6 +306,7 @@ export const studentApi = {
   examSubmission: (examId: string) =>
     apiFetch<{
       examId: string;
+      title: string;
       contentModules: ExamContentModule[];
       totalScore: number | null;
       submittedAt: string;
@@ -405,20 +437,9 @@ export const studentApi = {
 };
 
 async function downloadBlob(url: string, fallbackName: string): Promise<void> {
-  const response = await fetch(url, { credentials: 'include' });
-  if (!response.ok) {
-    throw new ApiError('下载失败', response.status);
-  }
-  const blob = await response.blob();
-  const disposition = response.headers.get('Content-Disposition') ?? '';
-  const match = disposition.match(/filename\*=UTF-8''([^;]+)/i);
-  const name = match ? decodeURIComponent(match[1]) : fallbackName;
-  const objectUrl = URL.createObjectURL(blob);
-  const anchor = document.createElement('a');
-  anchor.href = objectUrl;
-  anchor.download = name;
-  anchor.click();
-  URL.revokeObjectURL(objectUrl);
+  return downloadOnce(url, async () => {
+    await downloadBlobFromUrl(url, fallbackName, { credentials: 'include' });
+  });
 }
 
 export { ApiError };

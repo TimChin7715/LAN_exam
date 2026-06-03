@@ -6,6 +6,7 @@ import {
   unlinkExamsAndDeleteFillInBatch,
 } from '../../../lib/batch/delete-with-exam-unlink.js';
 import { resolveAdminTeacherId } from '../../../lib/admin-context.js';
+import { questionImportOrderBy } from '../../../lib/qbank/question-import-order.js';
 import { prisma } from '../../../lib/prisma.js';
 import { readStorageFile, resolveStoragePath } from '../../../lib/storage/index.js';
 import { requireAdminSession } from '../../../plugins/admin-guard.js';
@@ -74,7 +75,7 @@ export async function registerAdminFillInBatchesRoutes(
           importedCount: true,
           createdAt: true,
           questions: {
-            orderBy: { createdAt: 'asc' },
+            orderBy: questionImportOrderBy,
             select: {
               id: true,
               stem: true,

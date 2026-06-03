@@ -55,16 +55,18 @@ export async function registerStudentVerifyRoutes(
 
       let entry = matches[0] ?? null;
       if (matches.length > 1) {
-        const activeExam = await prisma.exam.findFirst({
+        const activeExams = await prisma.exam.findMany({
           where: { status: 'IN_PROGRESS' },
           select: { rosterBatchId: true },
+          distinct: ['rosterBatchId'],
         });
-        if (activeExam) {
-          const inActiveBatch = matches.find(
-            (m) => m.batchId === activeExam.rosterBatchId,
-          );
-          if (inActiveBatch) entry = inActiveBatch;
-        }
+        const activeBatchIds = new Set(
+          activeExams.map((e) => e.rosterBatchId),
+        );
+        const inActiveBatch = matches.find((m) =>
+          activeBatchIds.has(m.batchId),
+        );
+        if (inActiveBatch) entry = inActiveBatch;
       }
 
       if (!entry) {

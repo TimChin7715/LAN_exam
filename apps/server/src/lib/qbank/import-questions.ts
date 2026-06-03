@@ -31,7 +31,7 @@ export async function importQuestions(
           importedCount: questions.length,
           skippedCount,
           questions: {
-            create: questions.map((q) => ({
+            create: questions.map((q, importSortOrder) => ({
               type: q.type,
               stem: q.stem,
               answerKeys: q.answerKeys,
@@ -39,6 +39,7 @@ export async function importQuestions(
               difficulty: q.difficulty,
               explanation: q.explanation,
               knowledgePoints: q.knowledgePoints,
+              importSortOrder,
               multiScoringRule: q.multiScoringRule ?? null,
               options: {
                 create: q.options.map((o) => ({

@@ -74,6 +74,7 @@ export default function StudentExamTake() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const examId = searchParams.get('examId') ?? '';
+  const [examTitle, setExamTitle] = useState<string | null>(null);
 
   const goToExamEnded = useCallback(() => {
     if (!examId) return;
@@ -156,9 +157,12 @@ export default function StudentExamTake() {
 
     setLoading(true);
     try {
+      await studentApi.selectExam(examId);
+
       try {
         const submission = await studentApi.examSubmission(examId);
         resetPendingSaveState();
+        setExamTitle(submission.title);
         setContentModules(submission.contentModules);
         setFillIn(null);
         setItems(submission.items);
@@ -187,6 +191,7 @@ export default function StudentExamTake() {
       });
       paperRetryToastShownRef.current = false;
       resetPendingSaveState();
+      setExamTitle(paper.title);
       setContentModules(paper.contentModules);
       setItems(paper.items);
       setFillIn(paper.fillIn);
@@ -566,11 +571,17 @@ export default function StudentExamTake() {
   }
 
   const fillItems = useMemo(
-    () => items.filter((item) => item.type === 'FILL'),
+    () =>
+      items
+        .filter((item) => item.type === 'FILL')
+        .sort((a, b) => a.sortOrder - b.sortOrder),
     [items],
   );
   const objectiveItems = useMemo(
-    () => items.filter((item) => item.type !== 'FILL'),
+    () =>
+      items
+        .filter((item) => item.type !== 'FILL')
+        .sort((a, b) => a.sortOrder - b.sortOrder),
     [items],
   );
 
@@ -638,7 +649,7 @@ export default function StudentExamTake() {
     if (readOnly || !needsQuestionItems(contentModules)) return null;
     if (saveStatus === 'saving') return '正在保存答案...';
     if (saveStatus === 'saved') return '答案已保存';
-    return null;
+    return '答案将自动保存';
   }, [contentModules, readOnly, saveStatus]);
 
   const progressSyncLabel = useMemo(() => {
@@ -721,7 +732,37 @@ export default function StudentExamTake() {
       </AlertDialog>
 
       {!readOnly ? (
-        <div className="fixed right-0 top-0 z-50 p-3 sm:p-4">
+        <div className="fixed left-0 right-0 top-0 z-50 flex items-center justify-between gap-3 bg-background/80 p-3 backdrop-blur sm:p-4">
+          <div className="min-w-0 max-w-[46%] space-y-1 rounded-lg border border-primary/30 bg-primary/10 px-2.5 py-2 text-xs shadow-sm sm:text-sm">
+            {scheduledEndAt && remainingMs !== null ? (
+              <p className="truncate font-medium text-foreground">
+                {remainingMs > 0 ? (
+                  <>
+                    距离考试结束还剩{' '}
+                    <span className="font-mono text-base font-bold tabular-nums text-primary sm:text-lg">
+                      {formatExamRemaining(remainingMs)}
+                    </span>
+                    ，到点将自动交卷。
+                  </>
+                ) : (
+                  <span className="font-semibold text-destructive">
+                    考试时间已到，正在自动提交试卷…
+                  </span>
+                )}
+              </p>
+            ) : null}
+            {saveLabel ? (
+              <p className="truncate text-foreground/90">保存状态：{saveLabel}</p>
+            ) : null}
+            {progressSyncLabel ? (
+              <p className="truncate text-foreground/90">同步状态：{progressSyncLabel}</p>
+            ) : null}
+          </div>
+          <div className="pointer-events-none absolute inset-x-0 flex justify-center px-20">
+            <p className="truncate text-center text-lg font-bold text-foreground sm:text-xl">
+              {examTitle ?? '考试中'}
+            </p>
+          </div>
           <Button
             type="button"
             variant="outline"
@@ -760,31 +801,6 @@ export default function StudentExamTake() {
               : ''}
           </AlertDescription>
         </Alert>
-      ) : null}
-
-      {scheduledEndAt && remainingMs !== null && !readOnly ? (
-        <Alert>
-          <AlertDescription>
-            {remainingMs > 0 ? (
-              <>
-                距离考试结束还剩{' '}
-                <span className="font-mono font-semibold tabular-nums text-foreground">
-                  {formatExamRemaining(remainingMs)}
-                </span>
-                ，到点将自动提交试卷。
-              </>
-            ) : (
-              '考试时间已到，正在自动提交试卷…'
-            )}
-          </AlertDescription>
-        </Alert>
-      ) : null}
-
-      {saveLabel || progressSyncLabel ? (
-        <div className="space-y-1 text-sm text-muted-foreground">
-          {saveLabel ? <p>{saveLabel}</p> : null}
-          {progressSyncLabel ? <p>{progressSyncLabel}</p> : null}
-        </div>
       ) : null}
 
       {hasObjectiveModule &&

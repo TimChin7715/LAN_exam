@@ -29,6 +29,7 @@ export type ExamPaperStaticPracticalMeta = {
 
 export type ExamPaperStaticPayload = {
   examId: string;
+  title: string;
   contentModules: ExamContentModule[];
   items: ExamPaperStaticItem[];
   fillIn: ExamPaperStaticFillIn | null;

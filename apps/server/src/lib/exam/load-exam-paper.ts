@@ -31,6 +31,7 @@ export type ExamPaperDrafts = {
 
 export type ExamPaperResponse = {
   examId: string;
+  title: string;
   contentModules: ExamPaperStaticPayload['contentModules'];
   scheduledEndAt: string | null;
   items: Array<
@@ -50,6 +51,7 @@ async function loadStaticFromDb(
   const exam = await db.exam.findUnique({
     where: { id: examId },
     select: {
+      title: true,
       contentModules: true,
       fillInBatch: {
         select: {
@@ -160,6 +162,7 @@ async function loadStaticFromDb(
 
   const staticPayload: ExamPaperStaticPayload = {
     examId,
+    title: exam.title,
     contentModules: exam.contentModules,
     items,
     fillIn,
@@ -235,6 +238,7 @@ export function mergePaperResponse(
 ): ExamPaperResponse {
   return {
     examId: staticPayload.examId,
+    title: staticPayload.title,
     contentModules: staticPayload.contentModules,
     scheduledEndAt,
     items: staticPayload.items.map((item) => ({

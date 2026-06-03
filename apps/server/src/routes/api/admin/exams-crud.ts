@@ -43,6 +43,8 @@ const patchBodySchema = z
     fillInBatchId: z.string().min(1).nullable().optional(),
     practicalBatchId: z.string().min(1).nullable().optional(),
     rosterBatchId: z.string().min(1).optional(),
+    scheduledStartAt: z.string().datetime().optional(),
+    scheduledEndAt: z.string().datetime().optional(),
   })
   .refine(
     (data) =>
@@ -51,7 +53,9 @@ const patchBodySchema = z
       data.questionBatchId !== undefined ||
       data.fillInBatchId !== undefined ||
       data.practicalBatchId !== undefined ||
-      data.rosterBatchId !== undefined,
+      data.rosterBatchId !== undefined ||
+      data.scheduledStartAt !== undefined ||
+      data.scheduledEndAt !== undefined,
     { message: '至少提供一个可更新字段' },
   );
 
@@ -274,6 +278,8 @@ export async function registerAdminExamsCrudRoutes(
           fillInBatchId: true,
           practicalBatchId: true,
           rosterBatchId: true,
+          scheduledStartAt: true,
+          scheduledEndAt: true,
         },
       });
 
@@ -284,11 +290,11 @@ export async function registerAdminExamsCrudRoutes(
         });
       }
 
-      if (existing.status !== 'DRAFT') {
+      if (existing.status !== 'DRAFT' && existing.status !== 'IN_PROGRESS') {
         return reply.status(409).send({
           ok: false,
           code: 'INVALID_STATUS',
-          message: '仅草稿状态的考试可以编辑',
+          message: '仅草稿或进行中状态的考试可以编辑',
         });
       }
 
@@ -308,6 +314,30 @@ export async function registerAdminExamsCrudRoutes(
           : existing.practicalBatchId;
       const nextRosterBatchId =
         parsed.data.rosterBatchId ?? existing.rosterBatchId;
+      const nextScheduledStartAt =
+        parsed.data.scheduledStartAt !== undefined
+          ? new Date(parsed.data.scheduledStartAt)
+          : existing.scheduledStartAt;
+      const nextScheduledEndAt =
+        parsed.data.scheduledEndAt !== undefined
+          ? new Date(parsed.data.scheduledEndAt)
+          : existing.scheduledEndAt;
+
+      if (!nextScheduledStartAt || !nextScheduledEndAt) {
+        return reply.status(400).send({
+          ok: false,
+          code: 'VALIDATION_ERROR',
+          message: '开始时间与结束时间不能为空',
+        });
+      }
+
+      if (!(nextScheduledEndAt > nextScheduledStartAt)) {
+        return reply.status(400).send({
+          ok: false,
+          code: 'VALIDATION_ERROR',
+          message: '结束时间必须晚于开始时间',
+        });
+      }
 
       const batchCheck = await assertTeacherOwnsExamBatches(teacherId, {
         contentModules: nextModules,
@@ -360,6 +390,12 @@ export async function registerAdminExamsCrudRoutes(
                 : {}),
               ...(parsed.data.rosterBatchId !== undefined
                 ? { rosterBatchId: parsed.data.rosterBatchId }
+                : {}),
+              ...(parsed.data.scheduledStartAt !== undefined
+                ? { scheduledStartAt: nextScheduledStartAt }
+                : {}),
+              ...(parsed.data.scheduledEndAt !== undefined
+                ? { scheduledEndAt: nextScheduledEndAt }
                 : {}),
             },
           });

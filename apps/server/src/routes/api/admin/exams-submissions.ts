@@ -27,7 +27,7 @@ export async function registerAdminExamsSubmissionsRoutes(
 
       const exam = await prisma.exam.findFirst({
         where: { id, teacherId },
-        select: { id: true, rosterBatchId: true, contentModules: true },
+        select: { id: true, status: true, rosterBatchId: true, contentModules: true },
       });
 
       if (!exam) {
@@ -51,6 +51,9 @@ export async function registerAdminExamsSubmissionsRoutes(
             select: {
               totalScore: true,
               submittedAt: true,
+              answers: {
+                select: { selectedKeys: true },
+              },
             },
             take: 1,
           },
@@ -68,18 +71,30 @@ export async function registerAdminExamsSubmissionsRoutes(
         items: rosterEntries.map((entry) => {
           const submission = entry.submissions[0];
           const practical = entry.practicalSubmissions[0];
+          const hasAnyQuestionAnswer = Boolean(
+            submission?.answers.some((a) => a.selectedKeys.trim().length > 0),
+          );
           const questionsDone =
             !requiresQuestionSubmission(exam.contentModules) ||
             Boolean(submission);
           const practicalDone =
             !requiresPracticalBatch(exam.contentModules) || Boolean(practical);
+          const submitted = questionsDone && practicalDone;
+          const absent =
+            exam.status === 'ENDED' && !hasAnyQuestionAnswer && !Boolean(practical);
+          const statusLabel: 'submitted' | 'pending' | 'absent' = absent
+            ? 'absent'
+            : submitted
+              ? 'submitted'
+              : 'pending';
           return {
             rosterEntryId: entry.id,
             fullName: entry.fullName,
             organization: entry.organization,
             nationalId: entry.nationalId,
             totalScore: submission?.totalScore ?? null,
-            submitted: questionsDone && practicalDone,
+            submitted,
+            statusLabel,
             submittedAt:
               submission?.submittedAt ?? practical?.submittedAt ?? null,
             practicalSubmitted: practicalDone,

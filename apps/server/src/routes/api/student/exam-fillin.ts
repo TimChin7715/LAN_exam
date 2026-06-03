@@ -145,6 +145,7 @@ export async function registerStudentExamFillInRoutes(
 
       const buffer = await readStorageFile(exam.fillInBatch.wordStorageKey);
       return reply
+        .header('Cache-Control', 'private, no-store')
         .header(
           'Content-Type',
           contentTypeForWordFilename(exam.fillInBatch.wordFileName),
@@ -345,6 +346,7 @@ export async function registerStudentExamFillInRoutes(
       if (singleArchive) {
         const buffer = await readStorageFile(singleArchive.storageKey);
         return reply
+          .header('Cache-Control', 'private, no-store')
           .header(
             'Content-Type',
             contentTypeForArchiveFilename(singleArchive.fileName),
@@ -365,6 +367,7 @@ export async function registerStudentExamFillInRoutes(
       );
 
       return reply
+        .header('Cache-Control', 'private, no-store')
         .header('Content-Type', 'application/zip')
         .header(
           'Content-Disposition',

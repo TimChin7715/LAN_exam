@@ -1,7 +1,12 @@
 import type { FastifyInstance } from 'fastify';
 
+import { resolveStudentInProgressExamStatus } from '../../../lib/exam/resolve-student-exam-status.js';
 import { resolveStudentEndedSummary } from '../../../lib/exam/student-ended-summary.js';
 import { prisma } from '../../../lib/prisma.js';
+import {
+  getSessionStudentExamId,
+  setSessionStudentExamId,
+} from '../../../lib/student-auth.js';
 import {
   ensureStudentRosterEntryId,
   requireStudentSession,
@@ -29,44 +34,17 @@ export async function registerStudentExamStatusRoutes(
         return reply.status(401).send({ error: 'Unauthorized' });
       }
 
-      const exam = await prisma.exam.findFirst({
-        where: {
-          status: 'IN_PROGRESS',
-          rosterBatchId: entry.batchId,
-        },
-        select: {
-          id: true,
-          title: true,
-          scheduledStartAt: true,
-          scheduledEndAt: true,
-        },
-      });
+      const inProgressStatus = await resolveStudentInProgressExamStatus(
+        prisma,
+        entry.batchId,
+        getSessionStudentExamId(request),
+      );
 
-      if (exam) {
-        const now = new Date();
-        if (exam.scheduledStartAt && now < exam.scheduledStartAt) {
-          return reply.send({
-            status: 'waiting' as const,
-            examId: exam.id,
-            title: exam.title,
-            scheduledStartAt: exam.scheduledStartAt.toISOString(),
-          });
+      if (inProgressStatus) {
+        if (inProgressStatus.status !== 'choose_exam') {
+          await setSessionStudentExamId(request, inProgressStatus.examId);
         }
-        if (exam.scheduledEndAt && now > exam.scheduledEndAt) {
-          return reply.send({
-            status: 'DEADLINE_REACHED' as const,
-            examId: exam.id,
-            title: exam.title,
-            scheduledEndAt: exam.scheduledEndAt.toISOString(),
-          });
-        }
-
-        return reply.send({
-          status: 'IN_PROGRESS' as const,
-          examId: exam.id,
-          title: exam.title,
-          scheduledEndAt: exam.scheduledEndAt?.toISOString() ?? null,
-        });
+        return reply.send(inProgressStatus);
       }
 
       const draftExam = await prisma.exam.findFirst({

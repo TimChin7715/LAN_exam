@@ -1,6 +1,12 @@
 import type { FastifyReply, FastifyRequest } from 'fastify';
 
-import { getSessionRosterEntryId } from '../lib/student-auth.js';
+import {
+  getSessionRosterEntryId,
+  getSessionStudentExamId,
+  setSessionStudentExamId,
+} from '../lib/student-auth.js';
+
+export { getSessionStudentExamId, setSessionStudentExamId };
 import { isReplyFinished, replyUnauthorized } from '../lib/reply.js';
 
 /**

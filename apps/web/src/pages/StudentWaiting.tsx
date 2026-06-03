@@ -26,6 +26,16 @@ export default function StudentWaiting() {
   const [loggingOut, setLoggingOut] = useState(false);
   const [waitingHint, setWaitingHint] = useState<string | null>(null);
   const [enteringExam, setEnteringExam] = useState(false);
+  const [currentExamTitle, setCurrentExamTitle] = useState<string | null>(null);
+  const [chooseExams, setChooseExams] = useState<
+    Array<{
+      id: string;
+      title: string;
+      scheduledStartAt: string | null;
+      scheduledEndAt: string | null;
+    }>
+  >([]);
+  const [selectingExamId, setSelectingExamId] = useState<string | null>(null);
   const navigateScheduledRef = useRef(false);
   const enterTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -71,6 +81,7 @@ export default function StudentWaiting() {
       navigateScheduledRef.current = true;
       setEnteringExam(true);
       setWaitingHint(null);
+      setChooseExams([]);
 
       const delayMs = computeEnterExamDelayMs(profile.nationalId);
       enterTimeoutRef.current = setTimeout(() => {
@@ -84,18 +95,32 @@ export default function StudentWaiting() {
       if (document.hidden || navigateScheduledRef.current) return;
       try {
         const status = await studentApi.examStatus();
+        if (status.status === 'choose_exam') {
+          setChooseExams(status.exams);
+          setCurrentExamTitle(null);
+          setWaitingHint(
+            '当前有多场考试同时进行，请先选择您要参加的考试，开考后将自动进入答题页。',
+          );
+          setEnteringExam(false);
+          return;
+        }
+        setChooseExams([]);
         if (status.status === 'IN_PROGRESS') {
+          setCurrentExamTitle(status.title);
           scheduleEnterExam(status.examId);
         } else if (status.status === 'ENDED') {
+          setCurrentExamTitle(status.title);
           setWaitingHint(null);
           navigate(`/exam/ended?examId=${encodeURIComponent(status.examId)}`, {
             replace: true,
           });
         } else if (status.status === 'waiting') {
+          setCurrentExamTitle(status.title);
           setWaitingHint(
-            `考试将于 ${formatExamDateTime(status.scheduledStartAt)} 开始，请稍候。`,
+            `「${status.title}」将于 ${formatExamDateTime(status.scheduledStartAt)} 开始，请稍候。`,
           );
         } else {
+          setCurrentExamTitle(null);
           setWaitingHint(null);
         }
       } catch (err) {
@@ -139,6 +164,38 @@ export default function StudentWaiting() {
     };
   }, [profile, loading, navigate]);
 
+  async function handleChooseExam(examId: string) {
+    setSelectingExamId(examId);
+    try {
+      await studentApi.selectExam(examId);
+      const status = await studentApi.examStatus();
+      if (status.status === 'IN_PROGRESS') {
+        if (enterTimeoutRef.current) {
+          clearTimeout(enterTimeoutRef.current);
+          enterTimeoutRef.current = null;
+        }
+        navigateScheduledRef.current = false;
+        setEnteringExam(false);
+        navigate(`/exam/take?examId=${encodeURIComponent(status.examId)}`, {
+          replace: true,
+        });
+        return;
+      }
+      if (status.status === 'waiting') {
+        setChooseExams([]);
+        setWaitingHint(
+          `「${status.title}」将于 ${formatExamDateTime(status.scheduledStartAt)} 开始，请稍候。`,
+        );
+      }
+    } catch (err) {
+      setWaitingHint(
+        err instanceof ApiError ? err.message : '无法选择考试，请重试。',
+      );
+    } finally {
+      setSelectingExamId(null);
+    }
+  }
+
   async function handleLogout() {
     setLoggingOut(true);
     try {
@@ -167,6 +224,11 @@ export default function StudentWaiting() {
         <CardHeader className="space-y-2 pb-6">
           <CardTitle>考试准备</CardTitle>
           <CardDescription>请确认身份信息并等待开考</CardDescription>
+          {currentExamTitle ? (
+            <p className="text-sm font-medium text-foreground">
+              当前考试：{currentExamTitle}
+            </p>
+          ) : null}
         </CardHeader>
         <CardContent className="space-y-6">
           <dl className="space-y-3 text-sm">
@@ -183,6 +245,31 @@ export default function StudentWaiting() {
               </dd>
             </div>
           </dl>
+
+          {chooseExams.length > 0 ? (
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-foreground">选择考试</p>
+              <ul className="space-y-2">
+                {chooseExams.map((exam) => (
+                  <li key={exam.id}>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      className="h-auto w-full justify-start whitespace-normal py-3 text-left"
+                      disabled={selectingExamId !== null || enteringExam}
+                      onClick={() => void handleChooseExam(exam.id)}
+                    >
+                      {selectingExamId === exam.id ? (
+                        <Loader2 className="mr-2 size-4 shrink-0 animate-spin" />
+                      ) : null}
+                      {exam.title}
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
           <p className="text-center text-base text-muted-foreground">
             {enteringExam
               ? '考试已开始，正在为您加载试卷，请稍候…'

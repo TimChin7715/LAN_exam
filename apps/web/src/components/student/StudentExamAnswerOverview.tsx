@@ -102,7 +102,7 @@ export function StudentExamAnswerOverview({
 
   if (!expanded) {
     return (
-      <div className="fixed top-0 left-0 z-40 p-3 sm:p-4">
+      <div className="fixed right-0 top-20 z-40 p-3 sm:top-24 sm:p-4">
         <Button
           type="button"
           variant="outline"
@@ -122,7 +122,7 @@ export function StudentExamAnswerOverview({
 
   return (
     <div
-      className="fixed top-0 left-0 z-40 p-3 sm:p-4"
+      className="fixed right-0 top-20 z-40 p-3 sm:top-24 sm:p-4"
       role="region"
       aria-label="考试情况概览"
     >

@@ -18,6 +18,8 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
 import {
   Table,
@@ -43,6 +45,8 @@ import {
   handleExamApiError,
   retakeExamSubmission,
   startExam,
+  toDatetimeLocalValue,
+  updateExamSchedule,
   type ExamDetail,
   type ExamSeatBoard,
   type SubmissionListItem,
@@ -68,7 +72,13 @@ export default function AdminExamDetail() {
   const [actionLoading, setActionLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [exportingScreenshots, setExportingScreenshots] = useState(false);
+  const [downloadingPracticalRoster, setDownloadingPracticalRoster] = useState<
+    string | null
+  >(null);
   const [retakingEntryId, setRetakingEntryId] = useState<string | null>(null);
+  const [scheduleStart, setScheduleStart] = useState('');
+  const [scheduleEnd, setScheduleEnd] = useState('');
+  const [savingSchedule, setSavingSchedule] = useState(false);
 
   const load = useCallback(async () => {
     if (!examId) return;
@@ -80,6 +90,14 @@ export default function AdminExamDetail() {
       ]);
       setExam(examData);
       setSubmissions(submissionItems);
+      setScheduleStart(
+        examData.scheduledStartAt
+          ? toDatetimeLocalValue(examData.scheduledStartAt)
+          : '',
+      );
+      setScheduleEnd(
+        examData.scheduledEndAt ? toDatetimeLocalValue(examData.scheduledEndAt) : '',
+      );
     } catch (err) {
       handleExamApiError(err, '无法加载考试详情。');
     } finally {
@@ -119,6 +137,37 @@ export default function AdminExamDetail() {
       void reloadSeats();
     }
   }, [load, refreshSubmissions, reloadSeats, showSeatBoard]);
+
+  async function handleSaveSchedule() {
+    if (!examId || !exam) return;
+    if (exam.status !== 'DRAFT' && exam.status !== 'IN_PROGRESS') {
+      toast.error('仅草稿或进行中状态的考试可以编辑时间。');
+      return;
+    }
+    if (!scheduleStart || !scheduleEnd) {
+      toast.error('请填写开始时间与结束时间。');
+      return;
+    }
+    const startIso = new Date(scheduleStart).toISOString();
+    const endIso = new Date(scheduleEnd).toISOString();
+    if (!(new Date(endIso) > new Date(startIso))) {
+      toast.error('结束时间必须晚于开始时间。');
+      return;
+    }
+    setSavingSchedule(true);
+    try {
+      await updateExamSchedule(examId, {
+        scheduledStartAt: startIso,
+        scheduledEndAt: endIso,
+      });
+      toast.success('考试时间已更新');
+      await load();
+    } catch (err) {
+      handleExamApiError(err, '更新考试时间失败。');
+    } finally {
+      setSavingSchedule(false);
+    }
+  }
 
   useEffect(() => {
     void load();
@@ -328,6 +377,55 @@ export default function AdminExamDetail() {
             计划时间：
             {formatExamScheduleRange(exam.scheduledStartAt, exam.scheduledEndAt)}
           </p>
+          <div className="space-y-3 pt-2">
+            <p className="text-sm font-medium text-foreground">修改计划时间</p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1">
+                <Label htmlFor="scheduleStart">开始时间</Label>
+                <Input
+                  id="scheduleStart"
+                  type="datetime-local"
+                  value={scheduleStart}
+                  disabled={
+                    (exam.status !== 'DRAFT' && exam.status !== 'IN_PROGRESS') ||
+                    savingSchedule
+                  }
+                  onChange={(e) => setScheduleStart(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="scheduleEnd">结束时间</Label>
+                <Input
+                  id="scheduleEnd"
+                  type="datetime-local"
+                  value={scheduleEnd}
+                  disabled={
+                    (exam.status !== 'DRAFT' && exam.status !== 'IN_PROGRESS') ||
+                    savingSchedule
+                  }
+                  onChange={(e) => setScheduleEnd(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={
+                  (exam.status !== 'DRAFT' && exam.status !== 'IN_PROGRESS') ||
+                  savingSchedule
+                }
+                onClick={() => void handleSaveSchedule()}
+              >
+                {savingSchedule ? '保存中…' : '保存时间'}
+              </Button>
+              {exam.status !== 'DRAFT' && exam.status !== 'IN_PROGRESS' ? (
+                <p className="text-xs text-muted-foreground">
+                  仅草稿/进行中允许修改计划时间。
+                </p>
+              ) : null}
+            </div>
+          </div>
           {exam.startedAt ? (
             <p>实际开始：{formatExamDateTime(exam.startedAt)}</p>
           ) : null}
@@ -460,7 +558,9 @@ export default function AdminExamDetail() {
                   <TableCell>{row.organization}</TableCell>
                   <TableCell>{maskNationalId(row.nationalId)}</TableCell>
                   <TableCell>
-                    {row.submitted ? (
+                    {row.statusLabel === 'absent' ? (
+                      <Badge variant="destructive">缺考</Badge>
+                    ) : row.statusLabel === 'submitted' || row.submitted ? (
                       <Badge>已提交</Badge>
                     ) : (
                       <Badge variant="outline">未提交</Badge>
@@ -481,15 +581,25 @@ export default function AdminExamDetail() {
                           type="button"
                           variant="outline"
                           size="sm"
+                          disabled={downloadingPracticalRoster === row.rosterEntryId}
                           onClick={() =>
-                            void downloadPracticalAnswer(
-                              examId,
-                              row.rosterEntryId,
-                              `${row.fullName}-操作题`,
-                            )
+                            void (async () => {
+                              setDownloadingPracticalRoster(row.rosterEntryId);
+                              try {
+                                await downloadPracticalAnswer(
+                                  examId,
+                                  row.rosterEntryId,
+                                  `${row.fullName}-操作题`,
+                                );
+                              } finally {
+                                setDownloadingPracticalRoster(null);
+                              }
+                            })()
                           }
                         >
-                          下载答卷
+                          {downloadingPracticalRoster === row.rosterEntryId
+                            ? '下载中…'
+                            : '下载答卷'}
                         </Button>
                       ) : (
                         <span className="text-muted-foreground">未提交</span>

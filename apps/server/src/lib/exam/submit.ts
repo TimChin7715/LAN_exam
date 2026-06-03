@@ -133,6 +133,10 @@ export function scoreQuestionsFromDrafts(
     assertAnswersComplete(questionsForCheck, draftByQuestionId);
   }
 
+  // Round scores to 0.5 steps to avoid floating artifacts and keep grading simple.
+  const roundScore = (n: number): number =>
+    Math.round((n + Number.EPSILON) * 2) / 2;
+
   let totalScore = 0;
   const answerCreates: {
     examQuestionId: string;
@@ -153,16 +157,17 @@ export function scoreQuestionsFromDrafts(
       },
       selectedRaw,
     );
-    totalScore += scored.pointsAwarded;
+    const pointsAwarded = roundScore(scored.pointsAwarded);
+    totalScore = roundScore(totalScore + pointsAwarded);
     answerCreates.push({
       examQuestionId: q.examQuestionId,
       selectedKeys: scored.selectedKeys,
       isCorrect: scored.isCorrect,
-      pointsAwarded: scored.pointsAwarded,
+      pointsAwarded,
     });
   }
 
-  return { totalScore, answerCreates };
+  return { totalScore: roundScore(totalScore), answerCreates };
 }
 
 async function submitScoredQuestionsPart(
@@ -172,6 +177,8 @@ async function submitScoredQuestionsPart(
   _mode: SubmitMode,
 ): Promise<{ totalScore: number; submittedAt: Date }> {
   const requireComplete = false;
+  const roundScore = (n: number): number =>
+    Math.round((n + Number.EPSILON) * 2) / 2;
 
   const drafts = await tx.answerDraft.findMany({
     where: { examId, rosterEntryId },
@@ -238,12 +245,13 @@ async function submitScoredQuestionsPart(
         },
         selectedRaw,
       );
-      totalScore += scored.pointsAwarded;
+      const pointsAwarded = roundScore(scored.pointsAwarded);
+      totalScore = roundScore(totalScore + pointsAwarded);
       answerCreates.push({
         examQuestionId: eq.id,
         selectedKeys: scored.selectedKeys,
         isCorrect: scored.isCorrect,
-        pointsAwarded: scored.pointsAwarded,
+        pointsAwarded,
       });
     }
   }
@@ -260,7 +268,7 @@ async function submitScoredQuestionsPart(
     data: {
       examId,
       rosterEntryId,
-      totalScore,
+      totalScore: roundScore(totalScore),
       answers: { create: answerCreates },
     },
     select: { id: true, totalScore: true, submittedAt: true },

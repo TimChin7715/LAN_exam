@@ -1,5 +1,7 @@
 import type { Prisma } from '@prisma/client';
 
+import { questionImportOrderBy } from '../qbank/question-import-order.js';
+
 export async function materializeExamQuestionSets(
   tx: Prisma.TransactionClient,
   examId: string,
@@ -15,7 +17,7 @@ export async function materializeExamQuestionSets(
   if (input.questionBatchId) {
     const objective = await tx.question.findMany({
       where: { batchId: input.questionBatchId },
-      orderBy: { createdAt: 'asc' },
+      orderBy: questionImportOrderBy,
       select: { id: true },
     });
     questionIds.push(...objective.map((q) => q.id));
@@ -24,7 +26,7 @@ export async function materializeExamQuestionSets(
   if (input.fillInBatchId) {
     const fillIn = await tx.question.findMany({
       where: { fillInBatchId: input.fillInBatchId },
-      orderBy: { createdAt: 'asc' },
+      orderBy: questionImportOrderBy,
       select: { id: true },
     });
     questionIds.push(...fillIn.map((q) => q.id));

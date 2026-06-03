@@ -1,6 +1,7 @@
 import { toast } from 'sonner';
 
 import { ApiError, apiFetch, handleAuthResponse } from '@/lib/api';
+import { downloadOnce } from '@/lib/download';
 
 export type ExamStatus = 'DRAFT' | 'IN_PROGRESS' | 'ENDED';
 export type ExamContentModule = 'OBJECTIVE' | 'FILL' | 'PRACTICAL';
@@ -107,6 +108,7 @@ export type SubmissionListItem = {
   nationalId: string;
   totalScore: number | null;
   submitted: boolean;
+  statusLabel?: 'submitted' | 'pending' | 'absent';
   submittedAt: string | null;
   practicalSubmitted: boolean;
   practicalSubmittedAt: string | null;
@@ -195,6 +197,19 @@ export async function createExam(input: {
   return data.examId;
 }
 
+export async function updateExamSchedule(
+  examId: string,
+  input: { scheduledStartAt: string; scheduledEndAt: string },
+): Promise<void> {
+  await apiFetch(`/api/admin/exams/${encodeURIComponent(examId)}`, {
+    method: 'PATCH',
+    body: JSON.stringify({
+      scheduledStartAt: input.scheduledStartAt,
+      scheduledEndAt: input.scheduledEndAt,
+    }),
+  });
+}
+
 export async function getExam(id: string): Promise<ExamDetail> {
   const data = await apiFetch<{ ok: true; exam: ExamDetail }>(
     `/api/admin/exams/${encodeURIComponent(id)}`,
@@ -247,25 +262,25 @@ export async function downloadPracticalAnswer(
   rosterEntryId: string,
   fileNameHint: string,
 ): Promise<void> {
-  const response = await fetch(
-    `/api/admin/exams/${encodeURIComponent(examId)}/submissions/${encodeURIComponent(rosterEntryId)}/practical-answer`,
-    { credentials: 'include' },
-  );
+  const url = `/api/admin/exams/${encodeURIComponent(examId)}/submissions/${encodeURIComponent(rosterEntryId)}/practical-answer`;
+  await downloadOnce(url, async () => {
+    const response = await fetch(url, { credentials: 'include' });
 
-  if (!response.ok) {
-    toast.error('下载操作题答卷失败。');
-    throw new ApiError('Download failed', response.status);
-  }
+    if (!response.ok) {
+      toast.error('下载操作题答卷失败。');
+      throw new ApiError('Download failed', response.status);
+    }
 
-  const blob = await response.blob();
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = fileNameHint.endsWith('.docx')
-    ? fileNameHint
-    : `${fileNameHint}-操作题作答.docx`;
-  anchor.click();
-  URL.revokeObjectURL(url);
+    const blob = await response.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = objectUrl;
+    anchor.download = fileNameHint.endsWith('.docx')
+      ? fileNameHint
+      : `${fileNameHint}-操作题作答.docx`;
+    anchor.click();
+    URL.revokeObjectURL(objectUrl);
+  });
 }
 
 export async function fetchExamSubmissions(
@@ -288,70 +303,70 @@ export async function retakeExamSubmission(
 }
 
 export async function downloadExamExport(examId: string, title: string): Promise<void> {
-  const response = await fetch(
-    `/api/admin/exams/${encodeURIComponent(examId)}/export`,
-    { credentials: 'include' },
-  );
+  const url = `/api/admin/exams/${encodeURIComponent(examId)}/export`;
+  await downloadOnce(url, async () => {
+    const response = await fetch(url, { credentials: 'include' });
 
-  if (response.status === 401 || response.status === 403) {
-    const ct = response.headers.get('content-type') ?? '';
-    const payload = ct.includes('application/json')
-      ? ((await response.json()) as Record<string, unknown>)
-      : null;
-    handleAuthResponse(response.status, payload);
-    throw new ApiError('Unauthorized', response.status);
-  }
+    if (response.status === 401 || response.status === 403) {
+      const ct = response.headers.get('content-type') ?? '';
+      const payload = ct.includes('application/json')
+        ? ((await response.json()) as Record<string, unknown>)
+        : null;
+      handleAuthResponse(response.status, payload);
+      throw new ApiError('Unauthorized', response.status);
+    }
 
-  if (!response.ok) {
-    toast.error('导出失败，请稍后重试。');
-    throw new ApiError('Export failed', response.status);
-  }
+    if (!response.ok) {
+      toast.error('导出失败，请稍后重试。');
+      throw new ApiError('Export failed', response.status);
+    }
 
-  const blob = await response.blob();
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = `${title.replace(/[\\/:*?"<>|]/g, '_')}-成绩导出.xlsx`;
-  anchor.click();
-  URL.revokeObjectURL(url);
+    const blob = await response.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = objectUrl;
+    anchor.download = `${title.replace(/[\\/:*?"<>|]/g, '_')}-成绩导出.xlsx`;
+    anchor.click();
+    URL.revokeObjectURL(objectUrl);
+  });
 }
 
 export async function downloadFillInScreenshots(
   examId: string,
   title: string,
 ): Promise<void> {
-  const response = await fetch(
-    `/api/admin/exams/${encodeURIComponent(examId)}/export-fillin-screenshots`,
-    { credentials: 'include' },
-  );
+  const url = `/api/admin/exams/${encodeURIComponent(examId)}/export-fillin-screenshots`;
+  await downloadOnce(url, async () => {
+    const response = await fetch(url, { credentials: 'include' });
 
-  if (response.status === 401 || response.status === 403) {
-    const ct = response.headers.get('content-type') ?? '';
-    const payload = ct.includes('application/json')
-      ? ((await response.json()) as Record<string, unknown>)
-      : null;
-    handleAuthResponse(response.status, payload);
-    throw new ApiError('Unauthorized', response.status);
-  }
-
-  if (!response.ok) {
-    const ct = response.headers.get('content-type') ?? '';
-    if (ct.includes('application/json')) {
-      const payload = (await response.json()) as { message?: string };
-      toast.error(payload.message ?? '导出填空题截图失败。');
-    } else {
-      toast.error('导出填空题截图失败。');
+    if (response.status === 401 || response.status === 403) {
+      const ct = response.headers.get('content-type') ?? '';
+      const payload = ct.includes('application/json')
+        ? ((await response.json()) as Record<string, unknown>)
+        : null;
+      handleAuthResponse(response.status, payload);
+      throw new ApiError('Unauthorized', response.status);
     }
-    throw new ApiError('Export failed', response.status);
-  }
 
-  const blob = await response.blob();
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = `${title.replace(/[\\/:*?"<>|]/g, '_')}-填空题截图.zip`;
-  anchor.click();
-  URL.revokeObjectURL(url);
+    if (!response.ok) {
+      const ct = response.headers.get('content-type') ?? '';
+      if (ct.includes('application/json')) {
+        const payload = (await response.json()) as { message?: string };
+        toast.error(payload.message ?? '导出填空题截图失败。');
+      } else {
+        toast.error('导出填空题截图失败。');
+      }
+      throw new ApiError('Export failed', response.status);
+    }
+
+    const blob = await response.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = objectUrl;
+    anchor.download = `${title.replace(/[\\/:*?"<>|]/g, '_')}-填空题截图.zip`;
+    anchor.click();
+    URL.revokeObjectURL(objectUrl);
+  });
 }
 
 export function handleExamApiError(err: unknown, fallback: string): void {

@@ -1,8 +1,11 @@
 import type { FastifyInstance } from 'fastify';
 
 import { getTeacherShowSeatBoard } from '../../../lib/admin-settings.js';
-import { loadExamSeatBoard } from '../../../lib/seat/load-seat-board.js';
-import { resolvePublicSeatExam } from '../../../lib/seat/resolve-public-seat-exam.js';
+import {
+  loadExamSeatBoard,
+  type SeatBoardPayload,
+} from '../../../lib/seat/load-seat-board.js';
+import { listPublicSeatExams } from '../../../lib/seat/resolve-public-seat-exam.js';
 import { prisma } from '../../../lib/prisma.js';
 
 export async function registerStudentSeatBoardsRoutes(
@@ -19,22 +22,39 @@ export async function registerStudentSeatBoardsRoutes(
       },
     },
     async (_request, reply) => {
-      const exam = await resolvePublicSeatExam(prisma);
+      const exams = await listPublicSeatExams(prisma);
 
-      if (!exam) {
-        return reply.send({ ok: true, board: null });
+      if (exams.length === 0) {
+        return reply.send({ ok: true, board: null, boards: [] });
       }
 
-      const showSeatBoard = await getTeacherShowSeatBoard(prisma, exam.teacherId);
-      if (!showSeatBoard) {
-        return reply.send({ ok: true, board: null });
+      const boards: SeatBoardPayload[] = [];
+
+      for (const exam of exams) {
+        const showSeatBoard = await getTeacherShowSeatBoard(
+          prisma,
+          exam.teacherId,
+        );
+        if (!showSeatBoard) continue;
+
+        const board = await loadExamSeatBoard(prisma, exam, {
+          includeDisplayStatus: true,
+        });
+        if (!board) continue;
+
+        boards.push({
+          ...board,
+          examId: exam.id,
+          title: exam.title,
+          status: exam.status,
+        });
       }
 
-      const board = await loadExamSeatBoard(prisma, exam, {
-        includeDisplayStatus: true,
+      return reply.send({
+        ok: true,
+        board: boards[0] ?? null,
+        boards,
       });
-
-      return reply.send({ ok: true, board });
     },
   );
 }

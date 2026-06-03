@@ -28,7 +28,9 @@ export function StudentPracticalSection({
   const inputId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
-  const [downloading, setDownloading] = useState<'paper' | 'excel' | null>(null);
+  const [downloading, setDownloading] = useState<
+    'paper' | 'excel' | 'answer' | null
+  >(null);
 
   async function handleDownloadPaper() {
     setDownloading('paper');
@@ -47,6 +49,17 @@ export function StudentPracticalSection({
       await studentApi.downloadPracticalExcel(examId, meta.excelFileName);
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : '下载 Excel 失败');
+    } finally {
+      setDownloading(null);
+    }
+  }
+
+  async function handleDownloadAnswer(fileName: string) {
+    setDownloading('answer');
+    try {
+      await studentApi.downloadPracticalAnswer(examId, fileName);
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : '下载答卷失败');
     } finally {
       setDownloading(null);
     }
@@ -119,11 +132,10 @@ export function StudentPracticalSection({
             <Button
               type="button"
               variant="outline"
-              onClick={() =>
-                void studentApi.downloadPracticalAnswer(examId, displayFile)
-              }
+              disabled={downloading === 'answer'}
+              onClick={() => void handleDownloadAnswer(displayFile)}
             >
-              下载已提交作答
+              {downloading === 'answer' ? '下载中…' : '下载已提交作答'}
             </Button>
           ) : null}
         </div>

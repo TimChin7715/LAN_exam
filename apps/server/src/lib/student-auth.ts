@@ -44,6 +44,26 @@ export async function establishStudentSession(
   }
   active.studentRosterEntryId = rosterEntryId;
   active.studentName = studentName;
+  delete active.studentExamId;
+  await saveSession(active);
+}
+
+export function getSessionStudentExamId(
+  request: FastifyRequest,
+): string | undefined {
+  const id = getRequestSession(request)?.studentExamId;
+  return typeof id === 'string' && id.length > 0 ? id : undefined;
+}
+
+export async function setSessionStudentExamId(
+  request: FastifyRequest,
+  examId: string,
+): Promise<void> {
+  const active = getRequestSession(request);
+  if (!active) {
+    throw new Error('Session middleware not available');
+  }
+  active.studentExamId = examId;
   await saveSession(active);
 }
 
@@ -57,6 +77,7 @@ export async function destroyStudentSession(
 
   delete appSession.studentRosterEntryId;
   delete appSession.studentName;
+  delete appSession.studentExamId;
   await saveSession(appSession);
 }
 

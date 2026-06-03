@@ -143,7 +143,8 @@ export async function importFillInBatch(
       });
     }
 
-    for (const blank of blanks) {
+    for (let importSortOrder = 0; importSortOrder < blanks.length; importSortOrder += 1) {
+      const blank = blanks[importSortOrder]!;
       await tx.question.create({
         data: {
           id: randomUUID(),
@@ -154,6 +155,7 @@ export async function importFillInBatch(
           points: blank.points,
           knowledgePoints: String(blank.questionNo),
           explanation: String(blank.blankIndex),
+          importSortOrder,
         },
       });
     }

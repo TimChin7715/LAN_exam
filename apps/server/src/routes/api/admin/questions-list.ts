@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 
 import { resolveAdminTeacherId } from '../../../lib/admin-context.js';
+import { questionImportOrderBy } from '../../../lib/qbank/question-import-order.js';
 import { prisma } from '../../../lib/prisma.js';
 import { requireAdminSession } from '../../../plugins/admin-guard.js';
 
@@ -39,7 +40,7 @@ export async function registerAdminQuestionsListRoutes(
         prisma.question.count({ where }),
         prisma.question.findMany({
           where,
-          orderBy: { createdAt: 'desc' },
+          orderBy: batchId ? questionImportOrderBy : [{ createdAt: 'desc' }],
           skip: (page - 1) * pageSize,
           take: pageSize,
           select: {

@@ -1,6 +1,6 @@
 # Windows 安装包修复记录
 
-> 版本跨度：v1.6.6 → v1.6.26
+> 版本跨度：v1.6.6 → v1.6.29
 > 涉及提交：`062890f` ~ 当前工作区
 
 ---
@@ -427,3 +427,47 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "C:\LAN-Exam\scripts\install
 - `scripts/windows/validate-install-scripts.ps1`
 - `scripts/windows/cleanup-dist-artifacts.ps1`
 - `docs/DEPLOY-WINDOWS-NATIVE.md`（日志排查说明）
+
+---
+
+## 17. v1.6.28: repack latest changes
+
+**Release artifact**: `dist\LAN-Exam-Setup-v1.6.28.exe`
+
+### This release updates
+
+- Bump `VERSION` to `1.6.28`.
+- Re-run full packaging pipeline (`validate-install-scripts` -> `build-release` -> `fetch-runtimes` -> `build-tray` -> `verify-package` -> Inno).
+- Keep prior installer hardening unchanged:
+  - Postgres slow-start and stale pid handling
+  - Prisma junction/readability checks and repair
+  - Firewall allow rule for `5180` on `private,public,domain`
+
+### Deployment reminders
+
+1. Run Setup as Administrator.
+2. Student URL must be `http://<LAN_IP>:5180/exam/login` (not `/admin`).
+3. Verify `logs\install.log` contains `install completed` and `verify-install passed`.
+4. Check `http://127.0.0.1:5180/health` returns version `1.6.28`.
+
+---
+
+## 18. v1.6.29: latest repack and doc sync
+
+**Release artifact**: `dist\LAN-Exam-Setup-v1.6.29.exe`
+
+### This release updates
+
+- Bump `VERSION` to `1.6.29`.
+- Re-run full packaging pipeline (`validate-install-scripts` -> `build-release` -> `fetch-runtimes` -> `build-tray` -> `verify-package` -> Inno).
+- Keep prior installer stability fixes unchanged:
+  - Postgres slow-start and stale pid handling
+  - Prisma junction/readability checks and repair
+  - Firewall allow rule for `5180` on `private,public,domain`
+
+### Deployment reminders
+
+1. Run Setup as Administrator.
+2. Student URL must be `http://<LAN_IP>:5180/exam/login` (not `/admin`).
+3. Verify `logs\install.log` contains `install completed` and `verify-install passed`.
+4. Check `http://127.0.0.1:5180/health` returns version `1.6.29`.

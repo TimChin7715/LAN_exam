@@ -5,6 +5,8 @@ declare module 'express-session' {
     teacherId?: string;
     studentRosterEntryId?: string;
     studentName?: string;
+    /** Selected in-progress exam when multiple share the same roster batch */
+    studentExamId?: string;
   }
 }
 

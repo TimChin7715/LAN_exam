@@ -9,10 +9,11 @@ export type PublicSeatExamSelect = {
   scheduledStartAt: Date | null;
 };
 
-export async function resolvePublicSeatExam(
+/** All public seat-board exams (in-progress first; else latest draft). */
+export async function listPublicSeatExams(
   prisma: PrismaClient,
-): Promise<PublicSeatExamSelect | null> {
-  const inProgress = await prisma.exam.findFirst({
+): Promise<PublicSeatExamSelect[]> {
+  const inProgress = await prisma.exam.findMany({
     where: { status: 'IN_PROGRESS' },
     orderBy: { startedAt: 'desc' },
     select: {
@@ -25,8 +26,8 @@ export async function resolvePublicSeatExam(
     },
   });
 
-  if (inProgress) {
-    return { ...inProgress, status: 'IN_PROGRESS' as const };
+  if (inProgress.length > 0) {
+    return inProgress.map((e) => ({ ...e, status: 'IN_PROGRESS' as const }));
   }
 
   const draft = await prisma.exam.findFirst({
@@ -42,9 +43,12 @@ export async function resolvePublicSeatExam(
     },
   });
 
-  if (!draft) {
-    return null;
-  }
+  return draft ? [{ ...draft, status: 'DRAFT' as const }] : [];
+}
 
-  return { ...draft, status: 'DRAFT' as const };
+export async function resolvePublicSeatExam(
+  prisma: PrismaClient,
+): Promise<PublicSeatExamSelect | null> {
+  const exams = await listPublicSeatExams(prisma);
+  return exams[0] ?? null;
 }
