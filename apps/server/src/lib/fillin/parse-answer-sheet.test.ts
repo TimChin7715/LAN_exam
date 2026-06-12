@@ -7,11 +7,17 @@ import {
   applyFillInAnswerColumnTextFormat,
 } from './excel-answer-column.js';
 import {
+  buildFillInInlinePreviewHtml,
   buildFillInBlanksFromAnswerSheet,
   buildFillInImportTemplateExcel,
+  countFillInBlankMarkers,
   parseAnswerSheetRows,
 } from './parse-answer-sheet.js';
-import { FILLIN_HEADERS, FILLIN_SHEET } from './types.js';
+import {
+  FILLIN_HEADERS,
+  FILLIN_SHEET,
+  FILLIN_TEMPLATE_HEADERS,
+} from './types.js';
 
 async function buildSampleAnswerSheet(): Promise<Buffer> {
   const wb = new ExcelJS.Workbook();
@@ -43,6 +49,73 @@ describe('parseAnswerSheetRows', () => {
     assert.equal(blanks[1]!.answerKeys, '00123');
     assert.equal(blanks[0]!.questionNo, 1);
     assert.equal(blanks[1]!.blankIndex, 2);
+  });
+
+  it('reads modern Excel-only rows with 题干 and propagates stems by question', async () => {
+    const wb = new ExcelJS.Workbook();
+    const sheet = wb.addWorksheet(FILLIN_SHEET);
+    sheet.addRow([...FILLIN_TEMPLATE_HEADERS]);
+    applyFillInAnswerColumnTextFormat(sheet, 3);
+    addFillInAnswerSheetRow(sheet, 1, '北京', 2, {
+      stem: '中国的首都是【】，直辖市之一是【】。',
+    });
+    addFillInAnswerSheetRow(sheet, 1, '上海', 2, { stem: '' });
+    const buffer = Buffer.from(await wb.xlsx.writeBuffer());
+
+    const { rows, errors } = await parseAnswerSheetRows(buffer);
+    assert.equal(errors.length, 0, JSON.stringify(errors));
+    assert.equal(rows.length, 2);
+
+    const blanks = buildFillInBlanksFromAnswerSheet(rows);
+    assert.equal(blanks[0]!.stem, '中国的首都是【】，直辖市之一是【】。');
+    assert.equal(blanks[1]!.stem, '中国的首都是【】，直辖市之一是【】。');
+    assert.equal(blanks[1]!.blankIndex, 2);
+  });
+
+  it('builds inline preview inputs for each imported blank', async () => {
+    const blanks = buildFillInBlanksFromAnswerSheet([
+      {
+        rowNumber: 2,
+        questionNo: 1,
+        stemText: '中国的首都是【】，直辖市之一是【】。',
+        answerText: '北京',
+        points: 2,
+      },
+      {
+        rowNumber: 3,
+        questionNo: 1,
+        answerText: '上海',
+        points: 2,
+      },
+    ]);
+
+    const html = buildFillInInlinePreviewHtml(blanks);
+    assert.match(html, /class="fillin-inline-input"/);
+    assert.match(html, /data-fillin-question-no="1"/);
+    assert.match(html, /data-fillin-blank-index="2"/);
+  });
+
+  it('only treats 【】 as inline blank markers', () => {
+    assert.equal(countFillInBlankMarkers('中国的首都是【】。'), 1);
+    assert.equal(countFillInBlankMarkers('中国的首都是____。'), 0);
+    assert.equal(countFillInBlankMarkers('中国的首都是（ ）。'), 0);
+  });
+
+  it('rejects unsupported blank marker styles in stem', async () => {
+    const wb = new ExcelJS.Workbook();
+    const sheet = wb.addWorksheet(FILLIN_SHEET);
+    sheet.addRow([...FILLIN_TEMPLATE_HEADERS]);
+    applyFillInAnswerColumnTextFormat(sheet, 3);
+    addFillInAnswerSheetRow(sheet, 1, '北京', 2, {
+      stem: '中国的首都是____。',
+    });
+    const buffer = Buffer.from(await wb.xlsx.writeBuffer());
+
+    const { rows, errors } = await parseAnswerSheetRows(buffer);
+    assert.equal(rows.length, 0);
+    assert.equal(errors.length, 1);
+    assert.equal(errors[0]!.column, '题干');
+    assert.match(errors[0]!.message, /只能使用【】/);
   });
 
   it('skips rows with 【示例】 or 【说明】 in 答案 column', async () => {

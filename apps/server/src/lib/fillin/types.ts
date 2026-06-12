@@ -5,7 +5,16 @@ export type { RowError };
 /** 唯一导入工作表 */
 export const FILLIN_SHEET = '答题卡';
 
+export const FILLIN_STEM_HEADER = '题干';
+
 export const FILLIN_HEADERS = ['题号', '答案', '分值'] as const;
+
+export const FILLIN_TEMPLATE_HEADERS = [
+  '题号',
+  FILLIN_STEM_HEADER,
+  '答案',
+  '分值',
+] as const;
 
 /** 下发学员的答题卡列（无答案/分值） */
 export const FILLIN_STUDENT_HEADERS = ['题号', '作答区'] as const;
@@ -13,6 +22,7 @@ export const FILLIN_STUDENT_HEADERS = ['题号', '作答区'] as const;
 export type ParsedAnswerRow = {
   rowNumber: number;
   questionNo: number;
+  stemText?: string;
   answerText: string;
   points: number;
 };

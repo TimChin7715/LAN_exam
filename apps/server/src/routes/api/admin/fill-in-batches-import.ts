@@ -60,8 +60,8 @@ async function collectMultipartImportFiles(
   return { singles, attachmentFiles };
 }
 
-function stripWordTitle(filename: string): string {
-  return filename.replace(/\.(docx?|doc)$/i, '').trim() || filename;
+function stripImportTitle(filename: string): string {
+  return filename.replace(/\.(docx?|xlsx?)$/i, '').trim() || filename;
 }
 
 function parseAttachmentInputs(
@@ -132,13 +132,6 @@ export async function registerAdminFillInBatchesImportRoutes(
       const word = singles.get('wordFile');
       const excel = singles.get('excelFile');
 
-      if (!word) {
-        return reply.status(400).send({
-          ok: false,
-          code: 'MISSING_WORD_FILE',
-          message: '请上传 wordFile 字段（.doc 或 .docx）',
-        });
-      }
       if (!excel) {
         return reply.status(400).send({
           ok: false,
@@ -147,13 +140,15 @@ export async function registerAdminFillInBatchesImportRoutes(
         });
       }
 
-      const wordCheck = assertValidWordUpload(
-        word.filename,
-        word.mimetype,
-        word.buffer,
-        getMaxWordUploadBytes(),
-      );
-      if (!wordCheck.ok) {
+      const wordCheck = word
+        ? assertValidWordUpload(
+            word.filename,
+            word.mimetype,
+            word.buffer,
+            getMaxWordUploadBytes(),
+          )
+        : null;
+      if (wordCheck && !wordCheck.ok) {
         return reply.status(400).send({
           ok: false,
           code: 'INVALID_WORD_FILE',
@@ -198,7 +193,7 @@ export async function registerAdminFillInBatchesImportRoutes(
       }
 
       const batchId = randomUUID();
-      const title = stripWordTitle(word.filename);
+      const title = stripImportTitle(word?.filename ?? excel.filename);
 
       let result;
       try {
@@ -206,9 +201,9 @@ export async function registerAdminFillInBatchesImportRoutes(
           teacherId,
           batchId,
           title,
-          wordFileName: word.filename,
-          wordExt: wordCheck.ext,
-          wordBuffer: word.buffer,
+          wordFileName: word?.filename,
+          wordExt: wordCheck?.ok ? wordCheck.ext : undefined,
+          wordBuffer: word?.buffer,
           excelFileName: excel.filename,
           excelBuffer: excel.buffer,
           attachments: attachmentParse.attachments,

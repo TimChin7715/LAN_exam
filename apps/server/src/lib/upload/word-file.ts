@@ -98,9 +98,9 @@ export function isDocxExtension(filename: string | undefined): boolean {
 }
 
 export function contentTypeForWordFilename(filename: string): string {
-  return filename.toLowerCase().endsWith('.doc')
-    ? DOC_MIME
-    : DOCX_MIME;
+  const lower = filename.toLowerCase();
+  if (lower.endsWith('.html')) return 'text/html; charset=utf-8';
+  return lower.endsWith('.doc') ? DOC_MIME : DOCX_MIME;
 }
 
 export function getMaxWordUploadBytes(): number {

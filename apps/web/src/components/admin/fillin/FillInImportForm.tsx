@@ -82,7 +82,7 @@ export function FillInImportForm({
   }
 
   async function handleImport() {
-    if (!wordFile || !excelFile || importing) return;
+    if (!excelFile || importing) return;
     const attachmentMsg = validateFillInAttachmentFiles(attachmentFiles);
     if (attachmentMsg) {
       setValidationError(attachmentMsg);
@@ -168,9 +168,9 @@ export function FillInImportForm({
 
       <div className="grid gap-4 md:grid-cols-3">
         <ImportFileDropzone
-          label="Word 题目"
-          hint="完整试卷 .doc/.docx，无需与 Excel 题号对应"
-          note="为考试机能显示图片请上传.docx格式文档"
+          label="Word 题目（可选）"
+          hint="新版可只上传 Excel；如需保留原 Word 预览，再上传 .doc/.docx"
+          note="仅 Word 预览需要上传；带图片的试卷建议使用 .docx"
           accept={WORD_ACCEPT}
           file={wordFile}
           disabled={disabled || importing}
@@ -197,8 +197,9 @@ export function FillInImportForm({
           onDrop={(e) => handleDrop('attachment', e)}
         />
         <ImportFileDropzone
-          label="Excel 答题卡"
-          hint="支持 .xls 或 .xlsx，须含工作表「答题卡」（列：题号、答案、分值）"
+          label="Excel 试卷与答题卡"
+          hint="支持 .xls 或 .xlsx；只改「答题卡」工作表，填写题号、题干、答案、分值"
+          note="题干中的留空只能写【】。一题有多个空时，用同一个题号写多行，题干里也写对应数量的【】。"
           accept={ANSWER_SHEET_ACCEPT}
           file={excelFile}
           disabled={disabled || importing}
@@ -217,7 +218,7 @@ export function FillInImportForm({
         <Button
           type="button"
           className="min-h-11 w-full md:w-auto"
-          disabled={!wordFile || !excelFile || importing || disabled}
+          disabled={!excelFile || importing || disabled}
           onClick={() => void handleImport()}
         >
           {importing ? '正在导入…' : '开始导入'}

@@ -58,5 +58,5 @@ export function validateAnswerSheetFile(file: File): string | null {
   if (lower.endsWith('.xlsx') || lower.endsWith('.xls')) {
     return null;
   }
-  return '请选择 .xls 或 .xlsx 格式的 Excel 答题卡';
+  return '请选择 .xls 或 .xlsx 格式的 Excel 试卷与答题卡';
 }

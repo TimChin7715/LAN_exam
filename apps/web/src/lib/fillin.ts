@@ -66,12 +66,14 @@ export async function downloadFillInTemplate(): Promise<void> {
 }
 
 export async function importFillInBatch(
-  wordFile: File,
+  wordFile: File | null,
   excelFile: File,
   attachmentFiles: File[] = [],
 ): Promise<FillInImportSuccess | FillInImportFailure> {
   const form = new FormData();
-  form.append('wordFile', wordFile);
+  if (wordFile) {
+    form.append('wordFile', wordFile);
+  }
   form.append('excelFile', excelFile);
   for (const file of attachmentFiles) {
     form.append('attachmentFiles', file);

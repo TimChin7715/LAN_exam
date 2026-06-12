@@ -3,8 +3,10 @@ import { randomUUID } from 'node:crypto';
 
 import { generateFillInWordPreview } from './generate-word-preview.js';
 import {
+  buildFillInInlinePreviewHtml,
   buildFillInBlanksFromAnswerSheet,
   buildStudentAnswerSheetExcel,
+  countFillInBlankMarkers,
   parseAnswerSheetRows,
 } from './parse-answer-sheet.js';
 import type { RowError } from './types.js';
@@ -41,15 +43,40 @@ export type FillInImportResult =
       errors: RowError[];
     };
 
+function validateInlineBlankMarkers(
+  blanks: ReturnType<typeof buildFillInBlanksFromAnswerSheet>,
+): RowError[] {
+  const groups = new Map<number, typeof blanks>();
+  for (const blank of blanks) {
+    const list = groups.get(blank.questionNo) ?? [];
+    list.push(blank);
+    groups.set(blank.questionNo, list);
+  }
+
+  const errors: RowError[] = [];
+  for (const [questionNo, group] of groups) {
+    const stem = group.find((blank) => blank.stem.trim())?.stem.trim() ?? '';
+    const markerCount = countFillInBlankMarkers(stem);
+    if (markerCount !== group.length) {
+      errors.push({
+        row: group[0]?.rowNumber ?? 0,
+        column: '题干',
+        message: `第 ${questionNo} 题有 ${group.length} 个空位答案，题干中也必须写 ${group.length} 个【】。`,
+      });
+    }
+  }
+  return errors;
+}
+
 export async function importFillInBatch(
   prisma: PrismaClient,
   input: {
     teacherId: string;
     batchId: string;
     title: string;
-    wordFileName: string;
-    wordExt: WordUploadExt;
-    wordBuffer: Buffer;
+    wordFileName?: string;
+    wordExt?: WordUploadExt;
+    wordBuffer?: Buffer;
     excelFileName: string;
     excelBuffer: Buffer;
     attachments?: FillInImportAttachmentInput[];
@@ -74,8 +101,36 @@ export async function importFillInBatch(
     };
   }
 
+  const hasUploadedWord = Boolean(input.wordFileName && input.wordExt && input.wordBuffer);
+  if (!hasUploadedWord && blanks.every((blank) => !blank.stem.trim())) {
+    return {
+      ok: false,
+      errors: [
+        {
+          row: 0,
+          column: '题干',
+          message:
+            '未上传 Word 时，Excel 中至少需要填写一个真实题干，用于生成考试端试卷预览。',
+        },
+      ],
+    };
+  }
+  if (!hasUploadedWord) {
+    const markerErrors = validateInlineBlankMarkers(blanks);
+    if (markerErrors.length > 0) {
+      return { ok: false, errors: markerErrors };
+    }
+  }
+
   const studentExcelBuffer = await buildStudentAnswerSheetExcel(blanks);
-  const wordExt = input.wordExt;
+  const generatedHtml = hasUploadedWord ? null : buildFillInInlinePreviewHtml(blanks);
+  const wordExt = hasUploadedWord ? input.wordExt! : 'html';
+  const wordFileName = hasUploadedWord
+    ? input.wordFileName!
+    : `${input.excelFileName.replace(/\.(xlsx?|xls)$/i, '').trim() || input.title}-题目.html`;
+  const wordBuffer = hasUploadedWord
+    ? input.wordBuffer!
+    : Buffer.from(generatedHtml!, 'utf8');
   const excelExt = spreadsheetExt(input.excelFileName) ?? 'xlsx';
   const wordKey = fillInBatchWordKey(input.batchId, wordExt);
   const excelKey = fillInBatchExcelKey(
@@ -84,11 +139,11 @@ export async function importFillInBatch(
   );
   const studentExcelKey = fillInBatchStudentExcelKey(input.batchId);
 
-  await writeStorageFile(wordKey, input.wordBuffer);
+  await writeStorageFile(wordKey, wordBuffer);
   await generateFillInWordPreview(
     input.batchId,
-    input.wordBuffer,
-    input.wordFileName,
+    wordBuffer,
+    wordFileName,
   );
   await writeStorageFile(excelKey, input.excelBuffer);
   await writeStorageFile(studentExcelKey, studentExcelBuffer);
@@ -120,7 +175,7 @@ export async function importFillInBatch(
         id: input.batchId,
         teacherId: input.teacherId,
         title: input.title,
-        wordFileName: input.wordFileName,
+        wordFileName,
         wordStorageKey: wordKey,
         excelFileName: input.excelFileName,
         excelStorageKey: excelKey,
@@ -166,7 +221,7 @@ export async function importFillInBatch(
     batchId: input.batchId,
     title: input.title,
     importedCount: blanks.length,
-    wordFileName: input.wordFileName,
+    wordFileName,
     excelFileName: input.excelFileName,
     attachmentCount: storedAttachments.length,
     attachmentFileNames: storedAttachments.map((a) => a.fileName),

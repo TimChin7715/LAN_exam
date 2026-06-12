@@ -707,6 +707,8 @@ export default function StudentExamTake() {
   const hasObjectiveModule = hasExamModule(contentModules, 'OBJECTIVE');
   const hasFillModule = hasExamModule(contentModules, 'FILL');
   const hasPracticalModule = needsPractical(contentModules);
+  const isFillOnlyExam =
+    hasFillModule && !hasObjectiveModule && !hasPracticalModule;
   const pageMaxWidth = hasFillModule ? 'max-w-[96rem]' : 'max-w-3xl';
 
   return (
@@ -774,7 +776,7 @@ export default function StudentExamTake() {
         </div>
       ) : null}
 
-      {!loading && answerProgress.totalCount > 0 ? (
+      {!loading && answerProgress.totalCount > 0 && !isFillOnlyExam ? (
         <StudentExamAnswerOverview
           summary={answerProgress}
           contentModules={contentModules}

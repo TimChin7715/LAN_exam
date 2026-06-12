@@ -57,7 +57,7 @@ export function examWorkFillInScreenshotKey(
 
 export function fillInBatchWordKey(
   batchId: string,
-  ext: 'doc' | 'docx' = 'docx',
+  ext: 'doc' | 'docx' | 'html' = 'docx',
 ): string {
   return `fill-in-batches/${batchId}/paper.${ext}`;
 }

@@ -1,13 +1,9 @@
-import { createReadStream } from 'node:fs';
-import { join } from 'node:path';
-
 import type { FastifyInstance } from 'fastify';
 
+import { buildFillInImportTemplateExcel } from '../../../lib/fillin/parse-answer-sheet.js';
 import { requireAdminSession } from '../../../plugins/admin-guard.js';
-import { TEMPLATES_DIR } from '../../../lib/templates-dir.js';
 
 const TEMPLATE_FILENAME = '填空题导入模板.xlsx';
-const TEMPLATE_PATH = join(TEMPLATES_DIR, TEMPLATE_FILENAME);
 
 export async function registerAdminFillInBatchesTemplateRoutes(
   app: FastifyInstance,
@@ -25,7 +21,7 @@ export async function registerAdminFillInBatchesTemplateRoutes(
           'Content-Disposition',
           `attachment; filename*=UTF-8''${encodeURIComponent(TEMPLATE_FILENAME)}`,
         )
-        .send(createReadStream(TEMPLATE_PATH));
+        .send(await buildFillInImportTemplateExcel());
     },
   );
 }

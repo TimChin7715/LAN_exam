@@ -37,6 +37,10 @@ export function previewVersionFromWordBuffer(buffer: Buffer): string {
   return createHash('sha256').update(buffer).digest('hex').slice(0, 16);
 }
 
+function isHtmlPreviewFilename(filename: string | undefined): boolean {
+  return filename?.toLowerCase().endsWith('.html') ?? false;
+}
+
 function imageExtFromContentType(contentType: string): string {
   if (contentType === 'image/png') return 'png';
   if (contentType === 'image/jpeg') return 'jpg';
@@ -110,12 +114,48 @@ async function buildDocPreviewHtml(buffer: Buffer): Promise<string> {
   return `<pre class="whitespace-pre-wrap font-sans text-sm leading-relaxed">${escapeHtml(text)}</pre>`;
 }
 
+/** Store already-rendered HTML preview, used by Excel-only fill-in imports. */
+export async function generateFillInHtmlPreview(
+  batchId: string,
+  html: string,
+  sourceBuffer: Buffer = Buffer.from(html, 'utf8'),
+): Promise<FillInPreviewMeta> {
+  const version = previewVersionFromWordBuffer(sourceBuffer);
+  const body = html.trim() || '<p class="text-muted">试卷正文为空。</p>';
+
+  try {
+    await deleteStorageTree(fillInBatchPreviewImagesPrefix(batchId));
+  } catch {
+    // ignore missing dir
+  }
+
+  const meta: FillInPreviewMeta = {
+    version,
+    generatedAt: new Date().toISOString(),
+  };
+
+  await writeStorageFile(
+    fillInBatchPreviewMetaKey(batchId),
+    Buffer.from(JSON.stringify(meta), 'utf8'),
+  );
+  await writeStorageFile(
+    fillInBatchPreviewBodyKey(batchId),
+    Buffer.from(body, 'utf8'),
+  );
+
+  return meta;
+}
+
 /** Pre-render Word 试卷 to HTML + sidecar images (import-time; cheap at exam read). */
 export async function generateFillInWordPreview(
   batchId: string,
   buffer: Buffer,
   filename?: string,
 ): Promise<FillInPreviewMeta> {
+  if (isHtmlPreviewFilename(filename)) {
+    return generateFillInHtmlPreview(batchId, buffer.toString('utf8'), buffer);
+  }
+
   const version = previewVersionFromWordBuffer(buffer);
   const ext = detectWordFormat(buffer) ?? wordUploadExt(filename) ?? 'docx';
 

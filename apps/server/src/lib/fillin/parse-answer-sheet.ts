@@ -3,6 +3,7 @@ import ExcelJS from 'exceljs';
 import {
   addFillInAnswerSheetRow,
   applyFillInAnswerColumnTextFormat,
+  FILLIN_INLINE_ANSWER_COLUMN,
   writeFillInAnswerCell,
 } from './excel-answer-column.js';
 import { parseNonNegativeScore } from '../parse-score.js';
@@ -16,14 +17,53 @@ import type { RowError } from './types.js';
 import {
   FILLIN_HEADERS,
   FILLIN_SHEET,
+  FILLIN_STEM_HEADER,
   FILLIN_STUDENT_HEADERS,
+  FILLIN_TEMPLATE_HEADERS,
   type ParsedAnswerRow,
   type ParsedFillInBlank,
 } from './types.js';
 
+const QUESTION_NO_HEADER = '题号';
+const ANSWER_HEADER = '答案';
+const POINTS_HEADER = '分值';
+const FILLIN_STEM_HEADER_ALIASES = [
+  FILLIN_STEM_HEADER,
+  '题目',
+  '完整题目',
+  '试题',
+] as const;
+const SAMPLE_PREFIXES = ['【示例】', '【说明】'] as const;
+const BLANK_MARKER_RE = /【\s*】/g;
+const UNSUPPORTED_BLANK_MARKER_RULES = [
+  { re: /_{2,}|＿{2,}/, example: '____' },
+  { re: /（\s*）|\(\s*\)/, example: '（）' },
+  { re: /\[\s*\]|［\s*］/, example: '[]' },
+] as const;
+
 function parseIntCell(text: string): number | null {
   const n = parseInt(text, 10);
   return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+function findHeader(
+  cols: Map<string, number>,
+  headers: readonly string[],
+): string | null {
+  return headers.find((h) => cols.has(h)) ?? null;
+}
+
+function getCellByAnyHeader(
+  row: string[],
+  cols: Map<string, number>,
+  headers: readonly string[],
+): string {
+  const header = findHeader(cols, headers);
+  return header ? getCellByHeader(row, cols, header) : '';
+}
+
+function isTemplateHelperText(text: string): boolean {
+  return SAMPLE_PREFIXES.some((prefix) => text.startsWith(prefix));
 }
 
 /** 与答题卡「答案」列一致：按 | 分隔多个可接受答案，仅 trim，不改写内容 */
@@ -32,6 +72,19 @@ function splitAcceptedAnswers(answerText: string): string[] {
     .split(/[|｜]/)
     .map((a) => a.trim())
     .filter(Boolean);
+}
+
+export function countFillInBlankMarkers(stem: string): number {
+  return [...stem.matchAll(BLANK_MARKER_RE)].length;
+}
+
+function findUnsupportedBlankMarker(stem: string): string | null {
+  for (const rule of UNSUPPORTED_BLANK_MARKER_RULES) {
+    if (rule.re.test(stem)) {
+      return rule.example;
+    }
+  }
+  return null;
 }
 
 export async function parseAnswerSheetRows(
@@ -68,45 +121,55 @@ export async function parseAnswerSheetRows(
   for (let i = 1; i < allRows.length; i++) {
     const row = allRows[i]!;
     const rowNumber = i + 1;
-    const qText = getCellByHeader(row, cols, '题号');
-    const answerText = getCellByHeader(row, cols, '答案');
-    const pointsText = getCellByHeader(row, cols, '分值');
+    const qText = getCellByHeader(row, cols, QUESTION_NO_HEADER);
+    const stemText = getCellByAnyHeader(row, cols, FILLIN_STEM_HEADER_ALIASES);
+    const answerText = getCellByHeader(row, cols, ANSWER_HEADER);
+    const pointsText = getCellByHeader(row, cols, POINTS_HEADER);
 
-    if (!qText && !answerText && !pointsText) continue;
+    if (!qText && !stemText && !answerText && !pointsText) continue;
 
-    if (
-      answerText.startsWith('【示例】') ||
-      answerText.startsWith('【说明】')
-    ) {
+    if (isTemplateHelperText(answerText) || isTemplateHelperText(stemText)) {
       continue;
     }
 
     const questionNo = parseIntCell(qText);
     if (questionNo == null) {
-      errors.push({ row: rowNumber, column: '题号', message: '题号须为正整数' });
+      errors.push({ row: rowNumber, column: QUESTION_NO_HEADER, message: '题号须为正整数' });
+      continue;
+    }
+    const unsupportedBlankMarker = stemText
+      ? findUnsupportedBlankMarker(stemText)
+      : null;
+    if (unsupportedBlankMarker) {
+      errors.push({
+        row: rowNumber,
+        column: FILLIN_STEM_HEADER,
+        message: `题干中的空位只能使用【】；请不要使用 ${unsupportedBlankMarker}。`,
+      });
       continue;
     }
     if (!answerText) {
-      errors.push({ row: rowNumber, column: '答案', message: '答案不能为空' });
+      errors.push({ row: rowNumber, column: ANSWER_HEADER, message: '答案不能为空' });
       continue;
     }
     const points = parseNonNegativeScore(pointsText);
     if (points === null) {
       errors.push({
         row: rowNumber,
-        column: '分值',
+        column: POINTS_HEADER,
         message: '分值须为非负数字（上限 1000）',
       });
       continue;
     }
     if (splitAcceptedAnswers(answerText).length === 0) {
-      errors.push({ row: rowNumber, column: '答案', message: '答案无效' });
+      errors.push({ row: rowNumber, column: ANSWER_HEADER, message: '答案无效' });
       continue;
     }
 
     rows.push({
       rowNumber,
       questionNo,
+      stemText: stemText || undefined,
       answerText,
       points,
     });
@@ -116,13 +179,22 @@ export async function parseAnswerSheetRows(
 }
 
 /**
- * 由答题卡 Excel 生成空位（不校验 Word 题号；Word 试卷在考试端全文展示）。
+ * 由答题卡 Excel 生成空位。新版 Excel 可在「题干」列携带完整题目；
+ * 同题号多空时，题干可只写在任意一行，会传播到该题所有空位。
  */
 export function buildFillInBlanksFromAnswerSheet(
   answerRows: ParsedAnswerRow[],
 ): ParsedFillInBlank[] {
   const blankIndexByQuestion = new Map<number, number>();
+  const stemByQuestion = new Map<number, string>();
   const blanks: ParsedFillInBlank[] = [];
+
+  for (const row of answerRows) {
+    const stem = row.stemText?.trim();
+    if (stem && !stemByQuestion.has(row.questionNo)) {
+      stemByQuestion.set(row.questionNo, stem);
+    }
+  }
 
   for (const row of answerRows) {
     const nextIdx = (blankIndexByQuestion.get(row.questionNo) ?? 0) + 1;
@@ -133,7 +205,7 @@ export function buildFillInBlanksFromAnswerSheet(
       rowNumber: row.rowNumber,
       questionNo: row.questionNo,
       blankIndex: nextIdx,
-      stem: '',
+      stem: row.stemText?.trim() || stemByQuestion.get(row.questionNo) || '',
       answerKeys: accepted.join('|'),
       points: row.points,
     });
@@ -143,52 +215,155 @@ export function buildFillInBlanksFromAnswerSheet(
   return blanks;
 }
 
+type InlineBlank = ParsedFillInBlank & {
+  inlineOrder: number;
+};
+
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function renderText(text: string): string {
+  return escapeHtml(text).replace(/\r\n|\r|\n/g, '<br>');
+}
+
+function renderInlineInput(blank: InlineBlank): string {
+  const label = `第 ${blank.questionNo} 题第 ${blank.blankIndex} 空`;
+  return [
+    '<input',
+    ' class="fillin-inline-input"',
+    ' type="text"',
+    ' autocomplete="off"',
+    ` aria-label="${escapeHtml(label)}"`,
+    ` data-fillin-order="${blank.inlineOrder}"`,
+    ` data-fillin-question-no="${blank.questionNo}"`,
+    ` data-fillin-blank-index="${blank.blankIndex}"`,
+    ' />',
+  ].join('');
+}
+
+function renderStemWithInputs(stem: string, blanks: InlineBlank[]): string {
+  BLANK_MARKER_RE.lastIndex = 0;
+  let html = '';
+  let cursor = 0;
+  let blankCursor = 0;
+
+  for (const match of stem.matchAll(BLANK_MARKER_RE)) {
+    const index = match.index ?? 0;
+    html += renderText(stem.slice(cursor, index));
+    const blank = blanks[blankCursor];
+    html += blank
+      ? renderInlineInput(blank)
+      : '<span class="fillin-inline-blank"></span>';
+    blankCursor += 1;
+    cursor = index + match[0].length;
+  }
+
+  html += renderText(stem.slice(cursor));
+
+  if (blankCursor < blanks.length) {
+    const missingInputs = blanks
+      .slice(blankCursor)
+      .map((blank) => renderInlineInput(blank))
+      .join('');
+    html += `<span class="fillin-inline-extra">${missingInputs}</span>`;
+  }
+
+  return html;
+}
+
+export function buildFillInInlinePreviewHtml(
+  blanks: ParsedFillInBlank[],
+): string {
+  const ordered = [...blanks].sort((a, b) => a.rowNumber - b.rowNumber);
+  const groups = new Map<number, InlineBlank[]>();
+
+  ordered.forEach((blank, inlineOrder) => {
+    const list = groups.get(blank.questionNo) ?? [];
+    list.push({ ...blank, inlineOrder });
+    groups.set(blank.questionNo, list);
+  });
+
+  const questionHtml = [...groups.entries()]
+    .map(([questionNo, group]) => {
+      const stem = group.find((b) => b.stem.trim())?.stem.trim() ?? '';
+      const fallbackStem = stem || `第 ${questionNo} 题`;
+      return [
+        '<section class="fillin-inline-question">',
+        `<p class="fillin-inline-title">第 ${questionNo} 题</p>`,
+        `<div class="fillin-inline-stem">${renderStemWithInputs(fallbackStem, group)}</div>`,
+        '</section>',
+      ].join('');
+    })
+    .join('');
+
+  return [
+    '<style>',
+    '.fillin-inline-paper{display:grid;gap:1.25rem;}',
+    '.fillin-inline-question{break-inside:avoid;padding-bottom:12px;border-bottom:1px solid hsl(var(--border,214 32% 91%));}',
+    '.fillin-inline-question:last-child{border-bottom:0;}',
+    '.fillin-inline-title{margin:0 0 .625rem;font-weight:700;}',
+    '.fillin-inline-stem{font-size:15px;line-height:2.35;}',
+    '.fillin-inline-input{box-sizing:border-box;display:inline-block;min-width:10rem;max-width:min(24rem,80vw);height:2.35rem;margin:0 .25rem;padding:.1rem .65rem;border:1px solid transparent;border-bottom-color:#334155;border-radius:.375rem .375rem .125rem .125rem;background:#f8fafc;color:inherit;font:inherit;line-height:1.7;vertical-align:baseline;outline:none;cursor:text;transition:background-color 150ms cubic-bezier(.2,0,0,1),border-color 150ms cubic-bezier(.2,0,0,1),box-shadow 150ms cubic-bezier(.2,0,0,1);}',
+    '.fillin-inline-input:hover{border-color:#cbd5e1;border-bottom-color:hsl(var(--primary,222 47% 11%));background:#fff;}',
+    '.fillin-inline-input:focus{border-color:hsl(var(--primary,222 47% 11%));background:#fff;box-shadow:0 0 0 3px rgb(37 99 235 / 16%);}',
+    '.fillin-inline-input:disabled{border-color:#cbd5e1;background:#f1f5f9;color:#475569;cursor:not-allowed;}',
+    '.fillin-inline-blank{display:inline-block;min-width:8rem;border-bottom:1.5px solid currentColor;}',
+    '.fillin-inline-extra{display:inline-flex;flex-wrap:wrap;gap:.35rem;margin-left:.5rem;vertical-align:baseline;}',
+    '</style>',
+    '<div class="fillin-inline-paper">',
+    questionHtml || '<p class="text-muted">试卷正文为空。</p>',
+    '</div>',
+  ].join('');
+}
+
 const FILLIN_INSTRUCTIONS_SHEET = '使用说明';
 
 function addFillInInstructionsSheet(wb: ExcelJS.Workbook): void {
   const sheet = wb.addWorksheet(FILLIN_INSTRUCTIONS_SHEET);
-  sheet.getColumn(1).width = 80;
+  sheet.getColumn(1).width = 88;
 
   const lines: { text: string; bold?: boolean }[] = [
-    { text: '填空题导入 — 答题卡制作说明', bold: true },
+    { text: '填空题导入模板', bold: true },
     { text: '' },
-    { text: '一、配套导入', bold: true },
+    { text: '怎么填：', bold: true },
     {
-      text: '• Word 文件：完整试卷，考试端全文展示；不要求与答题卡逐题一一对应。',
-    },
-    { text: '• 本 Excel：答题卡，定义每空的题号、标准答案与分值。' },
-    { text: '• 可选附件：在管理台导入时单独上传，供学员下载参考。' },
-    { text: '' },
-    { text: '二、工作表与表头', bold: true },
-    {
-      text: '• 答题卡数据须写在名为「答题卡」的工作表中（本模板已创建）。',
-    },
-    { text: '• 第 1 行为表头，列名固定为：题号、答案、分值（请勿修改列名）。' },
-    { text: '' },
-    { text: '三、一行一空', bold: true },
-    { text: '• 每一行代表 Word 试卷中的一个空。' },
-    {
-      text: '• 同一题号填写多行，表示该题有多个空；行顺序即第 1 空、第 2 空……',
-    },
-    { text: '' },
-    { text: '四、各列填写规则', bold: true },
-    { text: '• 题号：正整数；建议与 Word 中题号一致，便于学员对照。' },
-    {
-      text: '• 答案：必填。多个可接受答案用英文竖线 | 分隔（全角 ｜ 也可）。',
+      text: '1. 只需要这一个 Excel，就能导入填空题。Word 可以不传。',
     },
     {
-      text: '• 分值：非负数字（可为小数，如 2.5）。客观填空部分将按此分值自动计分。',
+      text: '2. 只改「答题卡」工作表，每一行都要填写：题号、题干、答案、分值。',
     },
     {
-      text: '• 答案列已设为文本格式，避免日期、前导零等被 Excel 自动改写。',
+      text: '3. 题干里的留空只能写【】。不要写 ____、（）、() 或 []。例如：我国的首都是【】。',
+    },
+    {
+      text: '4. 一行代表一个空。同一题有几个空，就用同一个题号写几行，题干里也写几个【】。',
+    },
+    {
+      text: '5. 一个空如果支持多个答案，就用 | 分开。例如：唐|唐朝。',
+    },
+    {
+      text: '6. 分值是这个空的分数，可以写整数或小数。',
     },
     { text: '' },
-    { text: '五、导入前请检查', bold: true },
+    { text: '多空题示例：', bold: true },
     {
-      text: '• 删除「答题卡」工作表中答案列以【示例】开头的行（模板自带示例）。',
+      text: '题干：《静夜思》的作者是【】，朝代是【】。',
     },
     {
-      text: '• 可参考同目录示例：填空题导入示例-题目.docx、填空题导入示例-答题卡.xlsx。',
+      text: '第 1 行答案写：李白；第 2 行答案写：唐|唐朝。两行题号都写 5。',
+    },
+    { text: '' },
+    { text: '导入前检查：', bold: true },
+    {
+      text: '• 删除下面以【示例】或【说明】开头的行，再填写真实题目。',
+    },
+    {
+      text: '• 题干里的空位数量，要和同一题号的答案行数一致。',
     },
     { text: '• 支持 .xls 与 .xlsx 格式。' },
   ];
@@ -196,34 +371,56 @@ function addFillInInstructionsSheet(wb: ExcelJS.Workbook): void {
   for (const { text, bold } of lines) {
     const row = sheet.addRow([text]);
     row.height = text ? 18 : 8;
+    row.getCell(1).alignment = { wrapText: true, vertical: 'top' };
     if (bold) {
       row.getCell(1).font = { bold: true };
     }
   }
 }
 
-/** 考官导入用答题卡模板（「答案」列为文本格式） */
+/** 考官导入用模板（新版题干 + 答案文本格式） */
 export async function buildFillInImportTemplateExcel(): Promise<Buffer> {
   const wb = new ExcelJS.Workbook();
   addFillInInstructionsSheet(wb);
 
   const sheet = wb.addWorksheet(FILLIN_SHEET);
-  const headerRow = sheet.addRow([...FILLIN_HEADERS]);
+  sheet.columns = [
+    { width: 10 },
+    { width: 64 },
+    { width: 24 },
+    { width: 10 },
+  ];
+  sheet.views = [{ state: 'frozen', ySplit: 1 }];
+
+  const headerRow = sheet.addRow([...FILLIN_TEMPLATE_HEADERS]);
   headerRow.font = { bold: true };
-  applyFillInAnswerColumnTextFormat(sheet);
+  headerRow.alignment = { vertical: 'middle' };
+  applyFillInAnswerColumnTextFormat(sheet, FILLIN_INLINE_ANSWER_COLUMN);
 
   const reminderRow = sheet.addRow([
     '',
-    '【说明】请删除下方【示例】行后填写真实内容；详细规则见「使用说明」工作表',
+    '【说明】请先删除下方【示例】行，再填写真实题目；题干留空只能写【】',
+    '',
     '',
   ]);
-  writeFillInAnswerCell(
-    reminderRow.getCell(2),
-    '【说明】请删除下方【示例】行后填写真实内容；详细规则见「使用说明」工作表',
-  );
-  addFillInAnswerSheetRow(sheet, 1, '【示例】示例答案A', 2);
-  addFillInAnswerSheetRow(sheet, 1, '【示例】示例答案A|别名A', 2);
-  addFillInAnswerSheetRow(sheet, 2, '【示例】2020-10-17', 3);
+  reminderRow.getCell(2).alignment = { wrapText: true };
+
+  addFillInAnswerSheetRow(sheet, 1, '北京', 2, {
+    stem: '【示例】中国的首都是【】。',
+  });
+  addFillInAnswerSheetRow(sheet, 2, '2020-10-17|2020/10/17', 3, {
+    stem: '【示例】本系统上线日期为【】。',
+  });
+  addFillInAnswerSheetRow(sheet, 3, '00123', 2.5, {
+    stem: '【示例】编号【】对应的设备需要检查。',
+  });
+
+  for (let r = 1; r <= sheet.rowCount; r += 1) {
+    sheet.getRow(r).eachCell((cell) => {
+      cell.alignment = { ...cell.alignment, wrapText: true, vertical: 'top' };
+    });
+  }
+  writeFillInAnswerCell(reminderRow.getCell(3), '');
 
   const buf = await wb.xlsx.writeBuffer();
   return Buffer.from(buf);

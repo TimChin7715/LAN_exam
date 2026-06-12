@@ -1,8 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Download } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { StudentFillInAnswerSheet } from '@/components/student/StudentFillInAnswerSheet';
 import { StudentFillInWordViewer } from '@/components/student/StudentFillInWordViewer';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
@@ -12,7 +11,6 @@ import {
   type ExamPaperItem,
   type ExamSubmissionItem,
   type FillInPaperMeta,
-  type FillInScreenshotInfo,
 } from '@/lib/student';
 
 type FillRow = ExamPaperItem | ExamSubmissionItem;
@@ -33,45 +31,13 @@ export function StudentFillInWorkspace({
   items,
   answers,
   readOnly,
-  showResult = false,
   onAnswerChange,
 }: StudentFillInWorkspaceProps) {
   const [downloading, setDownloading] = useState<'word' | 'attachment' | null>(
     null,
   );
-  const [screenshotsByQuestion, setScreenshotsByQuestion] = useState<
-    Record<string, FillInScreenshotInfo[]>
-  >({});
   const hasAttachment = Boolean(meta?.hasAttachments);
   const fillRows = items.filter((i) => i.type === 'FILL');
-
-  const loadScreenshots = useCallback(async () => {
-    if (fillRows.length === 0) return;
-    try {
-      const res = await studentApi.listFillInScreenshots(examId);
-      const map: Record<string, FillInScreenshotInfo[]> = {};
-      for (const item of res.items) {
-        map[item.examQuestionId] = item.screenshots;
-      }
-      setScreenshotsByQuestion(map);
-    } catch {
-      // 无填空或权限限制时不阻断答题
-    }
-  }, [examId, fillRows.length]);
-
-  useEffect(() => {
-    void loadScreenshots();
-  }, [loadScreenshots]);
-
-  function handleScreenshotsChange(
-    examQuestionId: string,
-    screenshots: FillInScreenshotInfo[],
-  ) {
-    setScreenshotsByQuestion((prev) => ({
-      ...prev,
-      [examQuestionId]: screenshots,
-    }));
-  }
 
   async function handleDownloadWord() {
     if (!meta?.wordFileName) return;
@@ -101,6 +67,9 @@ export function StudentFillInWorkspace({
   }
 
   const hasWord = Boolean(meta?.wordFileName);
+  const wordDownloadLabel = meta?.wordFileName?.toLowerCase().endsWith('.html')
+    ? '下载试卷'
+    : '下载 Word 试卷';
   const showToolbar = Boolean(meta && (hasWord || hasAttachment));
 
   return (
@@ -121,7 +90,7 @@ export function StudentFillInWorkspace({
               ) : (
                 <Download className="size-4" aria-hidden />
               )}
-              下载 Word 试卷
+              {wordDownloadLabel}
             </Button>
           ) : null}
           {hasAttachment ? (
@@ -140,38 +109,23 @@ export function StudentFillInWorkspace({
               下载附件（ZIP）
             </Button>
           ) : null}
-          {!readOnly ? (
-            <span className="w-full text-xs sm:w-auto">
-              左侧为试卷预览；请在右侧填写答案，并可上传或粘贴截图作为作答佐证。
-            </span>
-          ) : null}
         </div>
       ) : null}
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 grid-rows-2 gap-3 overflow-hidden lg:grid-cols-2 lg:grid-rows-1 lg:gap-4">
-        <div className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-lg border bg-card">
-          <StudentFillInWordViewer examId={examId} />
-        </div>
-
-        <div className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-lg border bg-card">
-          {fillRows.length > 0 ? (
-            <StudentFillInAnswerSheet
-              examId={examId}
-              variant="panel"
-              items={items}
-              answers={answers}
-              readOnly={readOnly}
-              showResult={showResult}
-              screenshotsByQuestion={screenshotsByQuestion}
-              onScreenshotsChange={handleScreenshotsChange}
-              onAnswerChange={onAnswerChange}
-            />
-          ) : (
-            <p className="p-4 text-sm text-muted-foreground">
-              本场考试暂无填空题。
-            </p>
-          )}
-        </div>
+      <div className="flex min-h-0 flex-1 min-w-0 overflow-hidden rounded-lg border bg-card shadow-sm">
+        {fillRows.length > 0 ? (
+          <StudentFillInWordViewer
+            examId={examId}
+            items={items}
+            answers={answers}
+            readOnly={readOnly}
+            onAnswerChange={onAnswerChange}
+          />
+        ) : (
+          <p className="p-4 text-sm text-muted-foreground">
+            本场考试暂无填空题。
+          </p>
+        )}
       </div>
     </div>
   );
