@@ -6,8 +6,8 @@
 
 | 环境 | 是否联网 | 操作 |
 | --- | --- | --- |
-| 发版机构 / 开发机 | 可以 | `fetch-runtimes.ps1` 下载 Node、PostgreSQL、VC++ → `package.ps1` 生成 `LAN-Exam-Setup-v<版本>.exe` |
-| 考场管理机 | 不可以 | U 盘拷贝安装包 → 双击 Setup → 桌面快捷方式打开管理台 |
+| 发版机构 / 开发机 | 可以 | `fetch-runtimes.ps1` 下载 Node、PostgreSQL、VC++ → `package.ps1` 生成 `LAN-Exam-win-v<版本>.zip` |
+| 考场管理机 | 不可以 | U 盘拷贝 zip → 解压 → **以管理员运行 `setup.bat`** → 托盘 / 桌面快捷方式打开管理台 |
 
 安装包**自包含**：Node、PostgreSQL 便携版、`vc_redist.x64.exe`、应用与迁移脚本。现场**禁止**引导考官访问微软官网或在线下载依赖。
 
@@ -24,8 +24,17 @@ cd E:\programs\LAN_exam
 
 产出：
 
-- `dist\LAN-Exam-Setup-v<版本>.exe`（例如 `LAN-Exam-Setup-v1.6.0.exe`，验收必选）
-- `dist\lan-exam-win\`（含同版本 `VERSION` 文件，可备份）
+- `dist\LAN-Exam-win-v<版本>.zip`（例如 `LAN-Exam-win-v1.6.29.zip`，**考场推荐**）
+- `dist\lan-exam-win\`（未压缩绿色目录，可本地调试或备份）
+- `dist\LAN-Exam-Setup-v<版本>.exe`（可选：加 `-WithInstaller` 时产出，Inno 压缩较慢）
+
+```powershell
+# 默认：绿色 zip（跳过 Inno，通常几分钟内完成）
+.\scripts\windows\package.ps1
+
+# 仍需传统安装包时
+.\scripts\windows\package.ps1 -WithInstaller
+```
 
 可选仅组装应用（不下载运行时）：
 
@@ -33,17 +42,24 @@ cd E:\programs\LAN_exam
 .\scripts\windows\build-release.ps1
 ```
 
-## 考场安装（无外网）
+## 考场部署（无外网）
 
-1. 将 `LAN-Exam-Setup-v<版本>.exe` 拷入 U 盘，复制到管理机（默认安装路径 `D:\LAN-Exam`）。
-2. 双击安装程序；向导会：
+1. 将 `LAN-Exam-win-v<版本>.zip` 拷入 U 盘，复制到管理机并解压（建议 `D:\LAN-Exam`）。
+2. **右键 `setup.bat` →「以管理员身份运行」**（首次必须）；脚本会：
    - 本地静默安装捆绑的 VC++ 运行库
    - 生成 `.env`（含随机 `SESSION_SECRET`）
    - 初始化 Postgres（`data\pg`，端口 **5434** 仅本机）
    - 执行 `prisma migrate deploy` 与种子账号 `local_exam_admin`
-   - 添加入站防火墙规则 **TCP 5180**（专用 / Private 配置文件）
-3. 安装结束勾选“启动”，或双击桌面 **“局域网考试系统”**。
+   - 添加入站防火墙规则 **TCP 5180**（专用 / 公用 / 域配置文件）
+   - 创建桌面快捷方式并启动托盘
+3. 日常启动：双击 **LAN-Exam-Tray.exe** 或桌面「局域网考试系统」。
 4. 浏览器打开 `http://127.0.0.1:5180/admin`（免登录管理台）。
+
+解压目录内另有 `考场使用说明.txt` 供现场查阅。
+
+### 可选：Inno Setup 安装包
+
+若使用 `package.ps1 -WithInstaller` 产出的 `LAN-Exam-Setup-v<版本>.exe`，流程与旧版相同：双击安装向导即可（内部仍调用同一套 `setup` 脚本逻辑）。
 
 ## 考前准备
 
@@ -175,7 +191,9 @@ curl http://127.0.0.1:5180/health
 ```
 D:\LAN-Exam\
 ├── LAN-Exam-Tray.exe
+├── setup.bat            # 首次配置（管理员）
 ├── start.bat / stop.bat / install.bat / open-admin.bat
+├── 考场使用说明.txt
 ├── runtime\   (node, postgres, vcredist)
 ├── app\       (server-bundle 运行时依赖 + dist, web dist, prisma)
 ├── data\

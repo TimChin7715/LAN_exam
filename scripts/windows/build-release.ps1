@@ -143,9 +143,10 @@ if (-not (Test-Path $seedCjs)) {
 }
 
 # Root batch files + install script
-foreach ($f in @('start.bat', 'stop.bat', 'open-admin.bat', 'install.bat')) {
+foreach ($f in @('start.bat', 'stop.bat', 'open-admin.bat', 'install.bat', 'setup.bat')) {
     Copy-Item (Join-Path $templates $f) (Join-Path $OutDir $f) -Force
 }
+Copy-Item (Join-Path $templates '考场使用说明.txt') (Join-Path $OutDir '考场使用说明.txt') -Force
 New-Item -ItemType Directory -Path (Join-Path $OutDir 'scripts') -Force | Out-Null
 Copy-Item (Join-Path $templates 'install-log.ps1') (Join-Path $OutDir 'scripts\install-log.ps1') -Force
 Copy-Item (Join-Path $templates 'install-db.ps1') (Join-Path $OutDir 'scripts\install-db.ps1') -Force
@@ -154,6 +155,7 @@ Copy-Item (Join-Path $templates 'write-env.ps1') (Join-Path $OutDir 'scripts\wri
 Copy-Item (Join-Path $templates 'start-node.ps1') (Join-Path $OutDir 'scripts\start-node.ps1') -Force
 Copy-Item (Join-Path $templates 'ensure-db-ready.ps1') (Join-Path $OutDir 'scripts\ensure-db-ready.ps1') -Force
 Copy-Item (Join-Path $templates 'verify-install.ps1') (Join-Path $OutDir 'scripts\verify-install.ps1') -Force
+Copy-Item (Join-Path $templates 'setup.ps1') (Join-Path $OutDir 'scripts\setup.ps1') -Force
 Copy-Item (Join-Path $PSScriptRoot 'repair-prisma-bundle-links.ps1') (Join-Path $OutDir 'scripts\repair-prisma-bundle-links.ps1') -Force
 Copy-Item (Join-Path $PSScriptRoot 'repair-pnpm-hoist-links.ps1') (Join-Path $OutDir 'scripts\repair-pnpm-hoist-links.ps1') -Force
 

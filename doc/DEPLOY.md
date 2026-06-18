@@ -19,10 +19,12 @@
 
 | 阶段 | 联网 | 动作 |
 |------|------|------|
-| 发版机 | 可以 | 维护根目录 `VERSION` → `.\scripts\windows\package.ps1` → `dist\LAN-Exam-Setup-v<版本>.exe` |
-| 考场管理机 | **不可以** | U 盘 Setup → 桌面快捷方式 → `127.0.0.1:5180/admin` |
+| 发版机 | 可以 | 维护根目录 `VERSION` → `.\scripts\windows\package.ps1` → `dist\LAN-Exam-win-v<版本>.zip` |
+| 考场管理机 | **不可以** | U 盘 zip → 解压 → 管理员运行 `setup.bat` → `127.0.0.1:5180/admin` |
 
-Setup **自包含**：便携 Node、Postgres 16、VC++、`app/`（server+web dist+migrations）、托盘。安装时：`.env`（随机 `SESSION_SECRET`）、`prisma migrate deploy`、种子 `local_exam_admin`、防火墙 **TCP 5180**（v1.6.26+ 含 public profile）。
+绿色包 **自包含**：便携 Node、Postgres 16、VC++、`app/`（server+web dist+migrations）、托盘。`setup.bat` 等价于旧 Setup 安装后步骤：`.env`、migrate、种子、防火墙 **TCP 5180**。
+
+可选：`package.ps1 -WithInstaller` 仍产出 `LAN-Exam-Setup-v*.exe`（Inno 压缩慢，非默认）。
 
 默认安装目录示例：`D:\LAN-Exam\`（`runtime\`、`app\`、`data\pg\`、`logs\`、`.env`）。
 

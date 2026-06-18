@@ -103,14 +103,14 @@ docker compose up -d --build
 
 ## 机房部署（推荐）
 
-**Windows 原生离线安装** 是考场推荐交付方式：
+**Windows 原生绿色免安装包** 是考场推荐交付方式：
 
-- 安装包：`LAN-Exam-Setup-v<版本>.exe`（版本号见仓库根目录 `VERSION`）
-- 形态：桌面快捷方式 + 托盘常驻 + 便携 Node / Postgres
+- 压缩包：`LAN-Exam-win-v<版本>.zip`（版本号见仓库根目录 `VERSION`）
+- 形态：解压 → 首次运行 `setup.bat` → 托盘常驻 + 便携 Node / Postgres
 - 现场要求：考场机器不访问外网
 
 具体操作见 [docs/DEPLOY-WINDOWS-NATIVE.md](./docs/DEPLOY-WINDOWS-NATIVE.md)。  
-发版在有网构建机执行：`.\scripts\windows\package.ps1`
+发版在有网构建机执行：`.\scripts\windows\package.ps1`（默认产出 zip；需 Inno 安装包时加 `-WithInstaller`）
 
 Docker / 反向代理等可选方案见 [docs/DEPLOY.md](./docs/DEPLOY.md)。
 

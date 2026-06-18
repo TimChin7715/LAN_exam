@@ -1,8 +1,63 @@
-# Assemble full offline installer via Inno Setup.
+# Assemble offline green package (zip) and optionally Inno Setup installer.
 param(
     [string]$OutDir = '',
-    [string]$InnoSetupCompiler = ''
+    [string]$InnoSetupCompiler = '',
+    [switch]$WithInstaller,
+    [switch]$SkipZip
 )
+
+$ErrorActionPreference = 'Stop'
+$root = Resolve-Path (Join-Path $PSScriptRoot '..\..')
+if (-not $OutDir) {
+    $OutDir = Join-Path $root 'dist\lan-exam-win'
+}
+
+$releaseVersion = & (Join-Path $PSScriptRoot 'get-release-version.ps1') -Root $root
+Write-Host "==> LAN Exam package v$releaseVersion started at $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
+if ($WithInstaller) {
+    Write-Host '    Stages: build-release -> fetch-runtimes -> tray -> verify -> zip -> Inno (Inno may take 15-30 min)'
+}
+else {
+    Write-Host '    Stages: build-release -> fetch-runtimes -> tray -> verify -> zip'
+}
+
+& (Join-Path $PSScriptRoot 'validate-install-scripts.ps1')
+& (Join-Path $PSScriptRoot 'cleanup-dist-artifacts.ps1') -Root $root -Version $releaseVersion
+
+Write-Host "==> [1/5] build-release $(Get-Date -Format HH:mm:ss)"
+& (Join-Path $PSScriptRoot 'build-release.ps1') -OutDir $OutDir
+Write-Host "==> [2/5] fetch-runtimes $(Get-Date -Format HH:mm:ss)"
+& (Join-Path $PSScriptRoot 'fetch-runtimes.ps1') -OutDir $OutDir
+Write-Host "==> [3/5] build-tray $(Get-Date -Format HH:mm:ss)"
+& (Join-Path $PSScriptRoot 'build-tray.ps1') -OutDir $OutDir -SkipIfMissingDotnet
+
+Write-Host "==> [4/5] verify-package $(Get-Date -Format HH:mm:ss)"
+& (Join-Path $PSScriptRoot 'verify-package.ps1') -OutDir $OutDir
+
+if (-not $SkipZip) {
+    $distDir = Join-Path $root 'dist'
+    $zipName = "LAN-Exam-win-v$releaseVersion.zip"
+    $zipPath = Join-Path $distDir $zipName
+    $folderName = Split-Path $OutDir -Leaf
+    Write-Host "==> [5/5] zip archive $(Get-Date -Format HH:mm:ss)"
+    if (Test-Path $zipPath) { Remove-Item -LiteralPath $zipPath -Force }
+    Push-Location $distDir
+    try {
+        & tar -a -cf $zipName $folderName
+        if ($LASTEXITCODE -ne 0) { throw "tar failed (exit $LASTEXITCODE)" }
+    }
+    finally {
+        Pop-Location
+    }
+    $zipSizeMb = [Math]::Round((Get-Item $zipPath).Length / 1MB, 1)
+    Write-Host "==> Green zip: dist\$zipName ($zipSizeMb MB)"
+}
+Write-Host "==> Green directory: $OutDir"
+
+if (-not $WithInstaller) {
+    Write-Host '==> Done (zip only). Pass -WithInstaller to also build LAN-Exam-Setup.exe via Inno Setup.'
+    exit 0
+}
 
 if (-not $InnoSetupCompiler) {
     $innoCandidates = @(
@@ -21,38 +76,14 @@ if (-not $InnoSetupCompiler) {
     }
 }
 
-$ErrorActionPreference = 'Stop'
-$root = Resolve-Path (Join-Path $PSScriptRoot '..\..')
-if (-not $OutDir) {
-    $OutDir = Join-Path $root 'dist\lan-exam-win'
-}
-
-$releaseVersion = & (Join-Path $PSScriptRoot 'get-release-version.ps1') -Root $root
-Write-Host "==> LAN Exam package v$releaseVersion started at $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
-Write-Host '    Stages: build-release -> fetch-runtimes -> tray -> verify -> Inno (Inno may take 15-30 min with little output)'
-
-& (Join-Path $PSScriptRoot 'validate-install-scripts.ps1')
-& (Join-Path $PSScriptRoot 'cleanup-dist-artifacts.ps1') -Root $root -Version $releaseVersion
-
-Write-Host "==> [1/5] build-release $(Get-Date -Format HH:mm:ss)"
-& (Join-Path $PSScriptRoot 'build-release.ps1') -OutDir $OutDir
-Write-Host "==> [2/5] fetch-runtimes $(Get-Date -Format HH:mm:ss)"
-& (Join-Path $PSScriptRoot 'fetch-runtimes.ps1') -OutDir $OutDir
-Write-Host "==> [3/5] build-tray $(Get-Date -Format HH:mm:ss)"
-& (Join-Path $PSScriptRoot 'build-tray.ps1') -OutDir $OutDir -SkipIfMissingDotnet
-
-Write-Host "==> [4/5] verify-package $(Get-Date -Format HH:mm:ss)"
-& (Join-Path $PSScriptRoot 'verify-package.ps1') -OutDir $OutDir
-
 $iss = Join-Path $root 'inno-setup\LAN-Exam.iss'
 if (-not (Test-Path $InnoSetupCompiler)) {
     Write-Warning "Inno Setup not found at: $InnoSetupCompiler"
-    Write-Warning "Green package is ready at: $OutDir"
-    Write-Warning "Install Inno Setup 6 and run: ISCC.exe `"$iss`""
+    Write-Warning 'Skipped installer; green zip is ready.'
     exit 0
 }
 
-Write-Host "==> [5/5] Inno Setup compress $(Get-Date -Format HH:mm:ss) (please wait, often 15-30 min)"
+Write-Host "==> [optional] Inno Setup compress $(Get-Date -Format HH:mm:ss) (often 15-30 min)"
 $appVersionFull = if ($releaseVersion -match '^\d+\.\d+\.\d+\.\d+$') {
     $releaseVersion
 } else {
