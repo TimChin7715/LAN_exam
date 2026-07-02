@@ -292,9 +292,12 @@ export function buildFillInInlinePreviewHtml(
     .map(([questionNo, group]) => {
       const stem = group.find((b) => b.stem.trim())?.stem.trim() ?? '';
       const fallbackStem = stem || `第 ${questionNo} 题`;
+      const totalPoints = group.reduce((sum, blank) => sum + blank.points, 0);
+      const pointsLabel =
+        Number.isInteger(totalPoints) ? String(totalPoints) : String(totalPoints);
       return [
         '<section class="fillin-inline-question">',
-        `<p class="fillin-inline-title">第 ${questionNo} 题</p>`,
+        `<p class="fillin-inline-title">第 ${questionNo} 题<span class="fillin-inline-points"> · ${pointsLabel} 分</span></p>`,
         `<div class="fillin-inline-stem">${renderStemWithInputs(fallbackStem, group)}</div>`,
         '</section>',
       ].join('');
@@ -303,15 +306,16 @@ export function buildFillInInlinePreviewHtml(
 
   return [
     '<style>',
-    '.fillin-inline-paper{display:grid;gap:1.25rem;}',
-    '.fillin-inline-question{break-inside:avoid;padding-bottom:12px;border-bottom:1px solid hsl(var(--border,214 32% 91%));}',
-    '.fillin-inline-question:last-child{border-bottom:0;}',
-    '.fillin-inline-title{margin:0 0 .625rem;font-weight:700;}',
+    '.fillin-inline-paper{display:flex;flex-direction:column;gap:1.5rem;}',
+    '.fillin-inline-question{break-inside:avoid;padding:1.25rem 1.5rem;border:1px solid #e2e8f0;border-radius:0.5rem;background:#fff;box-shadow:0 1px 2px rgb(0 0 0 / 0.05);}',
+    '.fillin-inline-title{margin:0 0 .75rem;font-size:1.25rem;font-weight:600;}',
+    '.fillin-inline-points{margin-left:.375rem;font-size:1rem;font-weight:500;color:#64748b;}',
+    '.fillin-inline-blank-points{margin-right:.375rem;font-size:.875rem;font-weight:600;color:#64748b;vertical-align:baseline;}',
     '.fillin-inline-stem{font-size:15px;line-height:2.35;}',
-    '.fillin-inline-input{box-sizing:border-box;display:inline-block;min-width:10rem;max-width:min(24rem,80vw);height:2.35rem;margin:0 .25rem;padding:.1rem .65rem;border:1px solid transparent;border-bottom-color:#334155;border-radius:.375rem .375rem .125rem .125rem;background:#f8fafc;color:inherit;font:inherit;line-height:1.7;vertical-align:baseline;outline:none;cursor:text;transition:background-color 150ms cubic-bezier(.2,0,0,1),border-color 150ms cubic-bezier(.2,0,0,1),box-shadow 150ms cubic-bezier(.2,0,0,1);}',
-    '.fillin-inline-input:hover{border-color:#cbd5e1;border-bottom-color:hsl(var(--primary,222 47% 11%));background:#fff;}',
-    '.fillin-inline-input:focus{border-color:hsl(var(--primary,222 47% 11%));background:#fff;box-shadow:0 0 0 3px rgb(37 99 235 / 16%);}',
-    '.fillin-inline-input:disabled{border-color:#cbd5e1;background:#f1f5f9;color:#475569;cursor:not-allowed;}',
+    '.fillin-inline-input{box-sizing:border-box;display:inline-block;min-width:10rem;max-width:min(24rem,80vw);height:2.35rem;margin:0 .25rem;padding:.1rem .65rem;border:1px solid #fde047;border-bottom-color:#ca8a04;border-radius:.375rem .375rem .125rem .125rem;background:#fef9c3;color:inherit;font:inherit;line-height:1.7;vertical-align:baseline;outline:none;cursor:text;transition:background-color 150ms cubic-bezier(.2,0,0,1),border-color 150ms cubic-bezier(.2,0,0,1),box-shadow 150ms cubic-bezier(.2,0,0,1);}',
+    '.fillin-inline-input:hover{border-color:#facc15;border-bottom-color:hsl(var(--primary,222 47% 11%));background:#fef08a;}',
+    '.fillin-inline-input:focus{border-color:hsl(var(--primary,222 47% 11%));background:#fef08a;box-shadow:0 0 0 3px rgb(37 99 235 / 16%);}',
+    '.fillin-inline-input:disabled{border-color:#fde68a;background:#fef3c7;color:#475569;cursor:not-allowed;}',
     '.fillin-inline-blank{display:inline-block;min-width:8rem;border-bottom:1.5px solid currentColor;}',
     '.fillin-inline-extra{display:inline-flex;flex-wrap:wrap;gap:.35rem;margin-left:.5rem;vertical-align:baseline;}',
     '</style>',

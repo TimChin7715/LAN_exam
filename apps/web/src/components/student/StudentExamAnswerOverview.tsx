@@ -1,7 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { useMemo } from 'react';
 
-import { Button } from '@/components/ui/button';
 import type {
   AnswerProgressRow,
   AnswerProgressSection,
@@ -40,48 +38,44 @@ function sectionVisible(
   return needsPractical(contentModules);
 }
 
-
-function QuestionCircle({ row }: { row: AnswerProgressRow }) {
+function QuestionNavButton({
+  row,
+  onQuestionClick,
+}: {
+  row: AnswerProgressRow;
+  onQuestionClick: (key: string) => void;
+}) {
   const statusText = row.answered ? '已作答' : '未作答';
   return (
-    <span
+    <button
+      type="button"
       title={`${row.label}（${statusText}）`}
-      aria-label={`${row.label}，${statusText}`}
+      aria-label={`${row.label}，${statusText}，点击跳转`}
+      onClick={() => onQuestionClick(row.key)}
       className={cn(
-        'inline-flex size-4 shrink-0 items-center justify-center rounded-full text-[0.625rem] leading-none font-medium tabular-nums sm:size-4.5 sm:text-[0.6875rem]',
+        'inline-flex h-10 min-w-10 shrink-0 items-center justify-center rounded-full px-1.5 text-sm leading-none font-semibold tabular-nums transition-colors',
+        'hover:ring-2 hover:ring-primary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
         row.answered
           ? 'bg-primary text-primary-foreground'
           : 'bg-muted text-muted-foreground ring-1 ring-border',
       )}
     >
       {row.circleLabel}
-    </span>
+    </button>
   );
 }
 
 type StudentExamAnswerOverviewProps = {
   summary: AnswerProgressSummary;
   contentModules: ExamContentModule[];
-  readOnly?: boolean;
+  onQuestionClick: (key: string) => void;
 };
 
 export function StudentExamAnswerOverview({
   summary,
   contentModules,
+  onQuestionClick,
 }: StudentExamAnswerOverviewProps) {
-  const [expanded, setExpanded] = useState(true);
-
-  useEffect(() => {
-    if (!expanded) return;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setExpanded(false);
-      }
-    };
-    document.addEventListener('keydown', onKeyDown);
-    return () => document.removeEventListener('keydown', onKeyDown);
-  }, [expanded]);
-
   const groupedRows = useMemo(() => {
     const groups = new Map<AnswerProgressSection, AnswerProgressRow[]>();
     for (const section of SECTION_ORDER) {
@@ -94,75 +88,38 @@ export function StudentExamAnswerOverview({
     return groups;
   }, [contentModules, summary.rows]);
 
-  const summaryLine = (
-    <span className="text-xs tabular-nums text-muted-foreground">
-      {summary.answeredCount}/{summary.totalCount}
-    </span>
-  );
-
-  if (!expanded) {
-    return (
-      <div className="fixed right-0 top-20 z-40 p-3 sm:top-24 sm:p-4">
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="h-8 gap-1.5 bg-background/95 shadow-md backdrop-blur-sm"
-          aria-expanded={false}
-          aria-label={`展开考试情况概览，已作答 ${summary.answeredCount} 题，共 ${summary.totalCount} 题`}
-          onClick={() => setExpanded(true)}
-        >
-          <span className="text-sm font-medium">考试情况</span>
-          {summaryLine}
-          <ChevronDown className="size-4 shrink-0 opacity-60" />
-        </Button>
-      </div>
-    );
-  }
-
   return (
     <div
-      className="fixed right-0 top-20 z-40 p-3 sm:top-24 sm:p-4"
+      className="flex h-full min-h-0 flex-col bg-muted/20"
       role="region"
       aria-label="考试情况概览"
     >
-      <div className="flex aspect-square w-[min(calc(100vw-1.5rem),13.5rem)] flex-col overflow-hidden rounded-lg border border-border bg-background/95 shadow-lg backdrop-blur-sm">
-        <div className="flex shrink-0 items-center justify-between gap-1 border-b border-border px-2.5 py-2">
-          <div className="min-w-0">
-            <h2 className="text-sm font-semibold leading-tight text-foreground">
-              考试情况
-            </h2>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              已作答 {summary.answeredCount} / {summary.totalCount}
-            </p>
-          </div>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="size-7 shrink-0"
-            aria-expanded={true}
-            aria-label="收起考试情况概览"
-            onClick={() => setExpanded(false)}
-          >
-            <ChevronUp className="size-4" />
-          </Button>
-        </div>
+      <div className="shrink-0 border-b border-border px-3 py-3">
+        <h2 className="text-sm font-semibold leading-tight text-foreground">
+          考试情况
+        </h2>
+        <p className="mt-0.5 text-xs tabular-nums text-muted-foreground">
+          已作答 {summary.answeredCount} / {summary.totalCount}
+        </p>
+      </div>
 
-        <div className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-y-contain px-2 py-2">
-          {[...groupedRows.entries()].map(([section, rows]) => (
-            <section key={section} aria-label={SECTION_LABELS[section]}>
-              <h3 className="mb-1 text-xs font-medium text-muted-foreground">
-                {SECTION_LABELS[section]}
-              </h3>
-              <div className="flex flex-wrap gap-1">
-                {rows.map((row) => (
-                  <QuestionCircle key={row.key} row={row} />
-                ))}
-              </div>
-            </section>
-          ))}
-        </div>
+      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-y-contain px-3 py-3">
+        {[...groupedRows.entries()].map(([section, rows]) => (
+          <section key={section} aria-label={SECTION_LABELS[section]}>
+            <h3 className="mb-1.5 text-xs font-medium text-muted-foreground">
+              {SECTION_LABELS[section]}
+            </h3>
+            <div className="flex flex-wrap gap-2">
+              {rows.map((row) => (
+                <QuestionNavButton
+                  key={row.key}
+                  row={row}
+                  onQuestionClick={onQuestionClick}
+                />
+              ))}
+            </div>
+          </section>
+        ))}
       </div>
     </div>
   );

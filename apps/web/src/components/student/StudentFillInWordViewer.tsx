@@ -7,10 +7,23 @@ import {
   type ReactNode,
 } from 'react';
 
+import { FillInScreenshotAttach } from '@/components/student/FillInScreenshotAttach';
 import { Spinner } from '@/components/ui/spinner';
-import { displayFillAnswer } from '@/lib/fillin';
+import {
+  buildFillInQuestionPointsMap,
+  displayFillAnswer,
+  formatFillQuestionPoints,
+  parseFillInTitleQuestionNo,
+  resolveFillQuestionLeaderId,
+} from '@/lib/fillin';
+import { examQuestionAnchorId } from '@/lib/exam-question-nav';
 import { ApiError, studentApi } from '@/lib/student';
-import type { ExamPaperItem, ExamSubmissionItem } from '@/lib/student';
+import type {
+  ExamPaperItem,
+  ExamSubmissionItem,
+  FillInScreenshotInfo,
+} from '@/lib/student';
+import { cn } from '@/lib/utils';
 
 type FillRow = ExamPaperItem | ExamSubmissionItem;
 
@@ -20,6 +33,11 @@ type StudentFillInWordViewerProps = {
   answers: Record<string, string>;
   readOnly: boolean;
   onAnswerChange: (examQuestionId: string, value: string) => void;
+  screenshotsByQuestion: Record<string, FillInScreenshotInfo[]>;
+  onScreenshotsChange: (
+    examQuestionId: string,
+    screenshots: FillInScreenshotInfo[],
+  ) => void;
 };
 
 type PreviewCacheEntry = {
@@ -123,12 +141,33 @@ function reactPropsFromAttrs(
   return props;
 }
 
+function extractTitleQuestionNo(node: ParsedPreviewNode): string | null {
+  if (typeof node === 'string' || node.kind === 'input') return null;
+  if (
+    node.tag === 'p' &&
+    (node.attrs.class ?? '').includes('fillin-inline-title')
+  ) {
+    const text = node.children
+      .filter((child): child is string => typeof child === 'string')
+      .join('')
+      .trim();
+    return parseFillInTitleQuestionNo(text);
+  }
+  for (const child of node.children) {
+    const qNo = extractTitleQuestionNo(child);
+    if (qNo) return qNo;
+  }
+  return null;
+}
+
 export function StudentFillInWordViewer({
   examId,
   items,
   answers,
   readOnly,
   onAnswerChange,
+  screenshotsByQuestion,
+  onScreenshotsChange,
 }: StudentFillInWordViewerProps) {
   const cached = previewByExam.get(examId);
   const [html, setHtml] = useState<string | null>(cached?.html ?? null);
@@ -136,6 +175,7 @@ export function StudentFillInWordViewer({
   const [error, setError] = useState<string | null>(null);
   const parsedInlinePreviewRef = useRef<ParsedPreviewNode[] | null>(null);
   const parsedInlinePreviewHtmlRef = useRef<string | null>(null);
+  const htmlFallbackRef = useRef<HTMLDivElement>(null);
 
   const fillRows = useMemo(
     () =>
@@ -152,6 +192,20 @@ export function StudentFillInWordViewer({
       if (key) map.set(key, row);
     }
     return map;
+  }, [fillRows]);
+
+  const pointsByQuestionNo = useMemo(
+    () => buildFillInQuestionPointsMap(fillRows),
+    [fillRows],
+  );
+
+  const multiBlankByQuestion = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const row of fillRows) {
+      const key = row.fillQuestionNo ?? row.examQuestionId;
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+    return counts;
   }, [fillRows]);
 
   const inlinePreviewNodes = useMemo(() => {
@@ -212,6 +266,57 @@ export function StudentFillInWordViewer({
     };
   }, [examId]);
 
+  useEffect(() => {
+    if (!html || inlinePreviewNodes || !htmlFallbackRef.current) return;
+
+    const root = htmlFallbackRef.current;
+
+    for (const title of root.querySelectorAll('.fillin-inline-title')) {
+      const qNo = parseFillInTitleQuestionNo(title.textContent ?? '');
+      if (!qNo) continue;
+      const points = pointsByQuestionNo.get(qNo);
+      if (points == null) continue;
+      if (title.querySelector('.fillin-inline-points')) continue;
+      const span = document.createElement('span');
+      span.className = 'fillin-inline-points';
+      span.textContent = ` · ${formatFillQuestionPoints(points)} 分`;
+      title.appendChild(span);
+    }
+
+    const inputs = root.querySelectorAll('input.fillin-inline-input');
+    let fallbackIndex = 0;
+    for (const input of inputs) {
+      const el = input as HTMLInputElement;
+      const questionNo = el.getAttribute('data-fillin-question-no');
+      const blankIndex = el.getAttribute('data-fillin-blank-index');
+      const order = Number(el.getAttribute('data-fillin-order') ?? fallbackIndex);
+      const row =
+        questionNo && blankIndex
+          ? fillRowsByKey.get(`${questionNo}::${blankIndex}`) ??
+            fillRows[order]
+          : fillRows[order];
+      fallbackIndex += 1;
+      if (row) {
+        el.id = examQuestionAnchorId(row.examQuestionId);
+        el.classList.add('scroll-mt-4');
+        const groupKey = row.fillQuestionNo ?? row.examQuestionId;
+        if ((multiBlankByQuestion.get(groupKey) ?? 0) > 1) {
+          el.setAttribute(
+            'aria-label',
+            `第 ${questionNo ?? '—'} 题第 ${blankIndex ?? '—'} 空（${formatFillQuestionPoints(row.points)} 分）`,
+          );
+        }
+      }
+    }
+  }, [
+    html,
+    inlinePreviewNodes,
+    fillRows,
+    fillRowsByKey,
+    pointsByQuestionNo,
+    multiBlankByQuestion,
+  ]);
+
   function resolveInlineInputRow(
     attrs: Record<string, string>,
     fallbackIndex: number,
@@ -244,15 +349,125 @@ export function StudentFillInWordViewer({
           readOnly: true,
         });
       }
-      return createElement('input', {
+
+      const groupKey = row.fillQuestionNo ?? row.examQuestionId;
+      const showBlankPoints = (multiBlankByQuestion.get(groupKey) ?? 0) > 1;
+      const questionNo = node.attrs['data-fillin-question-no'];
+      const blankIndex = node.attrs['data-fillin-blank-index'];
+      const ariaLabel =
+        showBlankPoints && questionNo && blankIndex
+          ? `第 ${questionNo} 题第 ${blankIndex} 空（${formatFillQuestionPoints(row.points)} 分）`
+          : props['aria-label'];
+
+      const inputEl = createElement('input', {
         ...props,
-        key: row.examQuestionId,
+        key: `${row.examQuestionId}-input`,
+        id: examQuestionAnchorId(row.examQuestionId),
+        className: cn(
+          typeof props.className === 'string' ? props.className : undefined,
+          'scroll-mt-4',
+        ),
+        'aria-label': ariaLabel,
         value: displayFillAnswer(answers[row.examQuestionId] ?? ''),
         disabled: readOnly,
         readOnly,
         onChange: (event) =>
           onAnswerChange(row.examQuestionId, event.currentTarget.value),
       });
+
+      if (!showBlankPoints) {
+        return inputEl;
+      }
+
+      return createElement(
+        'span',
+        { key: row.examQuestionId, className: 'inline' },
+        createElement(
+          'span',
+          { className: 'fillin-inline-blank-points', key: 'pts' },
+          `${formatFillQuestionPoints(row.points)}分 `,
+        ),
+        inputEl,
+      );
+    }
+
+    if (
+      node.kind === 'element' &&
+      node.tag === 'p' &&
+      (node.attrs.class ?? '').includes('fillin-inline-title')
+    ) {
+      const titleText = node.children
+        .filter((child): child is string => typeof child === 'string')
+        .join('')
+        .trim();
+      const qNo = parseFillInTitleQuestionNo(titleText);
+      const totalPoints = qNo ? pointsByQuestionNo.get(qNo) : undefined;
+      const hasPointsSpan = node.children.some(
+        (child) =>
+          typeof child !== 'string' &&
+          child.kind === 'element' &&
+          child.tag === 'span' &&
+          (child.attrs.class ?? '').includes('fillin-inline-points'),
+      );
+      const props = reactPropsFromAttrs(node.attrs);
+      const children = node.children
+        .filter(
+          (child) =>
+            !(
+              typeof child !== 'string' &&
+              child.kind === 'element' &&
+              child.tag === 'span' &&
+              (child.attrs.class ?? '').includes('fillin-inline-points')
+            ),
+        )
+        .map((child, index) =>
+          renderPreviewNode(child, `${key}-${index}`, inputIndex),
+        );
+      return createElement(
+        'p',
+        { ...props, key },
+        ...children,
+        totalPoints != null && !hasPointsSpan
+          ? createElement(
+              'span',
+              { key: 'pts', className: 'fillin-inline-points' },
+              ` · ${formatFillQuestionPoints(totalPoints)} 分`,
+            )
+          : null,
+      );
+    }
+
+    if (
+      node.kind === 'element' &&
+      node.tag === 'section' &&
+      (node.attrs.class ?? '').includes('fillin-inline-question')
+    ) {
+      const qNo = extractTitleQuestionNo(node);
+      const leaderId = qNo ? resolveFillQuestionLeaderId(fillRows, qNo) : null;
+      const props = reactPropsFromAttrs(node.attrs);
+      const children = node.children.map((child, index) =>
+        renderPreviewNode(child, `${key}-${index}`, inputIndex),
+      );
+      if (leaderId) {
+        children.push(
+          createElement(
+            'div',
+            {
+              key: `screenshots-${leaderId}`,
+              className: 'fillin-inline-screenshots',
+            },
+            createElement(FillInScreenshotAttach, {
+              examId,
+              examQuestionId: leaderId,
+              screenshots: screenshotsByQuestion[leaderId] ?? [],
+              readOnly,
+              onScreenshotsChange,
+              variant: 'inline-card',
+            }),
+          ),
+        );
+      }
+      return createElement('section', { ...props, key }, ...children);
     }
 
     const props = reactPropsFromAttrs(node.attrs);
@@ -271,8 +486,8 @@ export function StudentFillInWordViewer({
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain p-5 sm:p-6">
+    <div>
+      <div className="p-5 sm:p-6">
         {loading ? (
           <div className="flex justify-center py-12">
             <Spinner />
@@ -282,13 +497,14 @@ export function StudentFillInWordViewer({
           <p className="text-sm text-destructive">{error}</p>
         ) : null}
         {!loading && !error && inlinePreviewNodes ? (
-          <div className="fillin-word-preview max-w-none text-base leading-relaxed text-foreground">
+          <div className="fillin-word-preview max-w-none text-2xl leading-relaxed text-foreground">
             {renderInlinePreview()}
           </div>
         ) : null}
         {!loading && !error && html && !inlinePreviewNodes ? (
           <div
-            className="fillin-word-preview max-w-none text-base leading-relaxed text-foreground [&_img]:max-w-full [&_li]:my-1 [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:mb-3 [&_table]:my-3 [&_table]:w-full [&_table]:border-collapse [&_td]:border [&_td]:border-border [&_td]:p-2 [&_th]:border [&_th]:border-border [&_th]:bg-muted [&_th]:p-2 [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5"
+            ref={htmlFallbackRef}
+            className="fillin-word-preview max-w-none text-2xl leading-relaxed text-foreground [&_img]:max-w-full [&_li]:my-1 [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:mb-3 [&_table]:my-3 [&_table]:w-full [&_table]:border-collapse [&_td]:border [&_td]:border-border [&_td]:p-2 [&_th]:border [&_th]:border-border [&_th]:bg-muted [&_th]:p-2 [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5"
             dangerouslySetInnerHTML={{ __html: html }}
           />
         ) : null}

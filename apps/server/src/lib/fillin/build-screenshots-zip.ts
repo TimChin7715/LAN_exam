@@ -57,15 +57,10 @@ export async function streamFillInScreenshotsZip(
       const sorted = [...questionRows].sort(
         (a, b) => a.sortOrder - b.sortOrder,
       );
-      const total = sorted.length;
       for (let i = 0; i < sorted.length; i++) {
         const row = sorted[i]!;
-        const index = total <= 1 ? 1 : i + 1;
-        const base = fillInScreenshotExportBasename(
-          row.questionNo,
-          index,
-          total,
-        );
+        const index = i + 1;
+        const base = fillInScreenshotExportBasename(row.questionNo, index);
         const ext = fillInScreenshotExportExt(row.mimeType);
         const zipPath = `${folder}/${base}.${ext}`;
         const buffer = await readStorageFile(row.storageKey);

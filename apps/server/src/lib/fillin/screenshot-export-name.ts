@@ -1,12 +1,29 @@
-/** 导出 ZIP 内文件名（不含扩展名）：1 张 → 第x题；多张 → 第x题1、第x题2… */
+function toChineseNumeral(n: number): string {
+  if (!Number.isFinite(n) || n <= 0) return String(n);
+  const digits = ['零', '一', '二', '三', '四', '五', '六', '七', '八', '九'];
+  if (n < 10) return digits[n]!;
+  if (n < 20) {
+    return n === 10 ? '十' : `十${digits[n % 10]!}`;
+  }
+  if (n < 100) {
+    const tens = Math.floor(n / 10);
+    const ones = n % 10;
+    return ones === 0
+      ? `${digits[tens]!}十`
+      : `${digits[tens]!}十${digits[ones]!}`;
+  }
+  return String(n);
+}
+
+/** 导出 ZIP 内文件名（不含扩展名）：第一题01、第一题02… */
 export function fillInScreenshotExportBasename(
   questionNo: string,
   index: number,
-  total: number,
 ): string {
-  const q = questionNo.trim() || '0';
-  if (total <= 1) return `第${q}题`;
-  return `第${q}题${index}`;
+  const parsedQuestionNo = Number.parseInt(questionNo.trim(), 10);
+  const q = Number.isFinite(parsedQuestionNo) ? parsedQuestionNo : 0;
+  const seq = index <= 99 ? String(index).padStart(2, '0') : String(index);
+  return `第${toChineseNumeral(q)}题${seq}`;
 }
 
 export function fillInScreenshotExportExt(mimeType: string): string {

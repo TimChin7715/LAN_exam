@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 
 import { ObjectiveOptionTiles } from '@/components/student/ObjectiveOptionTiles';
 import { StudentExamAnswerOverview } from '@/components/student/StudentExamAnswerOverview';
+import { StudentExamQuestionStepper } from '@/components/student/StudentExamQuestionStepper';
 import { StudentFillInWorkspace } from '@/components/student/StudentFillInWorkspace';
 import { StudentPracticalSection } from '@/components/student/StudentPracticalSection';
 import {
@@ -27,6 +28,10 @@ import {
   formatSubmitConfirmDescription,
 } from '@/lib/exam-submit-validation';
 import { formatExamRemaining } from '@/lib/exam-countdown';
+import {
+  examQuestionAnchorId,
+  scrollToExamQuestion,
+} from '@/lib/exam-question-nav';
 import { formatStemForDisplay, questionTypeLabel } from '@/lib/qbank';
 import {
   ApiError,
@@ -107,6 +112,7 @@ export default function StudentExamTake() {
   const [autoSubmitting, setAutoSubmitting] = useState(false);
   const [logoutOpen, setLogoutOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [currentNavIndex, setCurrentNavIndex] = useState(0);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const saveInFlightRef = useRef<Promise<void> | null>(null);
   const dirtyAnswersRef = useRef<DirtyAnswerState>({});
@@ -118,6 +124,7 @@ export default function StudentExamTake() {
   const isMountedRef = useRef(true);
   const paperRetryToastShownRef = useRef(false);
   const autoSubmitInFlightRef = useRef(false);
+  const mainScrollRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     answersRef.current = answers;
@@ -688,6 +695,55 @@ export default function StudentExamTake() {
     [submitBlockers],
   );
 
+  const showAnswerOverview = !loading && answerProgress.totalCount > 0;
+  const useSplitLayout = showAnswerOverview;
+  const showQuestionStepper = !loading && answerProgress.totalCount > 1;
+  const navRows = answerProgress.rows;
+
+  useEffect(() => {
+    setCurrentNavIndex((index) =>
+      navRows.length === 0 ? 0 : Math.min(index, navRows.length - 1),
+    );
+  }, [examId, navRows.length]);
+
+  const goToNavIndex = useCallback(
+    (index: number) => {
+      if (navRows.length === 0) return;
+      const next = Math.max(0, Math.min(index, navRows.length - 1));
+      const row = navRows[next];
+      if (!row) return;
+      setCurrentNavIndex(next);
+      scrollToExamQuestion(row.key, mainScrollRef.current);
+    },
+    [navRows],
+  );
+
+  const handleQuestionNavClick = useCallback(
+    (key: string) => {
+      const index = navRows.findIndex((row) => row.key === key);
+      if (index >= 0) {
+        setCurrentNavIndex(index);
+      }
+      scrollToExamQuestion(key, mainScrollRef.current);
+    },
+    [navRows],
+  );
+
+  useEffect(() => {
+    if (!useSplitLayout) return;
+
+    const html = document.documentElement;
+    const { overflow: prevHtmlOverflow } = html.style;
+    const { overflow: prevBodyOverflow } = document.body.style;
+    html.style.overflow = 'hidden';
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      html.style.overflow = prevHtmlOverflow;
+      document.body.style.overflow = prevBodyOverflow;
+    };
+  }, [useSplitLayout]);
+
   if (!examId) {
     return (
       <Alert variant="destructive">
@@ -707,9 +763,60 @@ export default function StudentExamTake() {
   const hasObjectiveModule = hasExamModule(contentModules, 'OBJECTIVE');
   const hasFillModule = hasExamModule(contentModules, 'FILL');
   const hasPracticalModule = needsPractical(contentModules);
-  const isFillOnlyExam =
-    hasFillModule && !hasObjectiveModule && !hasPracticalModule;
   const pageMaxWidth = hasFillModule ? 'max-w-[96rem]' : 'max-w-3xl';
+
+  const examHeader =
+    !readOnly ? (
+      <div
+        className={cn(
+          'flex shrink-0 items-center justify-between gap-3 bg-background/95 p-3 backdrop-blur sm:p-4',
+          useSplitLayout
+            ? 'relative z-10 border-b border-border'
+            : 'fixed left-0 right-0 top-0 z-50',
+        )}
+      >
+        <div className="min-w-0 max-w-[46%] space-y-1 rounded-lg border border-primary/30 bg-primary/10 px-2.5 py-2 text-xs shadow-sm sm:text-sm">
+          {scheduledEndAt && remainingMs !== null ? (
+            <p className="truncate font-medium text-foreground">
+              {remainingMs > 0 ? (
+                <>
+                  距离考试结束还剩{' '}
+                  <span className="font-mono text-base font-bold tabular-nums text-primary sm:text-lg">
+                    {formatExamRemaining(remainingMs)}
+                  </span>
+                  ，到点将自动交卷。
+                </>
+              ) : (
+                <span className="font-semibold text-destructive">
+                  考试时间已到，正在自动提交试卷…
+                </span>
+              )}
+            </p>
+          ) : null}
+          {saveLabel ? (
+            <p className="truncate text-foreground/90">保存状态：{saveLabel}</p>
+          ) : null}
+          {progressSyncLabel ? (
+            <p className="truncate text-foreground/90">
+              同步状态：{progressSyncLabel}
+            </p>
+          ) : null}
+        </div>
+        <div className="pointer-events-none absolute inset-x-0 flex justify-center px-20">
+          <p className="truncate text-center text-lg font-bold text-foreground sm:text-xl">
+            {examTitle ?? '考试中'}
+          </p>
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => setLogoutOpen(true)}
+        >
+          退出登录
+        </Button>
+      </div>
+    ) : null;
 
   return (
     <>
@@ -733,67 +840,33 @@ export default function StudentExamTake() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {!readOnly ? (
-        <div className="fixed left-0 right-0 top-0 z-50 flex items-center justify-between gap-3 bg-background/80 p-3 backdrop-blur sm:p-4">
-          <div className="min-w-0 max-w-[46%] space-y-1 rounded-lg border border-primary/30 bg-primary/10 px-2.5 py-2 text-xs shadow-sm sm:text-sm">
-            {scheduledEndAt && remainingMs !== null ? (
-              <p className="truncate font-medium text-foreground">
-                {remainingMs > 0 ? (
-                  <>
-                    距离考试结束还剩{' '}
-                    <span className="font-mono text-base font-bold tabular-nums text-primary sm:text-lg">
-                      {formatExamRemaining(remainingMs)}
-                    </span>
-                    ，到点将自动交卷。
-                  </>
-                ) : (
-                  <span className="font-semibold text-destructive">
-                    考试时间已到，正在自动提交试卷…
-                  </span>
-                )}
-              </p>
-            ) : null}
-            {saveLabel ? (
-              <p className="truncate text-foreground/90">保存状态：{saveLabel}</p>
-            ) : null}
-            {progressSyncLabel ? (
-              <p className="truncate text-foreground/90">同步状态：{progressSyncLabel}</p>
-            ) : null}
-          </div>
-          <div className="pointer-events-none absolute inset-x-0 flex justify-center px-20">
-            <p className="truncate text-center text-lg font-bold text-foreground sm:text-xl">
-              {examTitle ?? '考试中'}
-            </p>
-          </div>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => setLogoutOpen(true)}
-          >
-            退出登录
-          </Button>
-        </div>
-      ) : null}
-
-      {!loading && answerProgress.totalCount > 0 && !isFillOnlyExam ? (
-        <StudentExamAnswerOverview
-          summary={answerProgress}
-          contentModules={contentModules}
-          readOnly={readOnly}
-        />
-      ) : null}
-
       <div
         className={cn(
-          'mx-auto w-full space-y-10 p-4 pb-8',
-          !readOnly && 'pt-14',
-          hasObjectiveModule &&
-            answerProgress.totalCount > 0 &&
-            'pt-28 sm:pt-32',
-          pageMaxWidth,
+          useSplitLayout
+            ? 'fixed inset-0 flex flex-col overflow-hidden bg-background'
+            : cn(
+                'mx-auto w-full min-h-svh',
+                pageMaxWidth,
+                !readOnly && 'pt-14',
+              ),
         )}
       >
+        {examHeader}
+
+        <div
+          className={cn(
+            'flex w-full',
+            useSplitLayout && 'min-h-0 flex-1 overflow-hidden',
+          )}
+        >
+          <main
+            ref={mainScrollRef}
+            className={cn(
+              'min-w-0 flex-1 space-y-8 px-5 py-4 pb-8',
+              useSplitLayout && 'min-h-0 overflow-y-auto overscroll-y-contain',
+              showQuestionStepper && 'pb-28',
+            )}
+          >
       {readOnly ? (
         <Alert>
           <AlertDescription>
@@ -808,10 +881,13 @@ export default function StudentExamTake() {
       {hasObjectiveModule &&
       needsQuestionItems(contentModules) &&
       objectiveItems.length > 0 ? (
-        <section className="space-y-6" aria-labelledby="objective-section-title">
+        <section
+          className="w-full space-y-5"
+          aria-labelledby="objective-section-title"
+        >
           <h2
             id="objective-section-title"
-            className="text-lg font-semibold text-foreground"
+            className="text-xl font-semibold text-foreground"
           >
             客观题
           </h2>
@@ -820,14 +896,18 @@ export default function StudentExamTake() {
             const showResult = false;
 
             return (
-              <Card key={item.examQuestionId}>
-                <CardHeader>
-                  <CardTitle className="flex flex-wrap items-center gap-2 text-base">
+              <Card
+                key={item.examQuestionId}
+                id={examQuestionAnchorId(item.examQuestionId)}
+                className="scroll-mt-4"
+              >
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex flex-wrap items-center gap-2 text-xl">
                     <span>{`第 ${index + 1} 题`}</span>
-                    <Badge variant="secondary">
+                    <Badge variant="secondary" className="text-sm">
                       {questionTypeLabel(item.type)}
                     </Badge>
-                    <span className="text-sm font-normal text-muted-foreground">
+                    <span className="text-base font-normal text-muted-foreground">
                       {`${item.points} 分`}
                     </span>
                     {showResult ? (
@@ -842,14 +922,14 @@ export default function StudentExamTake() {
                     ) : null}
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <p className="text-base text-foreground">
+                <CardContent className="space-y-5">
+                  <p className="text-2xl leading-relaxed text-foreground">
                     {formatStemForDisplay(item.stem)}
                   </p>
 
                   {item.type === 'MULTI' ? (
-                    <div className="space-y-3">
-                      <p className="text-sm text-muted-foreground">
+                    <div className="space-y-4">
+                      <p className="text-lg text-muted-foreground">
                         多选题须选出全部正确选项才得分。
                       </p>
                       <ObjectiveOptionTiles
@@ -897,27 +977,22 @@ export default function StudentExamTake() {
       ) : null}
 
       {hasFillModule ? (
-        <section
-          className="space-y-4"
-          aria-labelledby="fillin-section-title"
-        >
+        <section className="space-y-4" aria-labelledby="fillin-section-title">
           <h2
             id="fillin-section-title"
             className="text-lg font-semibold text-foreground"
           >
             填空题
           </h2>
-          <div className="h-[min(88vh,68rem)] min-h-[18rem]">
-            <StudentFillInWorkspace
-              examId={examId}
-              meta={fillIn}
-              items={fillItems}
-              answers={answers}
-              readOnly={readOnly}
-              showResult={false}
-              onAnswerChange={updateAnswer}
-            />
-          </div>
+          <StudentFillInWorkspace
+            examId={examId}
+            meta={fillIn}
+            items={fillItems}
+            answers={answers}
+            readOnly={readOnly}
+            showResult={false}
+            onAnswerChange={updateAnswer}
+          />
         </section>
       ) : null}
 
@@ -996,7 +1071,29 @@ export default function StudentExamTake() {
           </>
         )}
       </div>
+          </main>
+
+          {showAnswerOverview ? (
+            <aside className="hidden w-60 min-h-0 shrink-0 flex-col overflow-hidden border-l md:flex">
+              <StudentExamAnswerOverview
+                summary={answerProgress}
+                contentModules={contentModules}
+                onQuestionClick={handleQuestionNavClick}
+              />
+            </aside>
+          ) : null}
+        </div>
       </div>
+
+      {showQuestionStepper ? (
+        <StudentExamQuestionStepper
+          currentIndex={currentNavIndex}
+          totalCount={answerProgress.totalCount}
+          offsetForSidebar={showAnswerOverview}
+          onPrevious={() => goToNavIndex(currentNavIndex - 1)}
+          onNext={() => goToNavIndex(currentNavIndex + 1)}
+        />
+      ) : null}
     </>
   );
 }

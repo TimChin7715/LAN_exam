@@ -2,6 +2,10 @@ import { toast } from 'sonner';
 
 import { ApiError, apiFetch, handleAuthResponse } from '@/lib/api';
 import type { ImportRowError } from '@/lib/qbank';
+import type {
+  FillInScreenshotInfo,
+  FillInScreenshotsByQuestion,
+} from '@/lib/student';
 
 export type FillInBatchListItem = {
   id: string;
@@ -165,6 +169,33 @@ export function parseFillQuestionNo(meta: string | null | undefined): string | n
   return t || null;
 }
 
+/** 内联预览标题「第 N 题」解析题号 */
+export function parseFillInTitleQuestionNo(text: string): string | null {
+  const m = text.trim().match(/^第\s*(.+?)\s*题$/);
+  return m?.[1]?.trim() ?? null;
+}
+
+export function buildFillInQuestionPointsMap(
+  rows: { fillQuestionNo?: string | null; points: number }[],
+): Map<string, number> {
+  const map = new Map<string, number>();
+  for (const row of rows) {
+    const qNo = parseFillQuestionNo(row.fillQuestionNo);
+    if (!qNo) continue;
+    const keys = new Set<string>([qNo]);
+    const raw = row.fillQuestionNo?.trim();
+    if (raw && raw !== qNo) keys.add(raw);
+    for (const key of keys) {
+      map.set(key, (map.get(key) ?? 0) + row.points);
+    }
+  }
+  return map;
+}
+
+export function formatFillQuestionPoints(points: number): string {
+  return Number.isInteger(points) ? String(points) : String(points);
+}
+
 /** 学员作答展示：新格式纯文本；旧格式 JSON 合并为可读文本 */
 export function displayFillAnswer(raw: string): string {
   const trimmed = raw.trim();
@@ -211,4 +242,73 @@ export function formatFillAnswerKeysPreview(answerKeys: string): string {
         : b.answers.join(' / '),
     )
     .join('；');
+}
+
+export type FillInItemLike = {
+  examQuestionId: string;
+  sortOrder: number;
+  type?: string;
+  fillQuestionNo?: string | null;
+};
+
+/** 每道填空题（同 fillQuestionNo）第一空的 examQuestionId，用于题级截图绑定 */
+export function buildFillQuestionLeaderMap(
+  items: FillInItemLike[],
+): Map<string, string> {
+  const leaders = new Map<string, string>();
+  const rows = [...items]
+    .filter((item) => item.type === 'FILL' || item.type === undefined)
+    .sort((a, b) => a.sortOrder - b.sortOrder);
+
+  for (const row of rows) {
+    const groupKey = row.fillQuestionNo ?? row.examQuestionId;
+    if (!leaders.has(groupKey)) {
+      leaders.set(groupKey, row.examQuestionId);
+    }
+    const qNo = parseFillQuestionNo(row.fillQuestionNo);
+    if (qNo && !leaders.has(qNo)) {
+      leaders.set(qNo, row.examQuestionId);
+    }
+  }
+  return leaders;
+}
+
+export function resolveFillQuestionLeaderId(
+  items: FillInItemLike[],
+  questionNo: string,
+): string | null {
+  return buildFillQuestionLeaderMap(items).get(questionNo) ?? null;
+}
+
+/** 将 API 按空返回的截图合并为题级（leader examQuestionId）映射 */
+export function normalizeScreenshotsByFillQuestion(
+  items: FillInItemLike[],
+  apiItems: FillInScreenshotsByQuestion[],
+): Record<string, FillInScreenshotInfo[]> {
+  const leaders = buildFillQuestionLeaderMap(items);
+  const blankToLeader = new Map<string, string>();
+
+  for (const row of items) {
+    if (row.type && row.type !== 'FILL') continue;
+    const groupKey = row.fillQuestionNo ?? row.examQuestionId;
+    blankToLeader.set(
+      row.examQuestionId,
+      leaders.get(groupKey) ?? row.examQuestionId,
+    );
+  }
+
+  const merged = new Map<string, FillInScreenshotInfo[]>();
+  for (const item of apiItems) {
+    const leaderId =
+      blankToLeader.get(item.examQuestionId) ?? item.examQuestionId;
+    const list = merged.get(leaderId) ?? [];
+    list.push(...item.screenshots);
+    merged.set(leaderId, list);
+  }
+
+  const result: Record<string, FillInScreenshotInfo[]> = {};
+  for (const [leaderId, shots] of merged) {
+    result[leaderId] = [...shots].sort((a, b) => a.sortOrder - b.sortOrder);
+  }
+  return result;
 }

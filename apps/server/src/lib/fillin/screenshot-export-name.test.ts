@@ -8,14 +8,11 @@ import {
 } from './screenshot-export-name.js';
 
 describe('fillInScreenshotExportBasename', () => {
-  it('single image uses 第x题', () => {
-    assert.equal(fillInScreenshotExportBasename('3', 1, 1), '第3题');
-  });
-
-  it('multiple images use 第x题1, 第x题2', () => {
-    assert.equal(fillInScreenshotExportBasename('1', 1, 2), '第1题1');
-    assert.equal(fillInScreenshotExportBasename('1', 2, 2), '第1题2');
-    assert.equal(fillInScreenshotExportBasename('5', 3, 3), '第5题3');
+  it('uses chinese question number with zero-padded sequence', () => {
+    assert.equal(fillInScreenshotExportBasename('1', 1), '第一题01');
+    assert.equal(fillInScreenshotExportBasename('1', 2), '第一题02');
+    assert.equal(fillInScreenshotExportBasename('2', 1), '第二题01');
+    assert.equal(fillInScreenshotExportBasename('14', 1), '第十四题01');
   });
 });
 

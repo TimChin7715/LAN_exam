@@ -88,16 +88,49 @@
 
 @layer components {
   .fillin-word-preview .fillin-inline-paper {
-    gap: 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  .fillin-word-preview .fillin-inline-question {
+    break-inside: avoid;
+    padding: 1.25rem 1.5rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--card);
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.05);
   }
 
   .fillin-word-preview .fillin-inline-title {
-    margin-bottom: 0.625rem;
-    font-weight: 700;
+    margin-bottom: 0.75rem;
+    font-size: 1.25rem;
+    font-weight: 600;
+  }
+
+  .fillin-word-preview .fillin-inline-points {
+    margin-left: 0.375rem;
+    font-size: 1rem;
+    font-weight: 500;
+    color: var(--muted-foreground);
+  }
+
+  .fillin-word-preview .fillin-inline-blank-points {
+    margin-right: 0.375rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--muted-foreground);
+    vertical-align: baseline;
   }
 
   .fillin-word-preview .fillin-inline-stem {
     line-height: 2.35;
+  }
+
+  .fillin-word-preview .fillin-inline-screenshots {
+    margin-top: 1rem;
+    padding-top: 0.75rem;
+    border-top: 1px dashed var(--border);
   }
 
   .fillin-word-preview input.fillin-inline-input {
@@ -107,10 +140,10 @@
     height: 2.35rem;
     margin: 0 0.25rem;
     padding: 0.1rem 0.65rem;
-    border: 1px solid transparent;
-    border-bottom-color: #334155;
+    border: 1px solid #fde047;
+    border-bottom-color: #ca8a04;
     border-radius: 0.375rem 0.375rem 0.125rem 0.125rem;
-    background: #f8fafc;
+    background: #fef9c3;
     color: var(--foreground);
     cursor: text;
     font: inherit;
@@ -122,21 +155,21 @@
   }
 
   .fillin-word-preview input.fillin-inline-input:hover {
-    border-color: #cbd5e1;
+    border-color: #facc15;
     border-bottom-color: var(--primary);
-    background: #ffffff;
+    background: #fef08a;
   }
 
   .fillin-word-preview input.fillin-inline-input:focus {
     border-color: var(--primary);
-    background: #ffffff;
+    background: #fef08a;
     outline: none;
     box-shadow: 0 0 0 3px rgb(37 99 235 / 16%);
   }
 
   .fillin-word-preview input.fillin-inline-input:disabled {
-    border-color: #cbd5e1;
-    background: #f1f5f9;
+    border-color: #fde68a;
+    background: #fef3c7;
     color: #475569;
     cursor: not-allowed;
   }

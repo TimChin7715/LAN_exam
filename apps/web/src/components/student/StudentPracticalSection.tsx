@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Spinner } from '@/components/ui/spinner';
 import { ApiError, studentApi, type PracticalPaperMeta } from '@/lib/student';
+import { examQuestionAnchorId } from '@/lib/exam-question-nav';
 import { validateDocxFile } from '@/lib/practical';
 import { WORD_ACCEPT } from '@/lib/upload-formats';
 
@@ -93,7 +94,10 @@ export function StudentPracticalSection({
     submittedFileName ?? meta.answerFileName ?? null;
 
   return (
-    <Card>
+    <Card
+      id={examQuestionAnchorId('practical')}
+      className="scroll-mt-4"
+    >
       <CardHeader>
         <CardTitle className="text-base">操作题</CardTitle>
       </CardHeader>

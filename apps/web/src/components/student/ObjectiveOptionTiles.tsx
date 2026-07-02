@@ -16,7 +16,7 @@ function parseMultiKeys(raw: string): string[] {
 
 function optionTileClass(selected: boolean, readOnly: boolean): string {
   return cn(
-    'flex min-h-[3.25rem] flex-row items-center gap-3 rounded-lg border-2 px-4 py-3 text-left transition-colors',
+    'flex min-h-[4.875rem] flex-row items-center gap-4 rounded-lg border-2 px-5 py-4 text-left transition-colors',
     selected
       ? 'border-primary bg-primary/10 text-foreground shadow-sm'
       : 'border-border bg-card text-foreground',
@@ -29,8 +29,8 @@ function optionTileClass(selected: boolean, readOnly: boolean): string {
 function OptionTileContent({ opt }: { opt: ObjectiveOption }) {
   return (
     <>
-      <span className="w-7 shrink-0 text-base font-semibold">{opt.key}</span>
-      <span className="min-w-0 flex-1 text-base leading-snug">{opt.text}</span>
+      <span className="w-10 shrink-0 text-2xl font-semibold">{opt.key}</span>
+      <span className="min-w-0 flex-1 text-2xl leading-snug">{opt.text}</span>
     </>
   );
 }
@@ -59,7 +59,7 @@ export function ObjectiveOptionTiles({
 
     return (
       <div
-        className="grid grid-cols-2 gap-3"
+        className="grid grid-cols-2 gap-4"
         role="group"
         aria-label="选项"
       >
@@ -95,7 +95,7 @@ export function ObjectiveOptionTiles({
       value={selectedKeys}
       onValueChange={onSelect}
       disabled={readOnly}
-      className="grid grid-cols-2 gap-3"
+      className="grid grid-cols-2 gap-4"
     >
       {options.map((opt) => {
         const selected = selectedKeys === opt.key;

@@ -91,6 +91,8 @@ describe('parseAnswerSheetRows', () => {
 
     const html = buildFillInInlinePreviewHtml(blanks);
     assert.match(html, /class="fillin-inline-input"/);
+    assert.match(html, /fillin-inline-points/);
+    assert.match(html, / · 4 分/);
     assert.match(html, /data-fillin-question-no="1"/);
     assert.match(html, /data-fillin-blank-index="2"/);
   });
