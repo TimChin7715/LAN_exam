@@ -5,6 +5,16 @@ import { toast } from 'sonner';
 
 import { QuestionPreviewCards } from '@/components/admin/qbank/QuestionPreviewCards';
 import {
+  AdminDataTable,
+  AdminSectionCard,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/admin/AdminPagePrimitives';
+import { adminMeta, adminPageTitle } from '@/components/admin/admin-typography';
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -17,22 +27,12 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import {
   downloadExamExport,
   downloadFillInScreenshots,
-  downloadPracticalAnswer,
   endExam,
   examContentModulesLabel,
   hasExamModule,
@@ -56,6 +56,7 @@ import { ExamSeatBoardPanel } from '@/components/exam/ExamSeatBoardPanel';
 import { fetchAdminSettings } from '@/lib/admin-settings';
 import { ApiError } from '@/lib/api';
 import { maskNationalId } from '@/lib/roster';
+import { cn } from '@/lib/utils';
 import type { PreviewQuestion } from '@/lib/qbank';
 
 const ADMIN_SUBMISSIONS_POLL_INTERVAL_MS = 10_000;
@@ -64,7 +65,7 @@ export default function AdminExamDetail() {
   const { examId } = useParams<{ examId: string }>();
   const [exam, setExam] = useState<ExamDetail | null>(null);
   const [submissions, setSubmissions] = useState<SubmissionListItem[]>([]);
-  const [showSeatBoard, setShowSeatBoard] = useState(true);
+  const [showSeatBoard, setShowSeatBoard] = useState(false);
   const [seatBoard, setSeatBoard] = useState<ExamSeatBoard | null>(null);
   const [seatsLoading, setSeatsLoading] = useState(true);
   const [seatsError, setSeatsError] = useState<string | null>(null);
@@ -72,9 +73,6 @@ export default function AdminExamDetail() {
   const [actionLoading, setActionLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [exportingScreenshots, setExportingScreenshots] = useState(false);
-  const [downloadingPracticalRoster, setDownloadingPracticalRoster] = useState<
-    string | null
-  >(null);
   const [retakingEntryId, setRetakingEntryId] = useState<string | null>(null);
   const [scheduleStart, setScheduleStart] = useState('');
   const [scheduleEnd, setScheduleEnd] = useState('');
@@ -274,10 +272,10 @@ export default function AdminExamDetail() {
     setExportingScreenshots(true);
     try {
       await downloadFillInScreenshots(examId, exam.title);
-      toast.success('填空题截图导出已开始下载。');
+      toast.success('操作题截图导出已开始下载。');
     } catch (err) {
       if (!(err instanceof ApiError)) {
-        handleExamApiError(err, '导出填空题截图失败。');
+        handleExamApiError(err, '导出操作题截图失败。');
       }
     } finally {
       setExportingScreenshots(false);
@@ -329,103 +327,45 @@ export default function AdminExamDetail() {
   }));
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div className="flex flex-wrap items-center gap-4">
-        <Button variant="outline" size="sm" asChild>
+        <Button variant="outline" asChild>
           <Link to="/admin/exams">
-            <ArrowLeft className="size-4" aria-hidden />
+            <ArrowLeft className="size-5" aria-hidden />
             返回列表
           </Link>
         </Button>
-        <h1 className="text-xl font-semibold text-foreground">{exam.title}</h1>
-        <Badge variant="secondary">{examStatusLabel(exam.status)}</Badge>
+        <h1 className={adminPageTitle}>{exam.title}</h1>
+        <Badge variant="secondary">
+          {examStatusLabel(exam.status)}
+        </Badge>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">考试配置</CardTitle>
-        </CardHeader>
-        <CardContent className="grid gap-6 lg:grid-cols-2">
-          <div className="space-y-2 text-sm text-muted-foreground">
+      <AdminSectionCard title="考试配置" contentClassName="space-y-6">
+          <div className="grid gap-8 lg:grid-cols-2">
+          <div className={cn('space-y-3 leading-relaxed', adminMeta)}>
           <p>考试内容：{examContentModulesLabel(exam.contentModules)}</p>
           {exam.questionBatch ? (
             <p>客观题批次：{exam.questionBatch.fileName}</p>
           ) : null}
           {exam.fillInBatch ? (
             <p>
-              填空题批次：{exam.fillInBatch.title}（{exam.fillInBatch.wordFileName}、
-              {exam.fillInBatch.excelFileName}）
-            </p>
-          ) : null}
-          {exam.practicalBatch ? (
-            <p>
-              操作题批次：{exam.practicalBatch.title}（{exam.practicalBatch.wordFileName}
-              、{exam.practicalBatch.excelFileName}）
+              操作题批次：{exam.fillInBatch.title}（{exam.fillInBatch.wordFileName}
+              {exam.fillInBatch.excelFileName
+                ? `、${exam.fillInBatch.excelFileName}`
+                : ''}
+              ）
             </p>
           ) : null}
           <p>名单批次：{exam.rosterBatch.fileName}</p>
           {hasExamModule(exam.contentModules, 'OBJECTIVE') ||
           hasExamModule(exam.contentModules, 'FILL') ? (
-            <p>试题数量（客观+填空）：{exam.questions.length}</p>
-          ) : null}
-          {hasExamModule(exam.contentModules, 'PRACTICAL') ? (
-            <p className="text-amber-700 dark:text-amber-400">
-              操作题需人工评阅，系统不自动计分。
-            </p>
+            <p>试题数量（客观+操作）：{exam.questions.length}</p>
           ) : null}
           <p>
             计划时间：
             {formatExamScheduleRange(exam.scheduledStartAt, exam.scheduledEndAt)}
           </p>
-          <div className="space-y-3 pt-2">
-            <p className="text-sm font-medium text-foreground">修改计划时间</p>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="space-y-1">
-                <Label htmlFor="scheduleStart">开始时间</Label>
-                <Input
-                  id="scheduleStart"
-                  type="datetime-local"
-                  value={scheduleStart}
-                  disabled={
-                    (exam.status !== 'DRAFT' && exam.status !== 'IN_PROGRESS') ||
-                    savingSchedule
-                  }
-                  onChange={(e) => setScheduleStart(e.target.value)}
-                />
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="scheduleEnd">结束时间</Label>
-                <Input
-                  id="scheduleEnd"
-                  type="datetime-local"
-                  value={scheduleEnd}
-                  disabled={
-                    (exam.status !== 'DRAFT' && exam.status !== 'IN_PROGRESS') ||
-                    savingSchedule
-                  }
-                  onChange={(e) => setScheduleEnd(e.target.value)}
-                />
-              </div>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                disabled={
-                  (exam.status !== 'DRAFT' && exam.status !== 'IN_PROGRESS') ||
-                  savingSchedule
-                }
-                onClick={() => void handleSaveSchedule()}
-              >
-                {savingSchedule ? '保存中…' : '保存时间'}
-              </Button>
-              {exam.status !== 'DRAFT' && exam.status !== 'IN_PROGRESS' ? (
-                <p className="text-xs text-muted-foreground">
-                  仅草稿/进行中允许修改计划时间。
-                </p>
-              ) : null}
-            </div>
-          </div>
           {exam.startedAt ? (
             <p>实际开始：{formatExamDateTime(exam.startedAt)}</p>
           ) : null}
@@ -471,7 +411,7 @@ export default function AdminExamDetail() {
                     <Download className="size-4" aria-hidden />
                     {exportingScreenshots
                       ? '导出中…'
-                      : '导出填空题截图'}
+                      : '导出操作题截图'}
                   </Button>
                 ) : null}
               </>
@@ -509,20 +449,67 @@ export default function AdminExamDetail() {
               error={seatsError}
             />
           ) : null}
-        </CardContent>
-      </Card>
+          </div>
+
+          <div className="space-y-4 border-t border-border pt-6">
+            <p className="font-medium text-foreground">修改计划时间</p>
+            <div className="flex flex-col gap-4 sm:flex-row sm:flex-nowrap sm:items-end">
+              <div className="space-y-2">
+                <Label htmlFor="scheduleStart">开始时间</Label>
+                <Input
+                  id="scheduleStart"
+                  type="datetime-local"
+                  className="w-full sm:w-[13.5rem]"
+                  value={scheduleStart}
+                  disabled={
+                    (exam.status !== 'DRAFT' && exam.status !== 'IN_PROGRESS') ||
+                    savingSchedule
+                  }
+                  onChange={(e) => setScheduleStart(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="scheduleEnd">结束时间</Label>
+                <Input
+                  id="scheduleEnd"
+                  type="datetime-local"
+                  className="w-full sm:w-[13.5rem]"
+                  value={scheduleEnd}
+                  disabled={
+                    (exam.status !== 'DRAFT' && exam.status !== 'IN_PROGRESS') ||
+                    savingSchedule
+                  }
+                  onChange={(e) => setScheduleEnd(e.target.value)}
+                />
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <Button
+                  type="button"
+                  className="shrink-0"
+                  disabled={
+                    (exam.status !== 'DRAFT' && exam.status !== 'IN_PROGRESS') ||
+                    savingSchedule
+                  }
+                  onClick={() => void handleSaveSchedule()}
+                >
+                  {savingSchedule ? '修改中…' : '修改时间'}
+                </Button>
+                {exam.status !== 'DRAFT' && exam.status !== 'IN_PROGRESS' ? (
+                  <p className={cn(adminMeta, 'shrink-0 whitespace-nowrap')}>
+                    仅草稿/进行中允许修改计划时间。
+                  </p>
+                ) : null}
+              </div>
+            </div>
+          </div>
+      </AdminSectionCard>
 
       {(hasExamModule(exam.contentModules, 'OBJECTIVE') ||
         hasExamModule(exam.contentModules, 'FILL')) &&
       exam.questions.length > 0 ? (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">试题预览（含标准答案）</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <QuestionPreviewCards questions={previewQuestions} />
-          </CardContent>
-        </Card>
+        <AdminSectionCard title="试题预览（含标准答案）">
+            <QuestionPreviewCards questions={previewQuestions} size="large" />
+        </AdminSectionCard>
       ) : null}
 
       <RosterListSection
@@ -532,12 +519,8 @@ export default function AdminExamDetail() {
         onEntriesChanged={handleRosterEntriesChanged}
       />
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">成绩列表</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Table>
+      <AdminSectionCard title="成绩列表">
+          <AdminDataTable>
             <TableHeader>
               <TableRow>
                 <TableHead>姓名</TableHead>
@@ -545,9 +528,6 @@ export default function AdminExamDetail() {
                 <TableHead>身份证号</TableHead>
                 <TableHead>状态</TableHead>
                 <TableHead>试题得分</TableHead>
-                {hasExamModule(exam.contentModules, 'PRACTICAL') ? (
-                  <TableHead>操作题</TableHead>
-                ) : null}
                 <TableHead>操作</TableHead>
               </TableRow>
             </TableHeader>
@@ -574,38 +554,6 @@ export default function AdminExamDetail() {
                         ? row.totalScore
                         : '—'}
                   </TableCell>
-                  {hasExamModule(exam.contentModules, 'PRACTICAL') ? (
-                    <TableCell>
-                      {row.practicalSubmitted && examId ? (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          disabled={downloadingPracticalRoster === row.rosterEntryId}
-                          onClick={() =>
-                            void (async () => {
-                              setDownloadingPracticalRoster(row.rosterEntryId);
-                              try {
-                                await downloadPracticalAnswer(
-                                  examId,
-                                  row.rosterEntryId,
-                                  `${row.fullName}-操作题`,
-                                );
-                              } finally {
-                                setDownloadingPracticalRoster(null);
-                              }
-                            })()
-                          }
-                        >
-                          {downloadingPracticalRoster === row.rosterEntryId
-                            ? '下载中…'
-                            : '下载答卷'}
-                        </Button>
-                      ) : (
-                        <span className="text-muted-foreground">未提交</span>
-                      )}
-                    </TableCell>
-                  ) : null}
                   <TableCell>
                     {row.submitted && exam.status === 'IN_PROGRESS' ? (
                       <AlertDialog>
@@ -652,9 +600,8 @@ export default function AdminExamDetail() {
                 </TableRow>
               ))}
             </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+          </AdminDataTable>
+      </AdminSectionCard>
     </div>
   );
 }

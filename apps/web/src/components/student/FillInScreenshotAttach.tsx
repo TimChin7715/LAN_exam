@@ -27,7 +27,7 @@ type FillInScreenshotAttachProps = {
     screenshots: FillInScreenshotInfo[],
   ) => void;
   className?: string;
-  variant?: 'default' | 'inline-card';
+  variant?: 'default' | 'inline-card' | 'sidebar';
 };
 
 export function FillInScreenshotAttach({
@@ -45,6 +45,10 @@ export function FillInScreenshotAttach({
   const [previewShot, setPreviewShot] = useState<FillInScreenshotInfo | null>(null);
   const atLimit = screenshots.length >= MAX_FILLIN_SCREENSHOTS_PER_BLANK;
   const isInlineCard = variant === 'inline-card';
+  const isSidebar = variant === 'sidebar';
+  const thumbSize = isSidebar ? 'h-14 w-14' : 'h-16 w-16';
+  const zoneMinH = isSidebar ? 'min-h-16' : SCREENSHOT_ZONE_MIN_H;
+  const emptyZoneRef = useRef<HTMLDivElement>(null);
 
   async function uploadFile(file: File) {
     if (readOnly || atLimit) return;
@@ -100,12 +104,21 @@ export function FillInScreenshotAttach({
   return (
     <>
       <div
-        className={cn('flex flex-col gap-2', className)}
+        className={cn(
+          'flex flex-col',
+          isSidebar ? 'gap-1.5' : 'gap-2',
+          className,
+        )}
         onPaste={handlePaste}
         tabIndex={readOnly ? undefined : -1}
       >
         {!readOnly ? (
-          <div className="flex flex-wrap items-center gap-2">
+          <div
+            className={cn(
+              'flex gap-1.5',
+              isSidebar ? 'flex-col items-stretch' : 'flex-wrap items-center',
+            )}
+          >
             <input
               ref={fileInputRef}
               type="file"
@@ -124,55 +137,77 @@ export function FillInScreenshotAttach({
               className={cn(
                 isInlineCard
                   ? 'h-auto min-h-0 px-3 py-1.5 text-2xl leading-relaxed font-normal [&_svg]:!size-6'
-                  : 'h-8 text-xs',
+                  : isSidebar
+                    ? 'h-9 w-full border-amber-500/60 bg-amber-50 px-2.5 text-xs font-medium text-amber-950 hover:bg-amber-100 hover:text-amber-950 [&_svg]:!size-3.5'
+                    : 'h-8 text-xs',
               )}
               disabled={uploading || atLimit}
               onClick={() => fileInputRef.current?.click()}
             >
               {uploading ? (
-                <Spinner className={isInlineCard ? 'size-6' : 'size-3.5'} />
+                <Spinner
+                  className={
+                    isInlineCard ? 'size-6' : isSidebar ? 'size-3' : 'size-3.5'
+                  }
+                />
               ) : (
                 <Upload
-                  className={isInlineCard ? 'size-6' : 'size-3.5'}
+                  className={
+                    isInlineCard ? 'size-6' : isSidebar ? 'size-3' : 'size-3.5'
+                  }
                   aria-hidden
                 />
               )}
               上传截图
             </Button>
-            <span
-              className={cn(
-                'inline-flex items-center gap-1.5 font-medium text-amber-600 dark:text-amber-400',
-                isInlineCard ? 'text-2xl leading-relaxed' : 'text-sm',
-              )}
-            >
-              <Lightbulb
-                className={cn('shrink-0', isInlineCard ? 'size-6' : 'size-4')}
-                aria-hidden
-              />
-              可直接粘贴截图
-              {atLimit ? (
-                <span className="text-amber-600/80 dark:text-amber-400/80">
-                  {`（已满 ${MAX_FILLIN_SCREENSHOTS_PER_BLANK} 张）`}
-                </span>
-              ) : null}
-            </span>
+            {!isSidebar ? (
+              <span
+                className={cn(
+                  'inline-flex items-center gap-1.5 font-medium text-amber-600 dark:text-amber-400',
+                  isInlineCard ? 'text-2xl leading-relaxed' : 'text-sm',
+                )}
+              >
+                <Lightbulb
+                  className={cn('shrink-0', isInlineCard ? 'size-6' : 'size-4')}
+                  aria-hidden
+                />
+                可直接粘贴截图
+                {atLimit ? (
+                  <span className="text-amber-600/80 dark:text-amber-400/80">
+                    {`（已满 ${MAX_FILLIN_SCREENSHOTS_PER_BLANK} 张）`}
+                  </span>
+                ) : null}
+              </span>
+            ) : atLimit ? (
+              <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-800 dark:text-amber-400">
+                {`已满 ${MAX_FILLIN_SCREENSHOTS_PER_BLANK} 张`}
+              </span>
+            ) : (
+              <span className="inline-flex w-fit items-center gap-1 rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-800 dark:text-amber-400">
+                <Lightbulb className="size-3 shrink-0" aria-hidden />
+                可粘贴
+              </span>
+            )}
           </div>
         ) : null}
 
         <div
           className={cn(
-            SCREENSHOT_ZONE_MIN_H,
+            zoneMinH,
             screenshots.length === 0 && 'flex items-stretch',
             variant === 'default' && 'border-t border-border/60 pt-2',
             variant === 'inline-card' && 'pt-1',
           )}
         >
           {screenshots.length > 0 ? (
-            <ul className="flex flex-wrap gap-2">
+            <ul className={cn('flex flex-wrap', isSidebar ? 'gap-1.5' : 'gap-2')}>
               {screenshots.map((shot) => (
                 <li
                   key={shot.id}
-                  className="relative h-16 w-16 shrink-0 overflow-hidden rounded border bg-muted/30"
+                  className={cn(
+                    'relative shrink-0 overflow-hidden rounded border bg-muted/30',
+                    thumbSize,
+                  )}
                 >
                   <button
                     type="button"
@@ -209,16 +244,41 @@ export function FillInScreenshotAttach({
             </ul>
           ) : (
             <div
+              ref={emptyZoneRef}
               className={cn(
-                'flex w-full flex-1 items-center justify-center rounded-md border border-dashed border-border/80 bg-muted/25 px-2 text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
-                isInlineCard ? 'text-2xl leading-relaxed' : 'text-xs',
-                SCREENSHOT_ZONE_MIN_H,
+                'flex w-full flex-1 flex-col items-center justify-center gap-1 rounded-md border outline-none transition-colors',
+                isSidebar && !readOnly
+                  ? 'cursor-pointer border-2 border-dashed border-amber-400/60 bg-amber-50/70 px-2 py-2 text-xs text-amber-900/80 hover:border-amber-500 hover:bg-amber-100/80 focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:ring-offset-2'
+                  : 'border border-dashed border-border/80 bg-muted/25 text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+                isInlineCard
+                  ? 'px-2 text-2xl leading-relaxed'
+                  : isSidebar
+                    ? readOnly
+                      ? 'px-1 py-1 text-center text-xs leading-snug'
+                      : 'text-center leading-snug'
+                    : 'px-2 text-xs',
+                zoneMinH,
               )}
               tabIndex={readOnly ? undefined : 0}
               role={readOnly ? undefined : 'button'}
               aria-label={readOnly ? undefined : '截图区域，点击后可粘贴图片'}
+              onClick={
+                readOnly || !isSidebar
+                  ? undefined
+                  : () => {
+                      emptyZoneRef.current?.focus();
+                      fileInputRef.current?.click();
+                    }
+              }
             >
-              {readOnly ? '暂无截图' : '点击此处后可直接粘贴截图，或点上方按钮上传'}
+              {!readOnly && isSidebar ? (
+                <Upload className="size-4 shrink-0 text-amber-700/80" aria-hidden />
+              ) : null}
+              {readOnly
+                ? '暂无截图'
+                : isSidebar
+                  ? '点击粘贴或上传'
+                  : '点击此处后可直接粘贴截图，或点上方按钮上传'}
             </div>
           )}
         </div>
@@ -229,7 +289,7 @@ export function FillInScreenshotAttach({
           {previewShot ? (
             <img
               src={previewShot.previewUrl}
-              alt="填空题截图预览"
+              alt="操作题截图预览"
               className="mx-auto max-h-[min(85vh,1200px)] w-auto max-w-full rounded-md object-contain"
             />
           ) : null}

@@ -1,10 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 
-import {
-  requiresPracticalBatch,
-  requiresQuestionSubmission,
-} from '../../../lib/exam/content-mode.js';
+import { requiresQuestionSubmission } from '../../../lib/exam/content-mode.js';
 import { prisma } from '../../../lib/prisma.js';
 import {
   ensureStudentRosterEntryId,
@@ -62,42 +59,28 @@ export async function registerStudentExamSubmissionRoutes(
         });
       }
 
-      const [submission, practicalSubmission] = await Promise.all([
-        requiresQuestionSubmission(exam.contentModules)
-          ? prisma.submission.findUnique({
-              where: {
-                examId_rosterEntryId: { examId, rosterEntryId },
-              },
-              include: {
-                answers: {
-                  select: {
-                    examQuestionId: true,
-                    selectedKeys: true,
-                    isCorrect: true,
-                    pointsAwarded: true,
-                  },
+      const submission = requiresQuestionSubmission(exam.contentModules)
+        ? await prisma.submission.findUnique({
+            where: {
+              examId_rosterEntryId: { examId, rosterEntryId },
+            },
+            include: {
+              answers: {
+                select: {
+                  examQuestionId: true,
+                  selectedKeys: true,
+                  isCorrect: true,
+                  pointsAwarded: true,
                 },
               },
-            })
-          : Promise.resolve(null),
-        requiresPracticalBatch(exam.contentModules)
-          ? prisma.practicalSubmission.findUnique({
-              where: { examId_rosterEntryId: { examId, rosterEntryId } },
-              select: {
-                docxFileName: true,
-                submittedAt: true,
-              },
-            })
-          : Promise.resolve(null),
-      ]);
+            },
+          })
+        : null;
 
       const questionsDone =
         !requiresQuestionSubmission(exam.contentModules) || Boolean(submission);
-      const practicalDone =
-        !requiresPracticalBatch(exam.contentModules) ||
-        Boolean(practicalSubmission);
 
-      if (!questionsDone || !practicalDone) {
+      if (!questionsDone) {
         return reply.status(404).send({
           code: 'NOT_SUBMITTED',
           message: '尚未提交试卷',
@@ -132,10 +115,7 @@ export async function registerStudentExamSubmissionRoutes(
         submission?.answers.map((a) => [a.examQuestionId, a]) ?? [],
       );
 
-      const submittedAt =
-        submission?.submittedAt ??
-        practicalSubmission?.submittedAt ??
-        new Date();
+      const submittedAt = submission?.submittedAt ?? new Date();
 
       return reply.send({
         examId,
@@ -161,13 +141,6 @@ export async function registerStudentExamSubmissionRoutes(
             pointsAwarded: answer?.pointsAwarded ?? 0,
           };
         }),
-        practical: practicalSubmission
-          ? {
-              submitted: true,
-              docxFileName: practicalSubmission.docxFileName,
-              submittedAt: practicalSubmission.submittedAt.toISOString(),
-            }
-          : null,
       });
     },
   );

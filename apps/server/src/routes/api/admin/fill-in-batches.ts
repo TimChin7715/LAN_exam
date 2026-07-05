@@ -5,6 +5,7 @@ import {
   BatchDeleteBlockedError,
   unlinkExamsAndDeleteFillInBatch,
 } from '../../../lib/batch/delete-with-exam-unlink.js';
+import { FILL_MODULE_LABEL_ZH } from '../../../lib/exam/content-labels.js';
 import { resolveAdminTeacherId } from '../../../lib/admin-context.js';
 import { questionImportOrderBy } from '../../../lib/qbank/question-import-order.js';
 import { prisma } from '../../../lib/prisma.js';
@@ -15,7 +16,7 @@ function mapBatchItem(batch: {
   id: string;
   title: string;
   wordFileName: string;
-  excelFileName: string;
+  excelFileName: string | null;
   importedCount: number;
   createdAt: Date;
 }) {
@@ -90,7 +91,7 @@ export async function registerAdminFillInBatchesRoutes(
         return reply.status(404).send({
           ok: false,
           code: 'BATCH_NOT_FOUND',
-          message: '填空题批次不存在',
+          message: `${FILL_MODULE_LABEL_ZH}批次不存在`,
         });
       }
 
@@ -125,7 +126,7 @@ export async function registerAdminFillInBatchesRoutes(
         return reply.status(404).send({
           ok: false,
           code: 'BATCH_NOT_FOUND',
-          message: '填空题批次不存在',
+          message: `${FILL_MODULE_LABEL_ZH}批次不存在`,
         });
       }
 

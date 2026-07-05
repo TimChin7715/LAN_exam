@@ -87,7 +87,7 @@ const TYPE_LABELS: Record<QuestionType, string> = {
   SINGLE: '单选',
   MULTI: '多选',
   JUDGE: '判断',
-  FILL: '填空',
+  FILL: '操作',
 };
 
 export function questionTypeLabel(type: QuestionType): string {

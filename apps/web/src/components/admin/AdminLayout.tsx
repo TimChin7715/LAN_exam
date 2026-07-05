@@ -26,16 +26,15 @@ export function AdminLayout() {
 
   return (
     <div className="min-h-svh bg-background">
-      <header className="flex h-14 items-center justify-between border-b border-border bg-card px-4 md:px-6">
-        <span className="text-base font-semibold text-foreground">
+      <header className="flex h-16 items-center justify-between border-b border-border bg-card px-5 md:px-8">
+        <span className="text-lg font-semibold text-foreground sm:text-xl">
           {isAdminAuthDisabled ? '考试管理台' : '局域网考试系统'}
         </span>
         <div className="flex items-center gap-3">
           <Button
             variant="ghost"
-            size="sm"
             asChild
-            className={cn(onSettingsPage && 'text-primary')}
+            className={cn('text-base', onSettingsPage && 'text-primary')}
           >
             <Link
               to="/admin/settings"
@@ -47,7 +46,7 @@ export function AdminLayout() {
           </Button>
           {!isAdminAuthDisabled ? (
             <>
-              <span className="flex items-center gap-2 text-sm font-semibold text-foreground">
+              <span className="flex items-center gap-2 text-base font-semibold text-foreground">
                 <span className="size-2 rounded-full bg-primary" aria-hidden />
                 {user?.username}
               </span>
@@ -58,7 +57,7 @@ export function AdminLayout() {
           ) : null}
         </div>
       </header>
-      <main className="mx-auto max-w-[960px] px-4 py-8">
+      <main className="admin-shell mx-auto w-full max-w-[96rem] px-5 py-8 sm:px-8">
         <Outlet />
       </main>
     </div>

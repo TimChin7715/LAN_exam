@@ -12,14 +12,10 @@ import {
   downloadFillInTemplate,
   importFillInBatch,
   validateDocxFile,
-  validateFillInExcelFile,
   type FillInImportFailure,
   type FillInImportSuccess,
 } from '@/lib/fillin';
-import {
-  ANSWER_SHEET_ACCEPT,
-  WORD_ACCEPT,
-} from '@/lib/upload-formats';
+import { WORD_ACCEPT } from '@/lib/upload-formats';
 
 type FillInImportFormProps = {
   onSuccess: (result: FillInImportSuccess) => void;
@@ -27,7 +23,7 @@ type FillInImportFormProps = {
   disabled?: boolean;
 };
 
-type FileSlot = 'word' | 'attachment' | 'excel';
+type FileSlot = 'word' | 'attachment';
 
 export function FillInImportForm({
   onSuccess,
@@ -36,7 +32,6 @@ export function FillInImportForm({
 }: FillInImportFormProps) {
   const [wordFile, setWordFile] = useState<File | null>(null);
   const [attachmentFiles, setAttachmentFiles] = useState<File[]>([]);
-  const [excelFile, setExcelFile] = useState<File | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [downloading, setDownloading] = useState(false);
   const [importing, setImporting] = useState(false);
@@ -57,21 +52,6 @@ export function FillInImportForm({
     setWordFile(file);
   }, []);
 
-  const pickExcel = useCallback((file: File | null) => {
-    if (!file) {
-      setExcelFile(null);
-      return;
-    }
-    const msg = validateFillInExcelFile(file);
-    if (msg) {
-      setExcelFile(null);
-      setValidationError(msg);
-      return;
-    }
-    setValidationError(null);
-    setExcelFile(file);
-  }, []);
-
   async function handleDownload() {
     setDownloading(true);
     try {
@@ -82,7 +62,7 @@ export function FillInImportForm({
   }
 
   async function handleImport() {
-    if (!excelFile || importing) return;
+    if (!wordFile || importing) return;
     const attachmentMsg = validateFillInAttachmentFiles(attachmentFiles);
     if (attachmentMsg) {
       setValidationError(attachmentMsg);
@@ -90,11 +70,7 @@ export function FillInImportForm({
     }
     setImporting(true);
     try {
-      const result = await importFillInBatch(
-        wordFile,
-        excelFile,
-        attachmentFiles,
-      );
+      const result = await importFillInBatch(wordFile, attachmentFiles);
       if (!result.ok) {
         onFailure(result);
         return;
@@ -102,7 +78,6 @@ export function FillInImportForm({
       onSuccess(result);
       setWordFile(null);
       setAttachmentFiles([]);
-      setExcelFile(null);
       setValidationError(null);
     } catch {
       /* toast in importFillInBatch */
@@ -144,8 +119,7 @@ export function FillInImportForm({
     }
     const dropped = e.dataTransfer.files[0];
     if (!dropped) return;
-    if (slot === 'word') pickWord(dropped);
-    else pickExcel(dropped);
+    pickWord(dropped);
   }
 
   return (
@@ -166,11 +140,11 @@ export function FillInImportForm({
         </Alert>
       ) : null}
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2">
         <ImportFileDropzone
-          label="Word 题目（可选）"
-          hint="新版可只上传 Excel；如需保留原 Word 预览，再上传 .doc/.docx"
-          note="仅 Word 预览需要上传；带图片的试卷建议使用 .docx"
+          label="Word 试卷"
+          hint="支持 .doc 或 .docx；推荐使用 .docx 以保留图片"
+          note="每空使用【标准答案】（分值）格式，例如【北京|北平】（2分）。多个可接受答案用 | 分隔。"
           accept={WORD_ACCEPT}
           file={wordFile}
           disabled={disabled || importing}
@@ -196,29 +170,13 @@ export function FillInImportForm({
           onDragLeave={() => setDragOver(null)}
           onDrop={(e) => handleDrop('attachment', e)}
         />
-        <ImportFileDropzone
-          label="Excel 试卷与答题卡"
-          hint="支持 .xls 或 .xlsx；只改「答题卡」工作表，填写题号、题干、答案、分值"
-          note="题干中的留空只能写【】。一题有多个空时，用同一个题号写多行，题干里也写对应数量的【】。"
-          accept={ANSWER_SHEET_ACCEPT}
-          file={excelFile}
-          disabled={disabled || importing}
-          dragOver={dragOver === 'excel'}
-          onPick={pickExcel}
-          onDragOver={(e) => {
-            e.preventDefault();
-            setDragOver('excel');
-          }}
-          onDragLeave={() => setDragOver(null)}
-          onDrop={(e) => handleDrop('excel', e)}
-        />
       </div>
 
       <div className="flex justify-end">
         <Button
           type="button"
           className="min-h-11 w-full md:w-auto"
-          disabled={!excelFile || importing || disabled}
+          disabled={!wordFile || importing || disabled}
           onClick={() => void handleImport()}
         >
           {importing ? '正在导入…' : '开始导入'}

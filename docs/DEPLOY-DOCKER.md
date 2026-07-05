@@ -157,7 +157,7 @@ Compose 默认卷：
 | 卷名 | 挂载点 | 内容 |
 | --- | --- | --- |
 | `postgres_data` | Postgres 数据目录 | 考试、名单、成绩等 |
-| `uploads_data` | `/app/data` | 填空题/操作题批次、学员答卷、截图 |
+| `uploads_data` | `/app/data` | 操作题批次、学员答卷、截图 |
 
 备份建议：考后备份上述两个 Docker volume，或定期 `docker compose exec db pg_dump ...` 导出 SQL。
 

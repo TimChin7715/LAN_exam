@@ -10,7 +10,6 @@ export type ClearTeacherDataResult = {
   questionBatches: number;
   rosterBatches: number;
   fillInBatches: number;
-  practicalBatches: number;
 };
 
 async function removeStoragePrefix(prefix: string): Promise<void> {
@@ -25,16 +24,12 @@ export async function clearAllTeacherData(
   prisma: PrismaClient,
   teacherId: string,
 ): Promise<ClearTeacherDataResult> {
-  const [exams, fillInBatches, practicalBatches] = await Promise.all([
+  const [exams, fillInBatches] = await Promise.all([
     prisma.exam.findMany({
       where: { teacherId },
       select: { id: true },
     }),
     prisma.fillInQuestionImportBatch.findMany({
-      where: { teacherId },
-      select: { id: true },
-    }),
-    prisma.practicalQuestionImportBatch.findMany({
       where: { teacherId },
       select: { id: true },
     }),
@@ -51,9 +46,6 @@ export async function clearAllTeacherData(
     const deletedFillIn = await tx.fillInQuestionImportBatch.deleteMany({
       where: { teacherId },
     });
-    const deletedPractical = await tx.practicalQuestionImportBatch.deleteMany({
-      where: { teacherId },
-    });
     const deletedRoster = await tx.rosterImportBatch.deleteMany({
       where: { teacherId },
     });
@@ -63,16 +55,13 @@ export async function clearAllTeacherData(
       questionBatches: deletedQuestions.count,
       rosterBatches: deletedRoster.count,
       fillInBatches: deletedFillIn.count,
-      practicalBatches: deletedPractical.count,
     };
   });
 
   await Promise.all([
     ...exams.map((e) => removeStoragePrefix(`exam-work/${e.id}`)),
     ...fillInBatches.map((b) => removeStoragePrefix(`fill-in-batches/${b.id}`)),
-    ...practicalBatches.map((b) =>
-      removeStoragePrefix(`practical-batches/${b.id}`),
-    ),
+    removeStoragePrefix('practical-batches'),
   ]);
 
   clearExamPaperCache();

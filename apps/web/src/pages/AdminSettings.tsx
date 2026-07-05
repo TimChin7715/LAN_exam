@@ -3,6 +3,11 @@ import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 
 import {
+  AdminPageHeader,
+  AdminSectionCard,
+} from '@/components/admin/AdminPagePrimitives';
+import { adminMeta } from '@/components/admin/admin-typography';
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -15,13 +20,6 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
@@ -32,19 +30,18 @@ import {
   updateAdminSettings,
 } from '@/lib/admin-settings';
 import { getApiLoadErrorMessage } from '@/lib/api';
+import { cn } from '@/lib/utils';
 
 function formatClearSummary(deleted: {
   exams: number;
   questionBatches: number;
   rosterBatches: number;
   fillInBatches: number;
-  practicalBatches: number;
 }): string {
   const parts: string[] = [];
   if (deleted.exams > 0) parts.push(`${deleted.exams} 场考试`);
   if (deleted.questionBatches > 0) parts.push(`${deleted.questionBatches} 个客观题库`);
-  if (deleted.fillInBatches > 0) parts.push(`${deleted.fillInBatches} 个填空题批次`);
-  if (deleted.practicalBatches > 0) parts.push(`${deleted.practicalBatches} 个操作题批次`);
+  if (deleted.fillInBatches > 0) parts.push(`${deleted.fillInBatches} 个操作题批次`);
   if (deleted.rosterBatches > 0) parts.push(`${deleted.rosterBatches} 份名单`);
   return parts.length > 0 ? parts.join('、') : '无业务数据';
 }
@@ -110,132 +107,122 @@ export default function AdminSettings() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-xl font-semibold leading-tight text-foreground">设置</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          考场相关配置将在此维护。
-          {appVersion ? (
-            <span className="mt-1 block text-xs">当前版本 {appVersion}</span>
-          ) : null}
+      <AdminPageHeader
+        title="设置"
+        showBack={false}
+        description={
+          <>
+            考场相关配置将在此维护。
+            {appVersion ? (
+              <span className="mt-1 block text-sm">当前版本 {appVersion}</span>
+            ) : null}
+          </>
+        }
+      />
+
+      <AdminSectionCard title="考试座位表">
+        <p className={cn('mb-4', adminMeta)}>
+          关闭后，学员登录页与管理端考试详情均不显示座位表。
         </p>
-      </div>
-
-      <Card>
-        <CardHeader className="space-y-2 pb-4">
-          <CardTitle className="text-base font-semibold sm:text-lg">
-            考试座位表
-          </CardTitle>
-          <CardDescription className="text-sm">
-            关闭后，学员登录页与管理端考试详情均不显示座位表。
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="pt-0">
-          {loading ? (
-            <div className="flex min-h-[3rem] items-center">
-              <Spinner />
+        {loading ? (
+          <div className="flex min-h-[3rem] items-center">
+            <Spinner />
+          </div>
+        ) : (
+          <div className="flex items-start gap-3">
+            <Checkbox
+              id="show-seat-board"
+              checked={showSeatBoard}
+              disabled={saving}
+              onCheckedChange={(value) => {
+                void handleShowSeatBoardChange(value === true);
+              }}
+            />
+            <div className="space-y-1">
+              <Label htmlFor="show-seat-board" className="cursor-pointer font-semibold">
+                展示考试座位表
+              </Label>
+              <p className={adminMeta}>
+                开启后，学员可在登录页查看当前考试的座位安排；考官可在考试详情中查看。
+              </p>
             </div>
-          ) : (
-            <div className="flex items-start gap-3">
-              <Checkbox
-                id="show-seat-board"
-                checked={showSeatBoard}
-                disabled={saving}
-                onCheckedChange={(value) => {
-                  void handleShowSeatBoardChange(value === true);
-                }}
+          </div>
+        )}
+      </AdminSectionCard>
+
+      <AdminSectionCard
+        title="清除全部数据"
+        titleClassName="text-xl font-semibold text-destructive"
+        className="border-destructive/40"
+      >
+        <p className={cn('mb-4', adminMeta)}>
+          删除当前管理账号下的全部考试、题库、名单、操作题批次及学员答卷文件。
+          座位表等本页设置会保留。此操作不可恢复，请在每场考试结束后、下一场开考前使用。
+        </p>
+        <AlertDialog
+          open={clearDialogOpen}
+          onOpenChange={(open) => {
+            setClearDialogOpen(open);
+            if (!open) setClearConfirmInput('');
+          }}
+        >
+          <AlertDialogTrigger asChild>
+            <Button type="button" variant="destructive" disabled={loading}>
+              清除全部数据…
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>确认清除全部数据？</AlertDialogTitle>
+              <AlertDialogDescription asChild>
+                <div className={cn('space-y-3', adminMeta)}>
+                  <p>
+                    将永久删除所有考试记录、成绩与答卷、客观题/操作题批次、名单及关联上传文件。
+                    进行中的考试也会被清除，学员端将无法继续作答。
+                  </p>
+                  <p>
+                    请在下方输入{' '}
+                    <span className="font-semibold text-foreground">
+                      {CLEAR_ALL_DATA_CONFIRM_PHRASE}
+                    </span>{' '}
+                    以确认。
+                  </p>
+                </div>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="py-2">
+              <Label htmlFor="clear-confirm" className="sr-only">
+                确认短语
+              </Label>
+              <Input
+                id="clear-confirm"
+                value={clearConfirmInput}
+                onChange={(e) => setClearConfirmInput(e.target.value)}
+                placeholder={CLEAR_ALL_DATA_CONFIRM_PHRASE}
+                autoComplete="off"
+                disabled={clearing}
               />
-              <div className="space-y-1">
-                <Label
-                  htmlFor="show-seat-board"
-                  className="cursor-pointer text-sm font-semibold leading-none"
-                >
-                  展示考试座位表
-                </Label>
-                <p className="text-sm text-muted-foreground">
-                  开启后，学员可在登录页查看当前考试的座位安排；考官可在考试详情中查看。
-                </p>
-              </div>
             </div>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card className="border-destructive/40">
-        <CardHeader className="space-y-2 pb-4">
-          <CardTitle className="text-base font-semibold text-destructive sm:text-lg">
-            清除全部数据
-          </CardTitle>
-          <CardDescription className="text-sm">
-            删除当前管理账号下的全部考试、题库、名单、填空题与操作题批次及学员答卷文件。
-            座位表等本页设置会保留。此操作不可恢复，请在每场考试结束后、下一场开考前使用。
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="pt-0">
-          <AlertDialog
-            open={clearDialogOpen}
-            onOpenChange={(open) => {
-              setClearDialogOpen(open);
-              if (!open) setClearConfirmInput('');
-            }}
-          >
-            <AlertDialogTrigger asChild>
-              <Button type="button" variant="destructive" disabled={loading}>
-                清除全部数据…
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>确认清除全部数据？</AlertDialogTitle>
-                <AlertDialogDescription asChild>
-                  <div className="space-y-3 text-sm text-muted-foreground">
-                    <p>
-                      将永久删除所有考试记录、成绩与答卷、客观题/填空题/操作题批次、名单及关联上传文件。
-                      进行中的考试也会被清除，学员端将无法继续作答。
-                    </p>
-                    <p>
-                      请在下方输入{' '}
-                      <span className="font-semibold text-foreground">
-                        {CLEAR_ALL_DATA_CONFIRM_PHRASE}
-                      </span>{' '}
-                      以确认。
-                    </p>
-                  </div>
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <div className="py-2">
-                <Label htmlFor="clear-confirm" className="sr-only">
-                  确认短语
-                </Label>
-                <Input
-                  id="clear-confirm"
-                  value={clearConfirmInput}
-                  onChange={(e) => setClearConfirmInput(e.target.value)}
-                  placeholder={CLEAR_ALL_DATA_CONFIRM_PHRASE}
-                  autoComplete="off"
-                  disabled={clearing}
-                />
-              </div>
-              <AlertDialogFooter>
-                <AlertDialogCancel disabled={clearing}>取消</AlertDialogCancel>
-                <AlertDialogAction
-                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                  disabled={!clearConfirmReady || clearing}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    void handleClearAllData();
-                  }}
-                >
-                  {clearing ? '正在清除…' : '确认清除'}
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        </CardContent>
-      </Card>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={clearing}>取消</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                disabled={!clearConfirmReady || clearing}
+                onClick={(e) => {
+                  e.preventDefault();
+                  void handleClearAllData();
+                }}
+              >
+                {clearing ? '正在清除…' : '确认清除'}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </AdminSectionCard>
 
       <Link
-        to="/admin/dashboard"
-        className="text-sm font-semibold text-primary hover:underline"
+        to="/admin"
+        className="text-base font-semibold text-primary hover:underline"
       >
         返回首页
       </Link>

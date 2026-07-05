@@ -3,7 +3,17 @@ import { Users } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
-import { AdminBackToConsoleButton } from '@/components/admin/AdminBackToConsoleButton';
+import { adminEmptyTitle, adminMeta } from '@/components/admin/admin-typography';
+import {
+  AdminDataTable,
+  AdminPageHeader,
+  AdminSectionCard,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/admin/AdminPagePrimitives';
 import { ImportDropzone } from '@/components/admin/roster/ImportDropzone';
 import { ImportErrorTable } from '@/components/admin/roster/ImportErrorTable';
 import { ImportResultSummary } from '@/components/admin/roster/ImportResultSummary';
@@ -20,17 +30,9 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Spinner } from '@/components/ui/spinner';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { getApiLoadErrorMessage } from '@/lib/api';
+import { cn } from '@/lib/utils';
 import {
   deleteRosterBatch,
   fetchRosterBatches,
@@ -115,27 +117,17 @@ export default function AdminRoster() {
 
   return (
     <div className="space-y-8">
-      <div className="space-y-2">
-        <AdminBackToConsoleButton />
-        <h1 className="text-xl font-semibold leading-tight text-foreground">
-          名单管理
-        </h1>
-        <p className="text-base text-muted-foreground">
-          每次上传一个 Excel 文件将生成一份独立名单。请使用官方模板批量导入，须填写单位；姓名与身份证号须与证件一致（除首尾空格外须完全一致）。导入后可在名单详情中继续添加、编辑或删除考生。
-        </p>
-      </div>
+      <AdminPageHeader
+        title="名单管理"
+        description="每次上传一个 Excel 文件将生成一份独立名单。请使用官方模板批量导入，须填写单位；姓名与身份证号须与证件一致（除首尾空格外须完全一致）。导入后可在名单详情中继续添加、编辑或删除考生。"
+      />
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm font-semibold">导入名单</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ImportDropzone
-            onSuccess={handleImportSuccess}
-            onFailure={handleImportFailure}
-          />
-        </CardContent>
-      </Card>
+      <AdminSectionCard title="导入名单">
+        <ImportDropzone
+          onSuccess={handleImportSuccess}
+          onFailure={handleImportFailure}
+        />
+      </AdminSectionCard>
 
       {importSuccess ? (
         <ImportResultSummary
@@ -148,11 +140,8 @@ export default function AdminRoster() {
         <ImportErrorTable errors={importFailure.errors} />
       ) : null}
 
-      <Card ref={listRef}>
-        <CardHeader>
-          <CardTitle className="text-sm font-semibold">已上传名单</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <div ref={listRef}>
+        <AdminSectionCard title="已上传名单" contentClassName="space-y-4">
           {listError ? (
             <Alert variant="destructive">
               <AlertDescription className="flex flex-wrap items-center gap-3">
@@ -160,7 +149,6 @@ export default function AdminRoster() {
                 <Button
                   type="button"
                   variant="outline"
-                  size="sm"
                   onClick={() => void loadBatches()}
                 >
                   重试
@@ -177,14 +165,14 @@ export default function AdminRoster() {
           ) : batches.length === 0 ? (
             <div className="flex flex-col items-center gap-3 py-12 text-center">
               <Users className="size-10 text-muted-foreground" aria-hidden />
-              <h3 className="text-xl font-semibold text-foreground">暂无名单</h3>
-              <p className="max-w-md text-base text-muted-foreground">
+              <h3 className={adminEmptyTitle}>暂无名单</h3>
+              <p className={cn('max-w-2xl', adminMeta)}>
                 请先下载模板并导入 Excel 文件，每次导入将生成一份名单。
               </p>
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <Table>
+              <AdminDataTable>
                 <TableHeader>
                   <TableRow>
                     <TableHead scope="col">文件名</TableHead>
@@ -248,11 +236,11 @@ export default function AdminRoster() {
                     </TableRow>
                   ))}
                 </TableBody>
-              </Table>
+              </AdminDataTable>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </AdminSectionCard>
+      </div>
     </div>
   );
 }

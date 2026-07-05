@@ -6,7 +6,6 @@ import { ObjectiveOptionTiles } from '@/components/student/ObjectiveOptionTiles'
 import { StudentExamAnswerOverview } from '@/components/student/StudentExamAnswerOverview';
 import { StudentExamQuestionStepper } from '@/components/student/StudentExamQuestionStepper';
 import { StudentFillInWorkspace } from '@/components/student/StudentFillInWorkspace';
-import { StudentPracticalSection } from '@/components/student/StudentPracticalSection';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -37,7 +36,6 @@ import {
   ApiError,
   computeExamSyncInitialDelayMs,
   hasExamModule,
-  needsPractical,
   needsQuestionItems,
   SERVER_BUSY_CODE,
   STUDENT_ACTIVE_EXAM_POLL_INTERVAL_MS,
@@ -50,7 +48,6 @@ import {
   type ExamPaperItem,
   type ExamSubmissionItem,
   type FillInPaperMeta,
-  type PracticalPaperMeta,
 } from '@/lib/student';
 import { cn } from '@/lib/utils';
 
@@ -93,10 +90,6 @@ export default function StudentExamTake() {
   ]);
   const [items, setItems] = useState<(ExamPaperItem | ExamSubmissionItem)[]>([]);
   const [fillIn, setFillIn] = useState<FillInPaperMeta | null>(null);
-  const [practical, setPractical] = useState<PracticalPaperMeta | null>(null);
-  const [practicalSubmittedName, setPracticalSubmittedName] = useState<
-    string | null
-  >(null);
   const [answers, setAnswers] = useState<AnswerState>({});
   const [loading, setLoading] = useState(true);
   const [readOnly, setReadOnly] = useState(false);
@@ -178,8 +171,6 @@ export default function StudentExamTake() {
             submission.items.map((item) => [item.examQuestionId, item.selectedKeys]),
           ),
         );
-        setPractical(null);
-        setPracticalSubmittedName(submission.practical?.docxFileName ?? null);
         setReadOnly(true);
         return;
       } catch (err) {
@@ -202,8 +193,6 @@ export default function StudentExamTake() {
       setContentModules(paper.contentModules);
       setItems(paper.items);
       setFillIn(paper.fillIn);
-      setPractical(paper.practical);
-      setPracticalSubmittedName(null);
       setScheduledEndAt(paper.scheduledEndAt);
       setAnswers(
         Object.fromEntries(
@@ -674,9 +663,8 @@ export default function StudentExamTake() {
         items,
         answers,
         contentModules,
-        practical,
       }),
-    [items, answers, contentModules, practical],
+    [items, answers, contentModules],
   );
 
   const submitBlockers = useMemo(
@@ -685,9 +673,8 @@ export default function StudentExamTake() {
         items,
         answers,
         contentModules,
-        practical,
       }),
-    [items, answers, contentModules, practical],
+    [items, answers, contentModules],
   );
 
   const submitConfirmDescription = useMemo(
@@ -762,7 +749,6 @@ export default function StudentExamTake() {
 
   const hasObjectiveModule = hasExamModule(contentModules, 'OBJECTIVE');
   const hasFillModule = hasExamModule(contentModules, 'FILL');
-  const hasPracticalModule = needsPractical(contentModules);
   const pageMaxWidth = hasFillModule ? 'max-w-[96rem]' : 'max-w-3xl';
 
   const examHeader =
@@ -871,9 +857,6 @@ export default function StudentExamTake() {
         <Alert>
           <AlertDescription>
             您已提交本场考试，答卷为只读。
-            {hasPracticalModule
-              ? ' 操作题文件已提交，等待阅卷。'
-              : ''}
           </AlertDescription>
         </Alert>
       ) : null}
@@ -982,7 +965,7 @@ export default function StudentExamTake() {
             id="fillin-section-title"
             className="text-lg font-semibold text-foreground"
           >
-            填空题
+            操作题
           </h2>
           <StudentFillInWorkspace
             examId={examId}
@@ -993,33 +976,6 @@ export default function StudentExamTake() {
             showResult={false}
             onAnswerChange={updateAnswer}
           />
-        </section>
-      ) : null}
-
-      {hasPracticalModule ? (
-        <section
-          className="space-y-4"
-          aria-labelledby="practical-section-title"
-        >
-          <h2
-            id="practical-section-title"
-            className="text-lg font-semibold text-foreground"
-          >
-            操作题
-          </h2>
-          {practical ? (
-            <StudentPracticalSection
-              examId={examId}
-              meta={practical}
-              readOnly={readOnly}
-              submittedFileName={practicalSubmittedName}
-              onUploadSuccess={setPractical}
-            />
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              操作题资料加载中或不可用。
-            </p>
-          )}
         </section>
       ) : null}
 

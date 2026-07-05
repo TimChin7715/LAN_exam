@@ -1,17 +1,10 @@
 import type { FastifyInstance } from 'fastify';
 
 import { resolveAdminTeacherId } from '../../../lib/admin-context.js';
-import {
-  requiresPracticalBatch,
-  requiresQuestionSubmission,
-} from '../../../lib/exam/content-mode.js';
+import { requiresQuestionSubmission } from '../../../lib/exam/content-mode.js';
 import { resetStudentExamSubmission } from '../../../lib/exam/reset-student-submission.js';
 import { RetakeExamError } from '../../../lib/exam/types.js';
 import { prisma } from '../../../lib/prisma.js';
-import {
-  contentTypeForWordFilename,
-  readStorageFile,
-} from '../../../lib/storage/index.js';
 import { requireAdminSession } from '../../../plugins/admin-guard.js';
 
 export async function registerAdminExamsSubmissionsRoutes(
@@ -57,11 +50,6 @@ export async function registerAdminExamsSubmissionsRoutes(
             },
             take: 1,
           },
-          practicalSubmissions: {
-            where: { examId: id },
-            select: { submittedAt: true },
-            take: 1,
-          },
         },
       });
 
@@ -70,18 +58,15 @@ export async function registerAdminExamsSubmissionsRoutes(
         contentModules: exam.contentModules,
         items: rosterEntries.map((entry) => {
           const submission = entry.submissions[0];
-          const practical = entry.practicalSubmissions[0];
           const hasAnyQuestionAnswer = Boolean(
             submission?.answers.some((a) => a.selectedKeys.trim().length > 0),
           );
           const questionsDone =
             !requiresQuestionSubmission(exam.contentModules) ||
             Boolean(submission);
-          const practicalDone =
-            !requiresPracticalBatch(exam.contentModules) || Boolean(practical);
-          const submitted = questionsDone && practicalDone;
+          const submitted = questionsDone;
           const absent =
-            exam.status === 'ENDED' && !hasAnyQuestionAnswer && !Boolean(practical);
+            exam.status === 'ENDED' && !hasAnyQuestionAnswer;
           const statusLabel: 'submitted' | 'pending' | 'absent' = absent
             ? 'absent'
             : submitted
@@ -95,10 +80,7 @@ export async function registerAdminExamsSubmissionsRoutes(
             totalScore: submission?.totalScore ?? null,
             submitted,
             statusLabel,
-            submittedAt:
-              submission?.submittedAt ?? practical?.submittedAt ?? null,
-            practicalSubmitted: practicalDone,
-            practicalSubmittedAt: practical?.submittedAt ?? null,
+            submittedAt: submission?.submittedAt ?? null,
           };
         }),
       });
@@ -201,77 +183,6 @@ export async function registerAdminExamsSubmissionsRoutes(
             }
           : null,
       });
-    },
-  );
-
-  app.get(
-    '/api/admin/exams/:id/submissions/:rosterEntryId/practical-answer',
-    { preHandler: requireAdminSession },
-    async (request, reply) => {
-      const teacherId = await resolveAdminTeacherId(request);
-
-      const { id, rosterEntryId } = request.params as {
-        id: string;
-        rosterEntryId: string;
-      };
-
-      const exam = await prisma.exam.findFirst({
-        where: { id, teacherId },
-        select: { id: true, rosterBatchId: true, contentModules: true },
-      });
-
-      if (!exam) {
-        return reply.status(404).send({
-          ok: false,
-          code: 'EXAM_NOT_FOUND',
-          message: '考试不存在',
-        });
-      }
-
-      if (!requiresPracticalBatch(exam.contentModules)) {
-        return reply.status(404).send({
-          ok: false,
-          code: 'NO_PRACTICAL',
-          message: '本场考试不含操作题',
-        });
-      }
-
-      const entry = await prisma.rosterEntry.findFirst({
-        where: { id: rosterEntryId, batchId: exam.rosterBatchId },
-        select: { id: true },
-      });
-
-      if (!entry) {
-        return reply.status(404).send({
-          ok: false,
-          code: 'ROSTER_ENTRY_NOT_FOUND',
-          message: '考生不存在',
-        });
-      }
-
-      const practical = await prisma.practicalSubmission.findUnique({
-        where: { examId_rosterEntryId: { examId: id, rosterEntryId } },
-      });
-
-      if (!practical) {
-        return reply.status(404).send({
-          ok: false,
-          code: 'NOT_SUBMITTED',
-          message: '该考生尚未提交操作题作答',
-        });
-      }
-
-      const buffer = await readStorageFile(practical.docxStorageKey);
-      return reply
-        .header(
-          'Content-Type',
-          contentTypeForWordFilename(practical.docxFileName),
-        )
-        .header(
-          'Content-Disposition',
-          `attachment; filename*=UTF-8''${encodeURIComponent(practical.docxFileName)}`,
-        )
-        .send(buffer);
     },
   );
 

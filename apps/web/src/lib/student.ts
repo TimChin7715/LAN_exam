@@ -8,17 +8,13 @@ export type StudentProfile = {
   nationalId: string;
 };
 
-export type ExamContentModule = 'OBJECTIVE' | 'FILL' | 'PRACTICAL';
+export type ExamContentModule = 'OBJECTIVE' | 'FILL';
 
 export function hasExamModule(
   modules: ExamContentModule[],
   module: ExamContentModule,
 ): boolean {
   return modules.includes(module);
-}
-
-export function needsPractical(modules: ExamContentModule[]): boolean {
-  return hasExamModule(modules, 'PRACTICAL');
 }
 
 export function needsQuestionItems(modules: ExamContentModule[]): boolean {
@@ -123,7 +119,6 @@ export type ExamPaperResponse = {
   contentModules: ExamContentModule[];
   scheduledEndAt: string | null;
   items: ExamPaperItem[];
-  practical: PracticalPaperMeta | null;
   fillIn: FillInPaperMeta | null;
 };
 
@@ -135,19 +130,10 @@ export const STUDENT_ID_FORMAT_ERROR_MESSAGE = '身份证号无效，请检查�
 export const STUDENT_ALREADY_SUBMITTED_MESSAGE =
   '您已提交过本场考试，无法再次提交。';
 
-export type PracticalPaperMeta = {
-  batchTitle: string;
-  wordFileName: string;
-  excelFileName: string;
-  hasAnswerDraft: boolean;
-  answerFileName: string | null;
-  answerUpdatedAt: string | null;
-};
-
 export type FillInPaperMeta = {
   batchTitle: string;
   wordFileName: string;
-  excelFileName: string;
+  excelFileName: string | null;
   hasAttachments: boolean;
   attachmentZipFileName: string | null;
 };
@@ -311,38 +297,9 @@ export const studentApi = {
       totalScore: number | null;
       submittedAt: string;
       items: ExamSubmissionItem[];
-      practical: {
-        submitted: boolean;
-        docxFileName: string;
-        submittedAt: string;
-      } | null;
     }>(`/api/student/exam/submission?examId=${encodeURIComponent(examId)}`, {
       skipAuthRedirect: true,
     }),
-
-  downloadPracticalPaper: (examId: string) =>
-    downloadBlob(
-      `/api/student/exam/practical/paper?examId=${encodeURIComponent(examId)}`,
-      '试卷.docx',
-    ),
-
-  downloadPracticalExcel: (examId: string, fileName: string) =>
-    downloadBlob(
-      `/api/student/exam/practical/excel?examId=${encodeURIComponent(examId)}`,
-      fileName,
-    ),
-
-  downloadPracticalAnswer: (examId: string, fileName: string) =>
-    downloadBlob(
-      `/api/student/exam/practical/answer?examId=${encodeURIComponent(examId)}`,
-      fileName,
-    ),
-
-  downloadFillInWord: (examId: string, fileName: string) =>
-    downloadBlob(
-      `/api/student/exam/fillin/word?examId=${encodeURIComponent(examId)}`,
-      fileName,
-    ),
 
   fetchFillInWordPreview: async (examId: string, etag?: string) => {
     const url = `/api/student/exam/fillin/word/preview?examId=${encodeURIComponent(examId)}`;
@@ -414,26 +371,6 @@ export const studentApi = {
       `/api/student/exam/fillin/screenshots/${encodeURIComponent(screenshotId)}?examId=${encodeURIComponent(examId)}`,
       { method: 'DELETE', skipAuthRedirect: true },
     ),
-
-  uploadPracticalAnswer: async (examId: string, file: File) => {
-    const form = new FormData();
-    form.append('file', file);
-    const response = await fetch(
-      `/api/student/exam/practical/answer?examId=${encodeURIComponent(examId)}`,
-      { method: 'PUT', body: form, credentials: 'include' },
-    );
-    const payload = (await response.json()) as Record<string, unknown>;
-    if (!response.ok) {
-      const message =
-        typeof payload.message === 'string' ? payload.message : '上传失败';
-      throw new ApiError(message, response.status);
-    }
-    return payload as {
-      ok: true;
-      docxFileName: string;
-      updatedAt: string;
-    };
-  },
 };
 
 async function downloadBlob(url: string, fallbackName: string): Promise<void> {

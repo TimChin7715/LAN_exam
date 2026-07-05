@@ -1,0 +1,8 @@
+# Linux 公网测试：允许远程访问管理台（勿用于考场离线包）
+services:
+  app:
+    environment:
+      ADMIN_API_LOOPBACK_ONLY: 'false'
+    build:
+      args:
+        VITE_ADMIN_ALLOW_REMOTE: 'true'

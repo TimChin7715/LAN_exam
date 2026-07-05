@@ -7,6 +7,7 @@ import {
   questionTypeLabel,
   type PreviewQuestion,
 } from '@/lib/qbank';
+import { cn } from '@/lib/utils';
 
 function parseAnswerKeyList(answerKeys: string): string[] {
   return answerKeys
@@ -18,57 +19,85 @@ function parseAnswerKeyList(answerKeys: string): string[] {
 type QuestionPreviewCardsProps = {
   questions: PreviewQuestion[];
   compact?: boolean;
+  size?: 'default' | 'large';
 };
 
 export function QuestionPreviewCards({
   questions,
   compact = false,
+  size = 'default',
 }: QuestionPreviewCardsProps) {
-  return <PreviewGrid questions={questions} compact={compact} />;
+  return <PreviewGrid questions={questions} compact={compact} size={size} />;
 }
 
 function PreviewGrid({
   questions,
   compact,
+  size,
 }: {
   questions: PreviewQuestion[];
   compact: boolean;
+  size: 'default' | 'large';
 }) {
   return (
     <div className="grid gap-4">
       {questions.slice(0, 3).map((q, index) => (
-        <PreviewCard key={`${q.stem}-${index}`} q={q} compact={compact} />
+        <PreviewCard
+          key={`${q.stem}-${index}`}
+          q={q}
+          compact={compact}
+          size={size}
+        />
       ))}
     </div>
   );
 }
 
-function PreviewCard({ q, compact }: { q: PreviewQuestion; compact: boolean }) {
+function PreviewCard({
+  q,
+  compact,
+  size,
+}: {
+  q: PreviewQuestion;
+  compact: boolean;
+  size: 'default' | 'large';
+}) {
   const isMulti = q.type === 'MULTI';
   const answerKeys = parseAnswerKeyList(q.answerKeys);
+  const large = size === 'large';
 
   return (
     <Card>
-      <CardContent className="space-y-3 pt-6">
+      <CardContent className={cn('space-y-3 pt-6', large && 'space-y-4 pt-8')}>
         <div className="flex flex-wrap items-center gap-2">
-          <Badge variant="secondary">{questionTypeLabel(q.type)}</Badge>
+          <Badge variant="secondary" className={large ? 'text-sm' : undefined}>
+            {questionTypeLabel(q.type)}
+          </Badge>
           {isMulti ? (
-            <Badge variant="outline" className="text-xs">
+            <Badge variant="outline" className={large ? 'text-sm' : 'text-xs'}>
               多选
             </Badge>
           ) : null}
         </div>
         <p
-          className={
-            compact
-              ? 'line-clamp-3 text-base text-foreground'
-              : 'text-base text-foreground'
-          }
+          className={cn(
+            'text-foreground',
+            large
+              ? 'text-2xl leading-relaxed'
+              : compact
+                ? 'line-clamp-3 text-base'
+                : 'text-base',
+          )}
         >
           {formatStemForDisplay(q.stem)}
         </p>
         {q.options && q.options.length > 0 ? (
-          <ul className="space-y-1 text-sm text-muted-foreground">
+          <ul
+            className={cn(
+              'space-y-1 text-muted-foreground',
+              large ? 'space-y-2 text-lg' : 'text-sm',
+            )}
+          >
             {q.options.slice(0, compact ? 3 : undefined).map((opt) => (
               <li key={opt.key}>
                 <span
@@ -88,7 +117,12 @@ function PreviewCard({ q, compact }: { q: PreviewQuestion; compact: boolean }) {
           </ul>
         ) : null}
         {q.type === 'FILL' ? (
-          <div className="space-y-1 text-sm text-muted-foreground">
+          <div
+            className={cn(
+              'space-y-1 text-muted-foreground',
+              large ? 'space-y-2 text-lg' : 'text-sm',
+            )}
+          >
             <p>
               标准答案：{formatFillAnswerKeysPreview(q.answerKeys)}
             </p>
@@ -104,9 +138,9 @@ function PreviewCard({ q, compact }: { q: PreviewQuestion; compact: boolean }) {
             ) : null}
           </div>
         ) : isMulti && answerKeys.length > 0 ? (
-          <AnswerKeyBadges answerKeys={answerKeys} />
+          <AnswerKeyBadges answerKeys={answerKeys} large={large} />
         ) : (
-          <p className="text-sm font-semibold">
+          <p className={cn('font-semibold', large ? 'text-lg' : 'text-sm')}>
             正确答案：{formatAnswerKeys(q.answerKeys)}
           </p>
         )}
@@ -115,10 +149,18 @@ function PreviewCard({ q, compact }: { q: PreviewQuestion; compact: boolean }) {
   );
 }
 
-function AnswerKeyBadges({ answerKeys }: { answerKeys: string[] }) {
+function AnswerKeyBadges({
+  answerKeys,
+  large = false,
+}: {
+  answerKeys: string[];
+  large?: boolean;
+}) {
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <span className="text-sm font-semibold">正确答案</span>
+      <span className={cn('font-semibold', large ? 'text-lg' : 'text-sm')}>
+        正确答案
+      </span>
       {answerKeys.map((key) => (
         <Badge key={key} variant="default">
           {key}

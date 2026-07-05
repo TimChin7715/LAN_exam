@@ -13,16 +13,18 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { Spinner } from '@/components/ui/spinner';
+import { adminEmptyTitle, adminMeta } from '@/components/admin/admin-typography';
 import {
-  Table,
+  AdminDataTable,
   TableBody,
   TableCell,
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
+} from '@/components/admin/AdminPagePrimitives';
+import { Spinner } from '@/components/ui/spinner';
 import type { FillInBatchListItem } from '@/lib/fillin';
+import { cn } from '@/lib/utils';
 
 type FillInBatchListProps = {
   batches: FillInBatchListItem[];
@@ -66,7 +68,7 @@ export function FillInBatchList({
     return (
       <div className="flex items-center justify-center gap-2 py-12 text-muted-foreground">
         <Spinner className="size-5" />
-        <span>加载填空题库列表…</span>
+        <span>加载操作题库列表…</span>
       </div>
     );
   }
@@ -75,9 +77,9 @@ export function FillInBatchList({
     return (
       <div className="flex flex-col items-center gap-3 py-12 text-center">
         <BookOpen className="size-10 text-muted-foreground" aria-hidden />
-        <h3 className="text-xl font-semibold text-foreground">暂无填空题库</h3>
-        <p className="max-w-md text-base text-muted-foreground">
-          请先下载模板：Word 为完整试卷（考试端全文展示），Excel「答题卡」按行定义题号、答案与分值，每行一空入库。
+        <h3 className={adminEmptyTitle}>暂无操作题库</h3>
+        <p className={cn('max-w-2xl', adminMeta)}>
+          请先下载 Word 模板，在文档中用【标准答案】（分值）标记空位，例如【北京|北平】（2分）。考试端将展示完整 Word 排版与图片。
         </p>
       </div>
     );
@@ -85,7 +87,7 @@ export function FillInBatchList({
 
   return (
     <div className="overflow-x-auto">
-      <Table>
+      <AdminDataTable>
         <TableHeader>
           <TableRow>
             <TableHead scope="col">文件名</TableHead>
@@ -100,8 +102,12 @@ export function FillInBatchList({
           {batches.map((b) => (
             <TableRow key={b.id}>
               <TableCell className="max-w-md">
-                <p className="font-medium">{b.wordFileName}</p>
-                <p className="text-sm text-muted-foreground">{b.excelFileName}</p>
+                <p className="font-medium">{b.title || b.wordFileName}</p>
+                {b.excelFileName ? (
+                  <p className={adminMeta}>Excel：{b.excelFileName}</p>
+                ) : (
+                  <p className={adminMeta}>{b.wordFileName}</p>
+                )}
               </TableCell>
               <TableCell>{b.itemCount}</TableCell>
               <TableCell>{formatImportedAt(b.createdAt)}</TableCell>
@@ -119,7 +125,7 @@ export function FillInBatchList({
                   </AlertDialogTrigger>
                   <AlertDialogContent>
                     <AlertDialogHeader>
-                      <AlertDialogTitle>确认删除填空题库？</AlertDialogTitle>
+                      <AlertDialogTitle>确认删除操作题库？</AlertDialogTitle>
                       <AlertDialogDescription>
                         将永久删除「{b.title}」及其中的 {b.itemCount}{' '}
                         道题目，此操作不可恢复。已结束或未开始的考试将自动解除关联；进行中的考试须先结束。
@@ -140,7 +146,7 @@ export function FillInBatchList({
             </TableRow>
           ))}
         </TableBody>
-      </Table>
+      </AdminDataTable>
     </div>
   );
 }

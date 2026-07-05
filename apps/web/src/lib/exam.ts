@@ -2,24 +2,22 @@ import { toast } from 'sonner';
 
 import { ApiError, apiFetch, handleAuthResponse } from '@/lib/api';
 import { downloadOnce } from '@/lib/download';
+import { FILL_MODULE_LABEL } from '@/lib/content-module-labels';
 
 export type ExamStatus = 'DRAFT' | 'IN_PROGRESS' | 'ENDED';
-export type ExamContentModule = 'OBJECTIVE' | 'FILL' | 'PRACTICAL';
+export type ExamContentModule = 'OBJECTIVE' | 'FILL';
+
+export { FILL_MODULE_LABEL };
 
 const MODULE_LABELS: Record<ExamContentModule, string> = {
   OBJECTIVE: '客观题',
-  FILL: '填空题',
-  PRACTICAL: '操作题',
+  FILL: FILL_MODULE_LABEL,
 };
 
 import {
   fetchQuestionBanks,
   type QuestionBankListItem,
 } from '@/lib/qbank';
-import {
-  fetchPracticalBatches,
-  type PracticalBatchListItem,
-} from '@/lib/practical';
 import {
   fetchRosterBatches as listRosterBatches,
   type RosterBatchListItem,
@@ -39,11 +37,9 @@ export type ExamListItem = {
   createdAt: string;
   questionBatchFileName: string | null;
   fillInBatchTitle: string | null;
-  practicalBatchTitle: string | null;
   rosterBatchFileName: string;
   questionCount: number;
   submissionCount: number;
-  practicalSubmissionCount: number;
 };
 
 export type ExamDetail = {
@@ -57,18 +53,11 @@ export type ExamDetail = {
   endedAt: string | null;
   createdAt: string;
   questionBatch: { id: string; fileName: string; createdAt: string } | null;
-  fillInBatch: {
+    fillInBatch: {
     id: string;
     title: string;
     wordFileName: string;
-    excelFileName: string;
-    createdAt: string;
-  } | null;
-  practicalBatch: {
-    id: string;
-    title: string;
-    wordFileName: string;
-    excelFileName: string;
+    excelFileName: string | null;
     createdAt: string;
   } | null;
   rosterBatch: { id: string; fileName: string; createdAt: string };
@@ -84,7 +73,7 @@ export type ExamDetail = {
       options: { key: string; text: string; sortOrder: number }[];
     };
   }[];
-  _count: { submissions: number; practicalSubmissions: number };
+  _count: { submissions: number };
 };
 
 export type SeatBoardItem = {
@@ -110,8 +99,6 @@ export type SubmissionListItem = {
   submitted: boolean;
   statusLabel?: 'submitted' | 'pending' | 'absent';
   submittedAt: string | null;
-  practicalSubmitted: boolean;
-  practicalSubmittedAt: string | null;
 };
 
 export function examContentModulesLabel(modules: ExamContentModule[]): string {
@@ -185,7 +172,6 @@ export async function createExam(input: {
   contentModules: ExamContentModule[];
   questionBatchId?: string;
   fillInBatchId?: string;
-  practicalBatchId?: string;
   rosterBatchId: string;
   scheduledStartAt: string;
   scheduledEndAt: string;
@@ -251,37 +237,8 @@ export async function fetchRosterBatches(): Promise<RosterBatchListItem[]> {
   return listRosterBatches();
 }
 
-export { fetchPracticalBatches };
-export type { PracticalBatchListItem };
-
 export { fetchFillInBatches } from '@/lib/fillin';
 export type { FillInBatchListItem } from '@/lib/fillin';
-
-export async function downloadPracticalAnswer(
-  examId: string,
-  rosterEntryId: string,
-  fileNameHint: string,
-): Promise<void> {
-  const url = `/api/admin/exams/${encodeURIComponent(examId)}/submissions/${encodeURIComponent(rosterEntryId)}/practical-answer`;
-  await downloadOnce(url, async () => {
-    const response = await fetch(url, { credentials: 'include' });
-
-    if (!response.ok) {
-      toast.error('下载操作题答卷失败。');
-      throw new ApiError('Download failed', response.status);
-    }
-
-    const blob = await response.blob();
-    const objectUrl = URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
-    anchor.href = objectUrl;
-    anchor.download = fileNameHint.endsWith('.docx')
-      ? fileNameHint
-      : `${fileNameHint}-操作题作答.docx`;
-    anchor.click();
-    URL.revokeObjectURL(objectUrl);
-  });
-}
 
 export async function fetchExamSubmissions(
   examId: string,
@@ -352,9 +309,9 @@ export async function downloadFillInScreenshots(
       const ct = response.headers.get('content-type') ?? '';
       if (ct.includes('application/json')) {
         const payload = (await response.json()) as { message?: string };
-        toast.error(payload.message ?? '导出填空题截图失败。');
+        toast.error(payload.message ?? `导出${FILL_MODULE_LABEL}截图失败。`);
       } else {
-        toast.error('导出填空题截图失败。');
+        toast.error(`导出${FILL_MODULE_LABEL}截图失败。`);
       }
       throw new ApiError('Export failed', response.status);
     }
@@ -363,7 +320,7 @@ export async function downloadFillInScreenshots(
     const objectUrl = URL.createObjectURL(blob);
     const anchor = document.createElement('a');
     anchor.href = objectUrl;
-    anchor.download = `${title.replace(/[\\/:*?"<>|]/g, '_')}-填空题截图.zip`;
+    anchor.download = `${title.replace(/[\\/:*?"<>|]/g, '_')}-${FILL_MODULE_LABEL}截图.zip`;
     anchor.click();
     URL.revokeObjectURL(objectUrl);
   });

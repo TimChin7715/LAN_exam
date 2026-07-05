@@ -24,7 +24,7 @@ Linux 联调学员 URL 用 `http://<IP>:8001/exam/login`，不是 5180。详见 
 
 | 现象 | 排查 |
 |------|------|
-| 填空题导入失败 | 答题卡须 `.xls/.xlsx`；工作表名 **答题卡**；列「题号/答案/分值」 |
+| 操作题导入失败 | 答题卡须 `.xls/.xlsx`；工作表名 **答题卡**；列「题号/答案/分值」 |
 | 上传 `request file too large` | 查 `MULTIPART_MAX_FILE_BYTES` ≥ `MAX_PRACTICAL_*` / `MAX_FILLIN_SCREENSHOT_BYTES` |
 | 导入后无旧数据 | 当前为 `local_exam_admin`；`teacher_admin` **不迁移** |
 

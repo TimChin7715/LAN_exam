@@ -16,15 +16,9 @@ export type ExamPaperStaticItem = {
 export type ExamPaperStaticFillIn = {
   batchTitle: string;
   wordFileName: string;
-  excelFileName: string;
+  excelFileName: string | null;
   hasAttachments: boolean;
   attachmentZipFileName: string | null;
-};
-
-export type ExamPaperStaticPracticalMeta = {
-  batchTitle: string;
-  wordFileName: string;
-  excelFileName: string;
 };
 
 export type ExamPaperStaticPayload = {
@@ -33,7 +27,6 @@ export type ExamPaperStaticPayload = {
   contentModules: ExamContentModule[];
   items: ExamPaperStaticItem[];
   fillIn: ExamPaperStaticFillIn | null;
-  practicalMeta: ExamPaperStaticPracticalMeta | null;
 };
 
 /** Scoreable question row reused by submit. */

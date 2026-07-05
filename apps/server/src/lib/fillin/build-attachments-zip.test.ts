@@ -71,9 +71,9 @@ describe('resolveFillInAttachmentDownloadFilename', () => {
             sortOrder: 1,
           },
         ],
-        '我的填空',
+        '我的操作',
       ),
-      safeFillInAttachmentsZipFilename('我的填空'),
+      safeFillInAttachmentsZipFilename('我的操作'),
     );
   });
 });

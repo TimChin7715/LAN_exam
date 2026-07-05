@@ -2,12 +2,12 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ClipboardList, Plus } from 'lucide-react';
 
-import { AdminBackToConsoleButton } from '@/components/admin/AdminBackToConsoleButton';
 import { toast } from 'sonner';
 
+import { AdminPageHeader, AdminSectionCard, AdminDataTable, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/admin/AdminPagePrimitives';
+import { adminMeta } from '@/components/admin/admin-typography';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
@@ -28,20 +28,11 @@ import {
 } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import {
   createExam,
   defaultExamSchedule,
   examContentModulesLabel,
   examStatusLabel,
   fetchFillInBatches,
-  fetchPracticalBatches,
   fetchQuestionBatches,
   fetchRosterBatches,
   formatExamScheduleRange,
@@ -51,7 +42,6 @@ import {
   type ExamContentModule,
   type ExamListItem,
   type FillInBatchListItem,
-  type PracticalBatchListItem,
 } from '@/lib/exam';
 
 export default function AdminExams() {
@@ -62,16 +52,11 @@ export default function AdminExams() {
   const [title, setTitle] = useState('');
   const [moduleObjective, setModuleObjective] = useState(true);
   const [moduleFillIn, setModuleFillIn] = useState(false);
-  const [modulePractical, setModulePractical] = useState(false);
   const [questionBatchId, setQuestionBatchId] = useState('');
   const [fillInBatchId, setFillInBatchId] = useState('');
-  const [practicalBatchId, setPracticalBatchId] = useState('');
   const [rosterBatchId, setRosterBatchId] = useState('');
   const [questionBatches, setQuestionBatches] = useState<BatchPickerItem[]>([]);
   const [fillInBatches, setFillInBatches] = useState<FillInBatchListItem[]>([]);
-  const [practicalBatches, setPracticalBatches] = useState<PracticalBatchListItem[]>(
-    [],
-  );
   const [rosterBatches, setRosterBatches] = useState<BatchPickerItem[]>([]);
   const [scheduledStart, setScheduledStart] = useState('');
   const [scheduledEnd, setScheduledEnd] = useState('');
@@ -99,15 +84,13 @@ export default function AdminExams() {
     setScheduledEnd(defaults.end);
     void (async () => {
       try {
-        const [qb, fb, pb, rb] = await Promise.all([
+        const [qb, fb, rb] = await Promise.all([
           fetchQuestionBatches(),
           fetchFillInBatches(),
-          fetchPracticalBatches(),
           fetchRosterBatches(),
         ]);
         setQuestionBatches(qb);
         setFillInBatches(fb);
-        setPracticalBatches(pb);
         setRosterBatches(rb);
       } catch (err) {
         handleExamApiError(err, '无法加载批次列表。');
@@ -124,7 +107,6 @@ export default function AdminExams() {
     const contentModules: ExamContentModule[] = [];
     if (moduleObjective) contentModules.push('OBJECTIVE');
     if (moduleFillIn) contentModules.push('FILL');
-    if (modulePractical) contentModules.push('PRACTICAL');
     if (contentModules.length === 0) {
       toast.error('请至少选择一种考试内容。');
       return;
@@ -134,10 +116,6 @@ export default function AdminExams() {
       return;
     }
     if (moduleFillIn && !fillInBatchId) {
-      toast.error('请选择填空题批次。');
-      return;
-    }
-    if (modulePractical && !practicalBatchId) {
       toast.error('请选择操作题批次。');
       return;
     }
@@ -162,7 +140,6 @@ export default function AdminExams() {
         contentModules,
         questionBatchId: moduleObjective ? questionBatchId : undefined,
         fillInBatchId: moduleFillIn ? fillInBatchId : undefined,
-        practicalBatchId: modulePractical ? practicalBatchId : undefined,
         rosterBatchId,
         scheduledStartAt: startDate.toISOString(),
         scheduledEndAt: endDate.toISOString(),
@@ -172,10 +149,8 @@ export default function AdminExams() {
       setTitle('');
       setModuleObjective(true);
       setModuleFillIn(false);
-      setModulePractical(false);
       setQuestionBatchId('');
       setFillInBatchId('');
-      setPracticalBatchId('');
       setRosterBatchId('');
       setScheduledStart('');
       setScheduledEnd('');
@@ -188,19 +163,14 @@ export default function AdminExams() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="space-y-2">
-        <AdminBackToConsoleButton />
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h1 className="text-xl font-semibold leading-tight text-foreground">
-              考试管理
-            </h1>
-          </div>
+    <div className="space-y-8">
+      <AdminPageHeader
+        title="考试管理"
+        actions={
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
               <Button>
-                <Plus className="size-4" aria-hidden />
+                <Plus className="size-5" aria-hidden />
                 新建考试
               </Button>
             </DialogTrigger>
@@ -240,16 +210,6 @@ export default function AdminExams() {
                           onCheckedChange={(v) => setModuleFillIn(v === true)}
                         />
                         <Label htmlFor="mod-fillin" className="font-normal">
-                          填空题
-                        </Label>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Checkbox
-                          id="mod-practical"
-                          checked={modulePractical}
-                          onCheckedChange={(v) => setModulePractical(v === true)}
-                        />
-                        <Label htmlFor="mod-practical" className="font-normal">
                           操作题
                         </Label>
                       </div>
@@ -277,38 +237,18 @@ export default function AdminExams() {
                   ) : null}
                   {moduleFillIn ? (
                     <div className="grid gap-2">
-                      <Label>填空题批次</Label>
+                      <Label>操作题批次</Label>
                       <Select
                         value={fillInBatchId}
                         onValueChange={setFillInBatchId}
                       >
                         <SelectTrigger>
-                          <SelectValue placeholder="选择填空题批次" />
+                          <SelectValue placeholder="选择操作题批次" />
                         </SelectTrigger>
                         <SelectContent>
                           {fillInBatches.map((b) => (
                             <SelectItem key={b.id} value={b.id}>
                               {b.title}（{b.itemCount} 题）
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  ) : null}
-                  {modulePractical ? (
-                    <div className="grid gap-2">
-                      <Label>操作题批次</Label>
-                      <Select
-                        value={practicalBatchId}
-                        onValueChange={setPracticalBatchId}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="选择操作题批次" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {practicalBatches.map((b) => (
-                            <SelectItem key={b.id} value={b.id}>
-                              {b.title}（{b.wordFileName}）
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -363,25 +303,25 @@ export default function AdminExams() {
               </form>
             </DialogContent>
           </Dialog>
-        </div>
-      </div>
+        }
+      />
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
+      <AdminSectionCard
+        title={
+          <span className="inline-flex items-center gap-2">
             <ClipboardList className="size-5" aria-hidden />
             考试列表
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
+          </span>
+        }
+      >
           {loading ? (
-            <div className="flex justify-center py-8">
+            <div className="flex justify-center py-12">
               <Spinner />
             </div>
           ) : items.length === 0 ? (
-            <p className="text-muted-foreground">暂无考试，请点击「新建考试」。</p>
+            <p className={adminMeta}>暂无考试，请点击「新建考试」。</p>
           ) : (
-            <Table>
+            <AdminDataTable>
               <TableHeader>
                 <TableRow>
                   <TableHead>名称</TableHead>
@@ -397,7 +337,7 @@ export default function AdminExams() {
                 {items.map((exam) => (
                   <TableRow key={exam.id}>
                     <TableCell className="font-medium">{exam.title}</TableCell>
-                    <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
+                    <TableCell className="whitespace-nowrap text-muted-foreground">
                       {formatExamScheduleRange(
                         exam.scheduledStartAt,
                         exam.scheduledEndAt,
@@ -414,17 +354,16 @@ export default function AdminExams() {
                     <TableCell>{exam.questionCount}</TableCell>
                     <TableCell>{exam.submissionCount}</TableCell>
                     <TableCell>
-                      <Button variant="outline" size="sm" asChild>
+                      <Button variant="outline" asChild>
                         <Link to={`/admin/exams/${exam.id}`}>详情</Link>
                       </Button>
                     </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
-            </Table>
+            </AdminDataTable>
           )}
-        </CardContent>
-      </Card>
+      </AdminSectionCard>
     </div>
   );
 }

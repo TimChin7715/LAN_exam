@@ -2,6 +2,11 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 
 import { RosterListSection } from '@/components/admin/roster/RosterListSection';
+import {
+  adminMeta,
+  adminPageDescription,
+  adminPageTitle,
+} from '@/components/admin/admin-typography';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
@@ -42,7 +47,7 @@ export default function AdminRosterBatchDetail() {
   if (!batchId) {
     return (
       <div className="space-y-4">
-        <p className="text-muted-foreground">无效的名单链接。</p>
+        <p className={adminMeta}>无效的名单链接。</p>
         <Button type="button" variant="outline" onClick={() => navigate('/admin/roster')}>
           返回名单管理
         </Button>
@@ -52,10 +57,10 @@ export default function AdminRosterBatchDetail() {
 
   return (
     <div className="space-y-8">
-      <div className="space-y-2">
+      <div className="space-y-3">
         <Link
           to="/admin/roster"
-          className="inline-block text-sm font-semibold text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="inline-block text-base font-semibold text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           ← 返回名单管理
         </Link>
@@ -68,17 +73,15 @@ export default function AdminRosterBatchDetail() {
           <Alert variant="destructive">
             <AlertDescription className="flex flex-wrap items-center gap-3">
               {error}
-              <Button type="button" variant="outline" size="sm" onClick={() => void loadBatch()}>
+              <Button type="button" variant="outline" onClick={() => void loadBatch()}>
                 重试
               </Button>
             </AlertDescription>
           </Alert>
         ) : batch ? (
           <>
-            <h1 className="text-xl font-semibold leading-tight text-foreground">
-              {batch.fileName}
-            </h1>
-            <p className="text-base text-muted-foreground">
+            <h1 className={adminPageTitle}>{batch.fileName}</h1>
+            <p className={adminPageDescription}>
               共 {batch.itemCount} 人 · 上传于 {formatImportedAt(batch.createdAt)}
               · 可在此增删改考生信息
             </p>

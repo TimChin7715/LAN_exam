@@ -16,18 +16,20 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Spinner } from '@/components/ui/spinner';
+import { adminEmptyTitle, adminMeta } from '@/components/admin/admin-typography';
 import {
-  Table,
+  AdminDataTable,
+  AdminSectionCard,
   TableBody,
   TableCell,
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
+} from '@/components/admin/AdminPagePrimitives';
+import { Input } from '@/components/ui/input';
+import { Spinner } from '@/components/ui/spinner';
 import { getApiLoadErrorMessage } from '@/lib/api';
+import { cn } from '@/lib/utils';
 import {
   createRosterEntry,
   deleteRosterEntry,
@@ -195,16 +197,17 @@ export function RosterListSection({
 
   return (
     <>
-      <Card>
-        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <CardTitle className="text-sm font-semibold">{title}</CardTitle>
-          {!readOnly ? (
-            <Button type="button" className="min-h-11 w-full sm:w-auto" onClick={openCreate}>
+      <AdminSectionCard
+        title={title}
+        headerExtra={
+          !readOnly ? (
+            <Button type="button" className="w-full sm:w-auto" onClick={openCreate}>
               添加考生
             </Button>
-          ) : null}
-        </CardHeader>
-        <CardContent className="space-y-4">
+          ) : null
+        }
+        contentClassName="space-y-4"
+      >
           {readOnly ? (
             <Alert>
               <AlertDescription>考试已结束，名单仅可查看。</AlertDescription>
@@ -263,8 +266,8 @@ export function RosterListSection({
           ) : isEmpty && !hasQuery ? (
             <div className="flex flex-col items-center gap-3 py-12 text-center">
               <Users className="size-10 text-muted-foreground" aria-hidden />
-              <h3 className="text-xl font-semibold text-foreground">暂无考生</h3>
-              <p className="max-w-md text-base text-muted-foreground">
+              <h3 className={adminEmptyTitle}>暂无考生</h3>
+              <p className={cn('max-w-2xl', adminMeta)}>
                 {readOnly
                   ? '本场考试名单为空。'
                   : '可点击「添加考生」手动录入，或返回重新导入 Excel。'}
@@ -272,15 +275,15 @@ export function RosterListSection({
             </div>
           ) : isEmpty && hasQuery ? (
             <div className="flex flex-col items-center gap-2 py-12 text-center">
-              <h3 className="text-xl font-semibold text-foreground">未找到匹配记录</h3>
-              <p className="text-base text-muted-foreground">
+              <h3 className={adminEmptyTitle}>未找到匹配记录</h3>
+              <p className={adminMeta}>
                 请检查姓名、单位或身份证号是否输入正确。
               </p>
             </div>
           ) : (
             <>
               <div className="overflow-x-auto">
-                <Table>
+                <AdminDataTable>
                   <TableHeader>
                     <TableRow>
                       <TableHead scope="col">姓名</TableHead>
@@ -349,11 +352,11 @@ export function RosterListSection({
                       </TableRow>
                     ))}
                   </TableBody>
-                </Table>
+                </AdminDataTable>
               </div>
 
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <p className="text-base text-muted-foreground">
+                <p className={adminMeta}>
                   第 {page} / {totalPages} 页，共 {total} 人
                 </p>
                 <div className="flex gap-2">
@@ -379,8 +382,7 @@ export function RosterListSection({
               </div>
             </>
           )}
-        </CardContent>
-      </Card>
+        </AdminSectionCard>
 
       <RosterEntryFormDialog
         open={formOpen}

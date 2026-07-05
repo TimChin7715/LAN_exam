@@ -16,8 +16,7 @@ export class BatchDeleteBlockedError extends Error {
 type ExamBatchLinkFilter =
   | { questionBatchId: string }
   | { rosterBatchId: string }
-  | { fillInBatchId: string }
-  | { practicalBatchId: string };
+  | { fillInBatchId: string };
 
 export async function findLinkedExamTitles(
   prisma: PrismaClient,
@@ -72,7 +71,7 @@ async function removeExamQuestionsForQuestionIds(
 export async function assertBatchNotUsedByInProgressExam(
   prisma: PrismaClient,
   teacherId: string,
-  link: { fillInBatchId: string } | { practicalBatchId: string },
+  link: { fillInBatchId: string },
 ): Promise<void> {
   const inProgress = await prisma.exam.findMany({
     where: { ...link, teacherId, status: 'IN_PROGRESS' },
@@ -132,23 +131,5 @@ export async function unlinkExamsAndDeleteFillInBatch(
       data: { fillInBatchId: null },
     });
     await tx.fillInQuestionImportBatch.delete({ where: { id: batchId } });
-  });
-}
-
-export async function unlinkExamsAndDeletePracticalBatch(
-  prisma: PrismaClient,
-  teacherId: string,
-  batchId: string,
-): Promise<void> {
-  await assertBatchNotUsedByInProgressExam(prisma, teacherId, {
-    practicalBatchId: batchId,
-  });
-
-  await prisma.$transaction(async (tx) => {
-    await tx.exam.updateMany({
-      where: { practicalBatchId: batchId, teacherId },
-      data: { practicalBatchId: null },
-    });
-    await tx.practicalQuestionImportBatch.delete({ where: { id: batchId } });
   });
 }

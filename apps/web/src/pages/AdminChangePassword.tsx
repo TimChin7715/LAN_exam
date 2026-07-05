@@ -12,8 +12,8 @@ import {
   CardContent,
   CardDescription,
   CardHeader,
-  CardTitle,
 } from '@/components/ui/card';
+import { adminSectionTitle } from '@/components/admin/admin-typography';
 import {
   Form,
   FormControl,
@@ -85,12 +85,12 @@ export default function AdminChangePassword() {
     <div className="flex min-h-svh items-center justify-center bg-background px-4 py-16">
       <Card className="w-full max-w-[400px]">
         <CardHeader className="space-y-2 pb-6">
-          <CardTitle>设置新密码</CardTitle>
-          <CardDescription>
+          <h1 className={adminSectionTitle}>设置新密码</h1>
+          <CardDescription className="text-base">
             首次登录须修改默认密码后方可使用管理功能。
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="text-base">
           <Form {...form}>
             <form
               className="space-y-6"

@@ -12,13 +12,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { formatExamDateTime } from '@/lib/exam';
-import {
-  ApiError,
-  needsPractical,
-  studentApi,
-  type ExamContentModule,
-  type StudentProfile,
-} from '@/lib/student';
+import { ApiError, studentApi, type StudentProfile } from '@/lib/student';
 
 export default function StudentExamEnded() {
   const navigate = useNavigate();
@@ -27,9 +21,6 @@ export default function StudentExamEnded() {
 
   const [profile, setProfile] = useState<StudentProfile | null>(null);
   const [title, setTitle] = useState<string | null>(null);
-  const [contentModules, setContentModules] = useState<ExamContentModule[]>([
-    'OBJECTIVE',
-  ]);
   const [endedAt, setEndedAt] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -60,7 +51,6 @@ export default function StudentExamEnded() {
             return;
           }
           setTitle(status.title);
-          setContentModules(status.contentModules);
           setEndedAt(status.endedAt);
           setSubmitted(status.submitted);
         } else if (status.status === 'IN_PROGRESS') {
@@ -112,29 +102,27 @@ export default function StudentExamEnded() {
   if (loading) {
     return (
       <div className="flex min-h-svh flex-col items-center justify-center gap-4 bg-background">
-        <Loader2 className="size-8 animate-spin text-muted-foreground" />
-        <p className="text-base text-muted-foreground">正在加载…</p>
+        <Loader2 className="size-10 animate-spin text-muted-foreground" />
+        <p className="text-xl text-muted-foreground">正在加载…</p>
       </div>
     );
   }
 
-  const hasPractical = needsPractical(contentModules);
-
   return (
-    <div className="flex min-h-svh items-center justify-center bg-background px-4 py-16">
-      <Card className="w-full max-w-[440px]">
-        <CardHeader className="space-y-2 pb-6">
+    <div className="flex min-h-svh w-full flex-col bg-background px-5 py-8 sm:px-8">
+      <Card className="mx-auto flex w-full max-w-3xl flex-1 flex-col justify-center">
+        <CardHeader className="space-y-3 pb-8">
           <CardTitle>考试已结束</CardTitle>
-          <CardDescription>
+          <CardDescription className="text-xl">
             {title ? `「${title}」` : '本场考试'}已由监考教师结束
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent className="space-y-8">
           {profile ? (
-            <dl className="space-y-3 text-sm">
+            <dl className="space-y-4 text-lg">
               <div>
                 <dt className="text-muted-foreground">姓名</dt>
-                <dd className="text-base font-medium text-foreground">
+                <dd className="text-2xl font-medium text-foreground">
                   {profile.fullName}
                 </dd>
               </div>
@@ -142,34 +130,32 @@ export default function StudentExamEnded() {
           ) : null}
 
           {endedAt ? (
-            <p className="text-sm text-muted-foreground">
+            <p className="text-lg text-muted-foreground">
               结束时间：{formatExamDateTime(endedAt)}
             </p>
           ) : null}
 
           {submitted ? (
-            <Alert>
-              <AlertDescription className="space-y-1">
+            <Alert className="text-lg">
+              <AlertDescription className="space-y-2 text-lg">
                 <p>您已交卷，答卷为只读。</p>
-                {hasPractical ? (
-                  <p>操作题答卷已提交，将由考官人工评阅。</p>
-                ) : null}
               </AlertDescription>
             </Alert>
           ) : (
-            <Alert>
-              <AlertDescription>
+            <Alert className="text-lg">
+              <AlertDescription className="text-lg">
                 您未交卷。考试结束后无法继续作答，未提交的答案不作为成绩。
               </AlertDescription>
             </Alert>
           )}
 
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-4">
             {submitted && resolvedExamId ? (
               <Button
                 type="button"
                 variant="outline"
-                className="w-full"
+                size="lg"
+                className="h-12 w-full text-lg"
                 onClick={() =>
                   navigate(
                     `/exam/take?examId=${encodeURIComponent(resolvedExamId)}`,
@@ -182,7 +168,8 @@ export default function StudentExamEnded() {
             <Button
               type="button"
               variant="secondary"
-              className="w-full"
+              size="lg"
+              className="h-12 w-full text-lg"
               disabled={loggingOut}
               onClick={() => void handleLogout()}
             >

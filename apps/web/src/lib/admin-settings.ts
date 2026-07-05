@@ -12,7 +12,6 @@ export type ClearAllDataResult = {
   questionBatches: number;
   rosterBatches: number;
   fillInBatches: number;
-  practicalBatches: number;
 };
 
 export async function fetchAdminSettings(): Promise<AdminSettings> {

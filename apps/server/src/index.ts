@@ -26,8 +26,6 @@ import { registerAdminQuestionBatchesRoutes } from './routes/api/admin/question-
 import { registerAdminFillInBatchesImportRoutes } from './routes/api/admin/fill-in-batches-import.js';
 import { registerAdminFillInBatchesRoutes } from './routes/api/admin/fill-in-batches.js';
 import { registerAdminFillInBatchesTemplateRoutes } from './routes/api/admin/fill-in-batches-template.js';
-import { registerAdminPracticalBatchesImportRoutes } from './routes/api/admin/practical-batches-import.js';
-import { registerAdminPracticalBatchesRoutes } from './routes/api/admin/practical-batches.js';
 import { registerAdminExamSeatsRoutes } from './routes/api/admin/exam-seats.js';
 import { registerAdminSettingsRoutes } from './routes/api/admin/settings.js';
 import { registerAdminExamsCrudRoutes } from './routes/api/admin/exams-crud.js';
@@ -67,8 +65,6 @@ await registerAdminQuestionBatchesRoutes(app);
 await registerAdminFillInBatchesTemplateRoutes(app);
 await registerAdminFillInBatchesImportRoutes(app);
 await registerAdminFillInBatchesRoutes(app);
-await registerAdminPracticalBatchesImportRoutes(app);
-await registerAdminPracticalBatchesRoutes(app);
 await registerAdminRosterBatchesRoutes(app);
 await registerAdminRosterEntriesRoutes(app);
 await registerAdminExamsCrudRoutes(app);

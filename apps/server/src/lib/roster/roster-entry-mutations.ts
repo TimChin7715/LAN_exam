@@ -132,23 +132,12 @@ export async function assertEntryMutable(
   prisma: PrismaClient,
   entryId: string,
 ): Promise<void> {
-  const [submissionExams, practicalExams] = await Promise.all([
-    prisma.submission.findMany({
-      where: { rosterEntryId: entryId },
-      select: { exam: { select: { title: true } } },
-    }),
-    prisma.practicalSubmission.findMany({
-      where: { rosterEntryId: entryId },
-      select: { exam: { select: { title: true } } },
-    }),
-  ]);
+  const submissionExams = await prisma.submission.findMany({
+    where: { rosterEntryId: entryId },
+    select: { exam: { select: { title: true } } },
+  });
 
-  const titles = [
-    ...new Set([
-      ...submissionExams.map((s) => s.exam.title),
-      ...practicalExams.map((p) => p.exam.title),
-    ]),
-  ];
+  const titles = [...new Set(submissionExams.map((s) => s.exam.title))];
 
   if (titles.length > 0) {
     throw new RosterEntryHasSubmissionsError(titles);

@@ -1,6 +1,11 @@
 import { useId, useRef } from 'react';
-import { Upload, X } from 'lucide-react';
+import { CheckCircle2, Upload, X } from 'lucide-react';
 
+import {
+  formatImportFileSize,
+  ImportSelectedFileDisplay,
+  importFileIcon,
+} from '@/components/admin/shared/ImportSelectedFileDisplay';
 import { Button } from '@/components/ui/button';
 import {
   MAX_FILLIN_BATCH_ATTACHMENTS,
@@ -67,6 +72,8 @@ export function FillInAttachmentsDropzone({
 }: FillInAttachmentsDropzoneProps) {
   const inputId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
+  const hasFiles = files.length > 0;
+  const firstFile = files[0];
 
   function applyFiles(next: File[]) {
     const msg = validateFillInAttachmentFiles(next);
@@ -89,7 +96,7 @@ export function FillInAttachmentsDropzone({
 
   return (
     <div className="space-y-2">
-      <p className="text-sm font-medium text-foreground">表格或压缩包附件</p>
+      <p className="text-base font-medium text-foreground">表格或压缩包附件</p>
       <div
         role="button"
         tabIndex={0}
@@ -105,26 +112,39 @@ export function FillInAttachmentsDropzone({
         onDragLeave={onDragLeave}
         onDrop={onDrop}
         className={`flex min-h-40 cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed p-6 transition-colors ${
-          files.length > 0
-            ? 'border-primary/50 bg-muted/20'
+          hasFiles
+            ? 'border-primary bg-primary/5'
             : dragOver
               ? 'border-primary bg-muted/30'
               : 'border-border'
         } ${disabled ? 'pointer-events-none opacity-60' : ''}`}
       >
-        <Upload
-          className={`size-8 ${files.length > 0 ? 'text-primary' : 'text-muted-foreground'}`}
-          aria-hidden
-        />
+        {hasFiles ? (
+          <CheckCircle2 className="size-8 text-primary" aria-hidden />
+        ) : (
+          <Upload className="size-8 text-muted-foreground" aria-hidden />
+        )}
         <p className="text-center text-base text-foreground">
-          {files.length > 0 ? `已选择 ${files.length} 个文件` : '点击或拖拽上传'}
+          {hasFiles ? `文件已选择（${files.length} 个）` : '点击或拖拽上传'}
         </p>
-        <p className="text-center text-sm text-muted-foreground">
-          支持 .xls / .xlsx / .csv 或 .zip / .rar / .7z / .tar.gz / .tgz / .gz，选填；最多{' '}
-          {MAX_FILLIN_BATCH_ATTACHMENTS} 个，合计不超过 {MAX_FILLIN_ATTACHMENTS_TOTAL_LABEL}
-          ；多个附件时学员端打包 ZIP 下载，仅一个压缩包时直接下载该文件
-        </p>
-        {files.length > 0 && files.length < MAX_FILLIN_BATCH_ATTACHMENTS ? (
+        {firstFile ? (
+          <ImportSelectedFileDisplay
+            file={firstFile}
+            summary={
+              files.length > 1
+                ? `等 ${files.length} 个文件，合计 ${formatImportFileSize(totalBytes(files))}`
+                : formatImportFileSize(firstFile.size)
+            }
+          />
+        ) : null}
+        {!hasFiles ? (
+          <p className="text-center text-base text-muted-foreground">
+            支持 .xls / .xlsx / .csv 或 .zip / .rar / .7z / .tar.gz / .tgz / .gz，选填；最多{' '}
+            {MAX_FILLIN_BATCH_ATTACHMENTS} 个，合计不超过 {MAX_FILLIN_ATTACHMENTS_TOTAL_LABEL}
+            ；多个附件时学员端打包 ZIP 下载，仅一个压缩包时直接下载该文件
+          </p>
+        ) : null}
+        {hasFiles && files.length < MAX_FILLIN_BATCH_ATTACHMENTS ? (
           <Button
             type="button"
             variant="link"
@@ -152,29 +172,43 @@ export function FillInAttachmentsDropzone({
           }}
         />
       </div>
-      {files.length > 0 ? (
-        <ul className="space-y-1 rounded-md border bg-muted/20 p-2 text-sm">
-          {files.map((file, index) => (
-            <li
-              key={`${file.name}-${file.size}-${file.lastModified}`}
-              className="flex items-center justify-between gap-2"
-            >
-              <span className="min-w-0 truncate" title={file.name}>
-                {file.name}
-              </span>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="size-8 shrink-0"
-                aria-label={`移除 ${file.name}`}
-                disabled={disabled}
-                onClick={() => removeAt(index)}
+      {hasFiles ? (
+        <ul className="space-y-2">
+          {files.map((file, index) => {
+            const Icon = importFileIcon(file.name);
+            return (
+              <li
+                key={`${file.name}-${file.size}-${file.lastModified}`}
+                className="flex items-center justify-between gap-2 rounded-lg border-2 border-primary/40 bg-primary/10 px-4 py-3"
               >
-                <X className="size-4" aria-hidden />
-              </Button>
-            </li>
-          ))}
+                <div className="flex min-w-0 flex-1 items-center gap-3">
+                  <Icon className="size-5 shrink-0 text-primary" aria-hidden />
+                  <div className="min-w-0">
+                    <p
+                      className="truncate text-base font-semibold text-foreground"
+                      title={file.name}
+                    >
+                      {file.name}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {formatImportFileSize(file.size)}
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="size-8 shrink-0"
+                  aria-label={`移除 ${file.name}`}
+                  disabled={disabled}
+                  onClick={() => removeAt(index)}
+                >
+                  <X className="size-4" aria-hidden />
+                </Button>
+              </li>
+            );
+          })}
         </ul>
       ) : null}
     </div>

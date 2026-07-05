@@ -1,9 +1,6 @@
 import type { ExamContentModule } from '@prisma/client';
 
-import {
-  requiresPracticalBatch,
-  requiresQuestionSubmission,
-} from './content-mode.js';
+import { requiresQuestionSubmission } from './content-mode.js';
 import { prisma } from '../prisma.js';
 
 export type StudentEndedSummary = {
@@ -42,29 +39,17 @@ export async function resolveStudentEndedSummary(
   if (!exam) return null;
 
   const needsQuestions = requiresQuestionSubmission(exam.contentModules);
-  const needsPrac = requiresPracticalBatch(exam.contentModules);
 
-  const [objective, practical] = await Promise.all([
-    needsQuestions
-      ? prisma.submission.findUnique({
-          where: {
-            examId_rosterEntryId: { examId, rosterEntryId },
-          },
-          select: { totalScore: true },
-        })
-      : Promise.resolve(null),
-    needsPrac
-      ? prisma.practicalSubmission.findUnique({
-          where: {
-            examId_rosterEntryId: { examId, rosterEntryId },
-          },
-          select: { id: true },
-        })
-      : Promise.resolve(null),
-  ]);
+  const objective = needsQuestions
+    ? await prisma.submission.findUnique({
+        where: {
+          examId_rosterEntryId: { examId, rosterEntryId },
+        },
+        select: { totalScore: true },
+      })
+    : null;
 
-  const submitted =
-    (!needsQuestions || Boolean(objective)) && (!needsPrac || Boolean(practical));
+  const submitted = !needsQuestions || Boolean(objective);
 
   return {
     examId: exam.id,

@@ -117,7 +117,7 @@ function assertSummaryFillInConsistency(
   expectedHeader: string,
 ): void {
   const summary = workbook.getWorksheet('成绩汇总');
-  const fillIn = workbook.getWorksheet('填空题明细');
+  const fillIn = workbook.getWorksheet('操作题明细');
   assert.ok(summary);
   assert.ok(fillIn);
 
@@ -142,7 +142,7 @@ function assertSummaryFillInConsistency(
         Array.isArray(row) && row[1] === studentName && row[4] === sortOrder,
     ) as ExcelJS.CellValue[] | undefined;
   assert.ok(fillRow, `fill-in row for ${studentName} 题序 ${sortOrder}`);
-  assert.equal(summaryScore, fillRow[10], 'summary vs 填空题明细 得分');
+  assert.equal(summaryScore, fillRow[10], 'summary vs 操作题明细 得分');
 }
 
 describe('perQuestionScoresForSummary', () => {
@@ -348,7 +348,7 @@ describe('summary workbook round-trip', () => {
       points: 2,
     });
 
-    const fillIn = wb.addWorksheet('填空题明细');
+    const fillIn = wb.addWorksheet('操作题明细');
     fillIn.columns = FILL_IN_DETAIL_HEADERS.map((header, i) => ({
       header,
       key: [
@@ -385,13 +385,13 @@ describe('summary workbook round-trip', () => {
     await loaded.xlsx.load(buffer as unknown as ExcelJS.Buffer);
 
     const objectiveDetail = loaded.getWorksheet('答题明细')!;
-    const fillDetail = loaded.getWorksheet('填空题明细')!;
+    const fillDetail = loaded.getWorksheet('操作题明细')!;
     assert.deepEqual(headerValues(objectiveDetail), [...OBJECTIVE_DETAIL_HEADERS]);
     assert.deepEqual(headerValues(fillDetail), [...FILL_IN_DETAIL_HEADERS]);
 
     const objectiveRows = objectiveDetail.getSheetValues().slice(2);
     assert.equal(objectiveRows.length, 1);
-    assert.notEqual(objectiveRows[0]?.[5], '填空');
+    assert.notEqual(objectiveRows[0]?.[5], '操作');
 
     const fillRows = fillDetail.getSheetValues().slice(2);
     assert.equal(fillRows.length, 1);
@@ -443,8 +443,8 @@ describe('fixture smoke (D-07)', () => {
     await wb.xlsx.load(buffer as unknown as ExcelJS.Buffer);
     const sheet = wb.getWorksheet('成绩汇总');
     assert.ok(sheet, '成绩汇总 worksheet');
-    const fillIn = wb.getWorksheet('填空题明细');
-    assert.ok(fillIn, '填空题明细 worksheet');
+    const fillIn = wb.getWorksheet('操作题明细');
+    assert.ok(fillIn, '操作题明细 worksheet');
     const headers = headerValues(sheet);
     assert.ok(headers.includes('姓名'));
     assert.ok(headers.includes('单位'));

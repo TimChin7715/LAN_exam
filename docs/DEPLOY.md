@@ -115,7 +115,7 @@ docker compose up --build
 管理台导入入口：
 
 - 客观题：`/admin/questions`
-- 填空题：`/admin/questions` → “填空题”
+- 操作题：`/admin/questions` → “操作题”
 - 操作题：`/admin/questions` → “操作题”
 - 名单：`/admin/roster`
 
@@ -123,13 +123,13 @@ docker compose up --build
 | --- | --- | --- |
 | 客观题 | `.xls` / `.xlsx` / `.csv` | 使用 `templates/题库导入模板.xlsx` |
 | 名单 | `.xls` / `.xlsx` / `.csv` | 使用 `templates/名单导入模板.xlsx`；列为“姓名 / 单位 / 身份证号” |
-| 填空题 | Word 题目 + `.xls` / `.xlsx` 答题卡 + 可选 `.xls` / `.xlsx` / `.csv` 附件 | 答题卡工作表名必须为 `答题卡`，列为“题号 / 答案 / 分值” |
+| 操作题 | Word 题目 + `.xls` / `.xlsx` 答题卡 + 可选 `.xls` / `.xlsx` / `.csv` 附件 | 答题卡工作表名必须为 `答题卡`，列为“题号 / 答案 / 分值” |
 | 操作题 | Word 试卷 + `.xls` / `.xlsx` / `.csv` 附件 | 不自动计分，无固定题库模板 |
 
 补充说明：
 
-- 填空题 Word 只做全文展示，不要求与答题卡逐题对应。
-- 填空题答题卡一行代表一空；答案列可用 `|` 分隔多个可接受答案。
+- 操作题 Word 只做全文展示，不要求与答题卡逐题对应。
+- 操作题答题卡一行代表一空；答案列可用 `|` 分隔多个可接受答案。
 - 客观题多选当前计分规则为 `ALL_OR_NOTHING`。
 
 ### 2. 创建考试
@@ -146,8 +146,7 @@ docker compose up --build
 - 开始考试后，学员用姓名 + 身份证号在 `/exam/login` 登录。
 - 若设置页 `showSeatBoard=true`，学员登录页与考试详情会展示座位表。
 - 座位分配按考试自动随机生成，首次读取座位表时若无记录会补分配。
-- 客观题 / 填空题自动保存；填空题每空可上传或粘贴截图（PNG / JPEG / WebP，每空最多 5 张，单张默认不超过 5MB）作为作答佐证，**不参与自动评分**。
-- 操作题需先上传作答文档后才允许交卷。
+- 客观题 / 操作题自动保存；操作题每空可上传或粘贴截图（PNG / JPEG / WebP，每空最多 5 张，单张默认不超过 5MB）作为作答佐证，**不参与自动评分**。
 - 已交卷学员进入 `/exam/submitted`，等待考官结束考试；考试结束后统一进入 `/exam/ended`。
 
 ### 4. 考后处理
@@ -155,9 +154,8 @@ docker compose up --build
 在 `/admin/exams/:id`：
 
 - 可导出成绩与答题明细 Excel
-- 若考试含填空题，可导出已交卷学员的填空题截图 ZIP（按学员分文件夹，文件名为 `第x题` / `第x题1`…；无已交卷截图时导出失败）
-- 若考试含操作题，可逐人下载操作题答卷
-- 自动总分只包含客观题与填空题（截图不计分）；操作题需人工评阅
+- 若考试含操作题，可导出已交卷学员的操作题截图 ZIP（按学员分文件夹，文件名为 `第一题01`、`第一题02`…；无已交卷截图时导出失败）
+- 自动总分包含客观题与操作题（截图不计分）
 
 在 `/admin/settings`：
 
@@ -168,7 +166,7 @@ docker compose up --build
 
 - 当前考官账号下全部考试
 - 客观题题库
-- 填空题批次
+- 操作题批次
 - 操作题批次
 - 名单批次
 - 关联上传文件与学员答卷
@@ -185,8 +183,8 @@ docker compose up --build
 | --- | --- |
 | `DATA_DIR` | 上传与衍生文件目录；Compose 默认挂载到 `/app/data`；学员截图位于 `exam-work/{examId}/{rosterEntryId}/fill-in/` |
 | `MAX_PRACTICAL_DOCX_BYTES` | Word 试卷 / 学员操作题答卷上限，默认 20MB |
-| `MAX_PRACTICAL_XLSX_BYTES` | 操作题 / 填空题附件上限，默认 10MB |
-| `MAX_FILLIN_SCREENSHOT_BYTES` | 填空题每空单张截图上限，默认 5MB；格式 PNG / JPEG / WebP，每空最多 5 张（代码常量） |
+| `MAX_PRACTICAL_XLSX_BYTES` | 操作题 Excel / 附件上限，默认 10MB |
+| `MAX_FILLIN_SCREENSHOT_BYTES` | 操作题每空单张截图上限，默认 5MB；格式 PNG / JPEG / WebP，每空最多 5 张（代码常量） |
 | `MULTIPART_MAX_FILE_BYTES` | Fastify multipart 单文件上限，必须不小于 practical、附件与截图等各类单文件上限中的最大值 |
 
 若导入或上传出现 `request file too large`，优先检查 `MULTIPART_MAX_FILE_BYTES`。
@@ -262,6 +260,6 @@ server {
 | 学员无法访问 `/exam/login` | 防火墙 `5180`；局域网 IP；Compose 端口映射 |
 | 考试机能打开 `/admin` | 页面提示“请在本机打开”属预期；`/api/admin/*` 应返回 `403` |
 | 导入后看不到旧数据 | 当前为 `local_exam_admin` 数据视图；旧 `teacher_admin` 数据不会自动迁移 |
-| 填空题导入失败 | 检查答题卡是否为 `.xls/.xlsx`，工作表名是否为 `答题卡`，列是否为“题号 / 答案 / 分值” |
+| 操作题导入失败 | 检查答题卡是否为 `.xls/.xlsx`，工作表名是否为 `答题卡`，列是否为“题号 / 答案 / 分值” |
 | 上传大文件失败 | 检查 `MAX_PRACTICAL_*`、`MAX_FILLIN_SCREENSHOT_BYTES` 与 `MULTIPART_MAX_FILE_BYTES` |
 | `/health` 非 200 | 检查 `5180` 端口映射、应用日志、数据库就绪情况 |

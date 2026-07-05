@@ -110,14 +110,7 @@ function StudentSeatPanel() {
   }
 
   if (boards.length === 0) {
-    return (
-      <CardShell>
-        <h3 className="text-base font-semibold text-foreground">考生座位</h3>
-        <p className="text-sm text-muted-foreground">
-          当前没有未开始或进行中的考试，暂无座位信息。
-        </p>
-      </CardShell>
-    );
+    return null;
   }
 
   return (

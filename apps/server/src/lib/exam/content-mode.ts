@@ -2,8 +2,9 @@ import type { ExamContentModule } from '@prisma/client';
 import { z } from 'zod';
 
 import { prisma } from '../prisma.js';
+import { FILL_MODULE_LABEL_ZH } from './content-labels.js';
 
-export const examContentModuleSchema = z.enum(['OBJECTIVE', 'FILL', 'PRACTICAL']);
+export const examContentModuleSchema = z.enum(['OBJECTIVE', 'FILL']);
 
 export const contentModulesSchema = z
   .array(examContentModuleSchema)
@@ -24,10 +25,6 @@ export function requiresFillInBatch(modules: ExamContentModule[]): boolean {
   return hasContentModule(modules, 'FILL');
 }
 
-export function requiresPracticalBatch(modules: ExamContentModule[]): boolean {
-  return hasContentModule(modules, 'PRACTICAL');
-}
-
 /** 客观题或填空题：需在浏览器作答并计入 Submission */
 export function requiresQuestionSubmission(modules: ExamContentModule[]): boolean {
   return requiresObjectiveBatch(modules) || requiresFillInBatch(modules);
@@ -39,7 +36,6 @@ export async function assertTeacherOwnsExamBatches(
     contentModules: ExamContentModule[];
     questionBatchId?: string | null;
     fillInBatchId?: string | null;
-    practicalBatchId?: string | null;
     rosterBatchId: string;
   },
 ): Promise<{ ok: true } | { ok: false; status: number; code: string; message: string }> {
@@ -56,15 +52,7 @@ export async function assertTeacherOwnsExamBatches(
       ok: false,
       status: 400,
       code: 'MISSING_FILL_IN_BATCH',
-      message: '请选择填空题批次',
-    };
-  }
-  if (requiresPracticalBatch(input.contentModules) && !input.practicalBatchId) {
-    return {
-      ok: false,
-      status: 400,
-      code: 'MISSING_PRACTICAL_BATCH',
-      message: '请选择操作题批次',
+      message: `请选择${FILL_MODULE_LABEL_ZH}批次`,
     };
   }
 
@@ -84,18 +72,7 @@ export async function assertTeacherOwnsExamBatches(
       ok: false,
       status: 400,
       code: 'UNEXPECTED_FILL_IN_BATCH',
-      message: '未勾选填空题时不应选择填空题批次',
-    };
-  }
-  if (
-    !requiresPracticalBatch(input.contentModules) &&
-    input.practicalBatchId
-  ) {
-    return {
-      ok: false,
-      status: 400,
-      code: 'UNEXPECTED_PRACTICAL_BATCH',
-      message: '未勾选操作题时不应选择操作题批次',
+      message: `未勾选${FILL_MODULE_LABEL_ZH}时不应选择${FILL_MODULE_LABEL_ZH}批次`,
     };
   }
 
@@ -137,22 +114,7 @@ export async function assertTeacherOwnsExamBatches(
         ok: false,
         status: 400,
         code: 'INVALID_FILL_IN_BATCH',
-        message: '填空题批次不存在或无权使用',
-      };
-    }
-  }
-
-  if (input.practicalBatchId) {
-    const practicalBatch = await prisma.practicalQuestionImportBatch.findFirst({
-      where: { id: input.practicalBatchId, teacherId },
-      select: { id: true },
-    });
-    if (!practicalBatch) {
-      return {
-        ok: false,
-        status: 400,
-        code: 'INVALID_PRACTICAL_BATCH',
-        message: '操作题批次不存在或无权使用',
+        message: `${FILL_MODULE_LABEL_ZH}批次不存在或无权使用`,
       };
     }
   }

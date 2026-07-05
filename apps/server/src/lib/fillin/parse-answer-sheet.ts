@@ -6,6 +6,7 @@ import {
   FILLIN_INLINE_ANSWER_COLUMN,
   writeFillInAnswerCell,
 } from './excel-answer-column.js';
+import { blankInputSize } from './inline-input-html.js';
 import { parseNonNegativeScore } from '../parse-score.js';
 import {
   getCellByHeader,
@@ -233,11 +234,13 @@ function renderText(text: string): string {
 
 function renderInlineInput(blank: InlineBlank): string {
   const label = `第 ${blank.questionNo} 题第 ${blank.blankIndex} 空`;
+  const size = blankInputSize(blank.answerKeys);
   return [
     '<input',
     ' class="fillin-inline-input"',
     ' type="text"',
     ' autocomplete="off"',
+    ` size="${size}"`,
     ` aria-label="${escapeHtml(label)}"`,
     ` data-fillin-order="${blank.inlineOrder}"`,
     ` data-fillin-question-no="${blank.questionNo}"`,
@@ -312,9 +315,9 @@ export function buildFillInInlinePreviewHtml(
     '.fillin-inline-points{margin-left:.375rem;font-size:1rem;font-weight:500;color:#64748b;}',
     '.fillin-inline-blank-points{margin-right:.375rem;font-size:.875rem;font-weight:600;color:#64748b;vertical-align:baseline;}',
     '.fillin-inline-stem{font-size:15px;line-height:2.35;}',
-    '.fillin-inline-input{box-sizing:border-box;display:inline-block;min-width:10rem;max-width:min(24rem,80vw);height:2.35rem;margin:0 .25rem;padding:.1rem .65rem;border:1px solid #fde047;border-bottom-color:#ca8a04;border-radius:.375rem .375rem .125rem .125rem;background:#fef9c3;color:inherit;font:inherit;line-height:1.7;vertical-align:baseline;outline:none;cursor:text;transition:background-color 150ms cubic-bezier(.2,0,0,1),border-color 150ms cubic-bezier(.2,0,0,1),box-shadow 150ms cubic-bezier(.2,0,0,1);}',
-    '.fillin-inline-input:hover{border-color:#facc15;border-bottom-color:hsl(var(--primary,222 47% 11%));background:#fef08a;}',
-    '.fillin-inline-input:focus{border-color:hsl(var(--primary,222 47% 11%));background:#fef08a;box-shadow:0 0 0 3px rgb(37 99 235 / 16%);}',
+    '.fillin-inline-input{box-sizing:content-box;display:inline;width:auto;min-width:4ch;max-width:min(24rem,80vw);height:auto;margin:0;padding:.1em .35em;border:1px solid #fde047;border-radius:.125rem;background:#fef9c3;color:inherit;font:inherit;font-weight:inherit;line-height:inherit;vertical-align:baseline;outline:none;cursor:text;field-sizing:content;}',
+    '.fillin-inline-input:hover{border-color:#facc15;background:#fef08a;}',
+    '.fillin-inline-input:focus{border-color:#2563eb;background:#fef08a;box-shadow:0 0 0 2px rgb(37 99 235 / 16%);}',
     '.fillin-inline-input:disabled{border-color:#fde68a;background:#fef3c7;color:#475569;cursor:not-allowed;}',
     '.fillin-inline-blank{display:inline-block;min-width:8rem;border-bottom:1.5px solid currentColor;}',
     '.fillin-inline-extra{display:inline-flex;flex-wrap:wrap;gap:.35rem;margin-left:.5rem;vertical-align:baseline;}',
@@ -332,11 +335,11 @@ function addFillInInstructionsSheet(wb: ExcelJS.Workbook): void {
   sheet.getColumn(1).width = 88;
 
   const lines: { text: string; bold?: boolean }[] = [
-    { text: '填空题导入模板', bold: true },
+    { text: '操作题导入模板', bold: true },
     { text: '' },
     { text: '怎么填：', bold: true },
     {
-      text: '1. 只需要这一个 Excel，就能导入填空题。Word 可以不传。',
+      text: '1. 只需要这一个 Excel，就能导入操作题。Word 可以不传。',
     },
     {
       text: '2. 只改「答题卡」工作表，每一行都要填写：题号、题干、答案、分值。',

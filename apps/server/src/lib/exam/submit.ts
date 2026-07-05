@@ -5,7 +5,6 @@ import {
   assertStudentExamAccess,
 } from './access.js';
 import {
-  requiresPracticalBatch,
   requiresQuestionSubmission,
 } from './content-mode.js';
 import {
@@ -13,9 +12,6 @@ import {
   type ScoreableExamQuestion,
 } from './exam-paper-cache.js';
 import { loadExamPaperStatic } from './load-exam-paper.js';
-import {
-  finalizePracticalSubmissionIfDraft,
-} from './submit-practical.js';
 import { finalizeFillInScreenshots } from '../fillin/finalize-screenshots.js';
 import { scoreQuestion } from './score-question.js';
 import { assertAnswersComplete } from './validate-answers-complete.js';
@@ -66,20 +62,6 @@ export async function submitExam(
     await loadExamPaperStatic(examId);
   }
 
-  if (requiresPracticalBatch(modules)) {
-    const existingPractical = await prisma.practicalSubmission.findUnique({
-      where: { examId_rosterEntryId: { examId, rosterEntryId } },
-      select: { id: true },
-    });
-    if (existingPractical) {
-      throw new SubmitExamError(
-        409,
-        'ALREADY_SUBMITTED',
-        '您已提交过本场考试，无法再次提交。',
-      );
-    }
-  }
-
   return prisma.$transaction(
     async (tx) => {
       let totalScore: number | null = null;
@@ -94,16 +76,6 @@ export async function submitExam(
         );
         totalScore = result.totalScore;
         submittedAt = result.submittedAt;
-      }
-
-      if (requiresPracticalBatch(modules)) {
-        await finalizePracticalSubmissionIfDraft(tx, {
-          examId,
-          rosterEntryId,
-        });
-        if (totalScore === null) {
-          submittedAt = new Date();
-        }
       }
 
       return { totalScore, submittedAt };

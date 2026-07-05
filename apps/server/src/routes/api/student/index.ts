@@ -4,7 +4,6 @@ import { registerStudentExamAnswersRoutes } from './exam-answers.js';
 import { registerStudentExamFillInRoutes } from './exam-fillin.js';
 import { registerStudentExamFillInScreenshotRoutes } from './exam-fillin-screenshots.js';
 import { registerStudentExamPaperRoutes } from './exam-paper.js';
-import { registerStudentExamPracticalRoutes } from './exam-practical.js';
 import { registerStudentExamSelectRoutes } from './exam-select.js';
 import { registerStudentExamStatusRoutes } from './exam-status.js';
 import { registerStudentExamSubmitRoutes } from './exam-submit.js';
@@ -28,7 +27,6 @@ export async function registerStudentRoutes(
   await registerStudentExamPaperRoutes(app);
   await registerStudentExamFillInRoutes(app);
   await registerStudentExamFillInScreenshotRoutes(app);
-  await registerStudentExamPracticalRoutes(app);
   await registerStudentExamAnswersRoutes(app);
   await registerStudentExamSyncProgressRoutes(app);
   await registerStudentExamSubmitRoutes(app);

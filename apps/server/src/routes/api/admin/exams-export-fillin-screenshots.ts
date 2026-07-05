@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 
+import { FILL_MODULE_LABEL_ZH } from '../../../lib/exam/content-labels.js';
 import { resolveAdminTeacherId } from '../../../lib/admin-context.js';
 import { requiresFillInBatch } from '../../../lib/exam/content-mode.js';
 import {
@@ -11,7 +12,7 @@ import { requireAdminSession } from '../../../plugins/admin-guard.js';
 
 function safeZipFilename(title: string): string {
   const base = title.replace(/[\\/:*?"<>|]/g, '_').trim() || 'exam';
-  return `${base}-填空题截图.zip`;
+  return `${base}-${FILL_MODULE_LABEL_ZH}截图.zip`;
 }
 
 export async function registerAdminExamsExportFillInScreenshotsRoutes(
@@ -41,7 +42,7 @@ export async function registerAdminExamsExportFillInScreenshotsRoutes(
         return reply.status(400).send({
           ok: false,
           code: 'NO_FILL_IN',
-          message: '本场考试不含填空题',
+          message: `本场考试不含${FILL_MODULE_LABEL_ZH}`,
         });
       }
 
@@ -97,7 +98,7 @@ export async function registerAdminExamsExportFillInScreenshotsRoutes(
         return reply.status(404).send({
           ok: false,
           code: 'NO_SCREENSHOTS',
-          message: '暂无已交卷学员的填空题截图',
+          message: `暂无已交卷学员的${FILL_MODULE_LABEL_ZH}截图`,
         });
       }
 

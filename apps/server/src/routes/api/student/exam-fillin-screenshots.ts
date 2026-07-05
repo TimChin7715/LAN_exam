@@ -4,6 +4,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 
 import { assertStudentExamAccess } from '../../../lib/exam/access.js';
+import { FILL_MODULE_LABEL_ZH } from '../../../lib/exam/content-labels.js';
 import { requiresFillInBatch } from '../../../lib/exam/content-mode.js';
 import { ExamAccessError } from '../../../lib/exam/types.js';
 import { prisma } from '../../../lib/prisma.js';
@@ -284,7 +285,7 @@ export async function registerStudentExamFillInScreenshotRoutes(
       if (!exam?.fillInBatchId || !requiresFillInBatch(exam.contentModules)) {
         return reply.status(404).send({
           code: 'NO_FILL_IN',
-          message: '本场考试不含填空题',
+          message: `本场考试不含${FILL_MODULE_LABEL_ZH}`,
         });
       }
 

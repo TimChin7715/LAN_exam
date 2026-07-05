@@ -7,8 +7,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as XLSX from 'xlsx';
 
-import { parseAnswerSheetRows } from '../src/lib/fillin/parse-answer-sheet.ts';
-import { parseWordQuestions } from '../src/lib/fillin/parse-word.ts';
+import { parseWordFillDocument } from '../src/lib/fillin/parse-word-fill.ts';
 import { loadSpreadsheet } from '../src/lib/spreadsheet/read-workbook.ts';
 import { parseWorkbook as parseRoster } from '../src/lib/roster/parse-workbook.ts';
 
@@ -18,8 +17,7 @@ const root = path.resolve(
 );
 
 const rosterXlsx = path.join(root, 'fixtures/import-test/名单导入-测试.xlsx');
-const fillinXlsx = path.join(root, 'templates/填空题导入模板.xlsx');
-const fillinDocx = path.join(root, 'templates/填空题导入示例-题目.docx');
+const fillinDocx = path.join(root, 'templates/操作题导入模板.docx');
 
 function writeXlsFromXlsx(xlsxPath, xlsPath) {
   const buf = fs.readFileSync(xlsxPath);
@@ -42,20 +40,26 @@ console.log('loadSpreadsheet xls rows:', loaded.rows.length);
 const roster = await parseRoster(rosterBuf);
 console.log('parseRoster xls entries:', roster.rows.length);
 
-const fillinBuf = fs.readFileSync(fillinXlsx);
-const fillinRows = await parseAnswerSheetRows(fillinBuf);
-console.log('parseAnswerSheet xlsx blanks:', fillinRows.rows.length, 'errors:', fillinRows.errors.length);
-if (fillinRows.errors.length > 0 || fillinRows.rows.length > 0) {
-  console.error(
-    'FAIL: fill-in template should have 0 importable rows and 0 errors',
-  );
-  process.exit(1);
-}
-
 if (fs.existsSync(fillinDocx)) {
   const wordBuf = fs.readFileSync(fillinDocx);
-  const segs = await parseWordQuestions(wordBuf, '填空题导入示例-题目.docx');
-  console.log('parseWord docx segments:', segs.length);
+  const parsed = await parseWordFillDocument(wordBuf, '操作题导入模板.docx');
+  console.log(
+    'parseWordFill docx blanks:',
+    parsed.blanks.length,
+    'errors:',
+    parsed.errors.length,
+  );
+  if (parsed.errors.length > 0) {
+    console.error('FAIL:', parsed.errors);
+    process.exit(1);
+  }
+  if (parsed.blanks.length < 1) {
+    console.error('FAIL: expected at least one blank in fill-in Word template');
+    process.exit(1);
+  }
+} else {
+  console.error('FAIL: missing', fillinDocx);
+  process.exit(1);
 }
 
 console.log('OK');

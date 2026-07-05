@@ -8,21 +8,16 @@ import type {
 import {
   hasExamModule,
   needsFillIn,
-  needsPractical,
   type ExamContentModule,
 } from '@/lib/student';
+import { FILL_MODULE_LABEL } from '@/lib/content-module-labels';
 import { cn } from '@/lib/utils';
 
-const SECTION_ORDER: AnswerProgressSection[] = [
-  'objective',
-  'fill',
-  'practical',
-];
+const SECTION_ORDER: AnswerProgressSection[] = ['objective', 'fill'];
 
 const SECTION_LABELS: Record<AnswerProgressSection, string> = {
   objective: '客观题',
-  fill: '填空题',
-  practical: '操作题',
+  fill: FILL_MODULE_LABEL,
 };
 
 function sectionVisible(
@@ -32,10 +27,7 @@ function sectionVisible(
   if (section === 'objective') {
     return hasExamModule(contentModules, 'OBJECTIVE');
   }
-  if (section === 'fill') {
-    return needsFillIn(contentModules);
-  }
-  return needsPractical(contentModules);
+  return needsFillIn(contentModules);
 }
 
 function QuestionNavButton({

@@ -2,6 +2,11 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 
 import { QuestionListSection } from '@/components/admin/qbank/QuestionListSection';
+import {
+  adminMeta,
+  adminPageDescription,
+  adminPageTitle,
+} from '@/components/admin/admin-typography';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
@@ -42,7 +47,7 @@ export default function AdminQuestionBankDetail() {
   if (!batchId) {
     return (
       <div className="space-y-4">
-        <p className="text-muted-foreground">无效的题库链接。</p>
+        <p className={adminMeta}>无效的题库链接。</p>
         <Button type="button" variant="outline" onClick={() => navigate('/admin/questions')}>
           返回题库管理
         </Button>
@@ -52,10 +57,10 @@ export default function AdminQuestionBankDetail() {
 
   return (
     <div className="space-y-8">
-      <div className="space-y-2">
+      <div className="space-y-3">
         <Link
           to="/admin/questions"
-          className="inline-block text-sm font-semibold text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="inline-block text-base font-semibold text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           ← 返回题库管理
         </Link>
@@ -68,17 +73,15 @@ export default function AdminQuestionBankDetail() {
           <Alert variant="destructive">
             <AlertDescription className="flex flex-wrap items-center gap-3">
               {error}
-              <Button type="button" variant="outline" size="sm" onClick={() => void loadBank()}>
+              <Button type="button" variant="outline" onClick={() => void loadBank()}>
                 重试
               </Button>
             </AlertDescription>
           </Alert>
         ) : bank ? (
           <>
-            <h1 className="text-xl font-semibold leading-tight text-foreground">
-              {bank.fileName}
-            </h1>
-            <p className="text-base text-muted-foreground">
+            <h1 className={adminPageTitle}>{bank.fileName}</h1>
+            <p className={adminPageDescription}>
               共 {bank.itemCount} 题 · 上传于 {formatImportedAt(bank.createdAt)}
             </p>
           </>

@@ -13,8 +13,8 @@ const root = path.resolve(
   '../../..',
 );
 const templatesDir = path.join(root, 'templates');
-const wordPath = path.join(templatesDir, '填空题导入示例-题目.docx');
-const excelPath = path.join(templatesDir, '填空题导入示例-答题卡.xlsx');
+const wordPath = path.join(templatesDir, '操作题导入示例-题目.docx');
+const excelPath = path.join(templatesDir, '操作题导入示例-答题卡.xlsx');
 
 const require = createRequire(import.meta.url);
 const JSZip = require(
@@ -22,9 +22,9 @@ const JSZip = require(
 );
 
 const paragraphs = [
-  'LAN 考试系统填空题导入示例',
+  'LAN 考试系统操作题导入示例',
   '',
-  '说明：题号使用「1.」「2、」等格式分段；Excel 答题卡中同一题号多行表示多空，行顺序即空位顺序。',
+  '说明：题号使用「1.」「2.」等半角句点格式分段；Excel 答题卡中同一题号多行表示多空，行顺序即空位顺序。',
   '',
   '1. 我国的首都是____，该城市常用的简称之一是____。',
   '',

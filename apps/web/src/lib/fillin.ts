@@ -11,7 +11,7 @@ export type FillInBatchListItem = {
   id: string;
   title: string;
   wordFileName: string;
-  excelFileName: string;
+  excelFileName: string | null;
   itemCount: number;
   createdAt: string;
 };
@@ -24,7 +24,6 @@ export type FillInImportSuccess = {
   title: string;
   importedCount: number;
   wordFileName: string;
-  excelFileName: string;
   attachmentCount: number;
   attachmentFileNames: string[];
 };
@@ -47,7 +46,6 @@ export class FillInBatchInUseError extends Error {
 }
 
 export {
-  validateAnswerSheetFile as validateFillInExcelFile,
   validateFillInAttachmentFile,
   validateWordFile as validateDocxFile,
 } from '@/lib/upload-formats';
@@ -64,21 +62,17 @@ export async function downloadFillInTemplate(): Promise<void> {
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement('a');
   anchor.href = url;
-  anchor.download = '填空题导入模板.xlsx';
+  anchor.download = '操作题导入模板.docx';
   anchor.click();
   URL.revokeObjectURL(url);
 }
 
 export async function importFillInBatch(
-  wordFile: File | null,
-  excelFile: File,
+  wordFile: File,
   attachmentFiles: File[] = [],
 ): Promise<FillInImportSuccess | FillInImportFailure> {
   const form = new FormData();
-  if (wordFile) {
-    form.append('wordFile', wordFile);
-  }
-  form.append('excelFile', excelFile);
+  form.append('wordFile', wordFile);
   for (const file of attachmentFiles) {
     form.append('attachmentFiles', file);
   }
@@ -278,6 +272,26 @@ export function resolveFillQuestionLeaderId(
   questionNo: string,
 ): string | null {
   return buildFillQuestionLeaderMap(items).get(questionNo) ?? null;
+}
+
+/** 将 API 返回的截图按空位 examQuestionId 直绑（Word 整卷每空独立截图）。 */
+export function normalizeScreenshotsByBlank(
+  items: FillInItemLike[],
+  apiItems: FillInScreenshotsByQuestion[],
+): Record<string, FillInScreenshotInfo[]> {
+  const allowed = new Set(
+    items
+      .filter((item) => item.type === 'FILL' || item.type === undefined)
+      .map((item) => item.examQuestionId),
+  );
+  const result: Record<string, FillInScreenshotInfo[]> = {};
+  for (const item of apiItems) {
+    if (!allowed.has(item.examQuestionId)) continue;
+    result[item.examQuestionId] = [...item.screenshots].sort(
+      (a, b) => a.sortOrder - b.sortOrder,
+    );
+  }
+  return result;
 }
 
 /** 将 API 按空返回的截图合并为题级（leader examQuestionId）映射 */

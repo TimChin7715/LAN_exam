@@ -13,10 +13,8 @@ import {
 } from '@/components/ui/card';
 import {
   ApiError,
-  needsPractical,
   STUDENT_SUBMITTED_POLL_INTERVAL_MS,
   studentApi,
-  type ExamContentModule,
   type StudentProfile,
 } from '@/lib/student';
 
@@ -27,9 +25,6 @@ export default function StudentExamSubmitted() {
 
   const [profile, setProfile] = useState<StudentProfile | null>(null);
   const [title, setTitle] = useState<string | null>(null);
-  const [contentModules, setContentModules] = useState<ExamContentModule[]>([
-    'OBJECTIVE',
-  ]);
   const [examInProgress, setExamInProgress] = useState(true);
   const [loading, setLoading] = useState(true);
   const [loggingOut, setLoggingOut] = useState(false);
@@ -48,9 +43,8 @@ export default function StudentExamSubmitted() {
         if (cancelled) return;
         setProfile(me);
 
-        let submission;
         try {
-          submission = await studentApi.examSubmission(examId);
+          await studentApi.examSubmission(examId);
         } catch (err) {
           if (err instanceof ApiError && err.status === 404) {
             navigate(`/exam/take?examId=${encodeURIComponent(examId)}`, {
@@ -59,10 +53,6 @@ export default function StudentExamSubmitted() {
             return;
           }
           throw err;
-        }
-
-        if (!cancelled) {
-          setContentModules(submission.contentModules);
         }
 
         const status = await studentApi.examStatus();
@@ -175,7 +165,6 @@ export default function StudentExamSubmitted() {
     );
   }
 
-  const hasPractical = needsPractical(contentModules);
   const examTitle = title
     ? "「" + title + "」"
     : "本场考试";
@@ -204,9 +193,6 @@ export default function StudentExamSubmitted() {
               <p>您已成功交卷，答卷为只读。</p>
               {examInProgress ? (
                 <p>考试仍在进行，请留在考场等待监考教师结束考试。</p>
-              ) : null}
-              {hasPractical ? (
-                <p>操作题答卷已提交，将由考官人工评阅。</p>
               ) : null}
             </AlertDescription>
           </Alert>

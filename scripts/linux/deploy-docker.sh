@@ -67,6 +67,10 @@ rm -f "${ROOT}/docker-compose.override.yml"
 
 COMPOSE_ENV="--env-file ${ENV_FILE}"
 COMPOSE_FILES="-f docker-compose.yml -f docker-compose.host-app.yml"
+if [ -f "${ROOT}/docker-compose.admin-remote.yml" ] && [ "${ADMIN_REMOTE:-false}" = "true" ]; then
+  COMPOSE_FILES="${COMPOSE_FILES} -f docker-compose.admin-remote.yml"
+  echo "==> Remote admin enabled (ADMIN_REMOTE=true + docker-compose.admin-remote.yml)"
+fi
 
 echo "==> docker compose up -d --build (host network app for SSH tunnel + admin API)"
 docker compose $COMPOSE_ENV $COMPOSE_FILES up -d --build

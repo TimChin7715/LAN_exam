@@ -73,7 +73,7 @@ detail.columns = OBJECTIVE_DETAIL_HEADERS.map((header, i) => ({
 }));
 detail.getRow(1).font = { bold: true };
 
-const fillIn = wb.addWorksheet('填空题明细');
+const fillIn = wb.addWorksheet('操作题明细');
 fillIn.columns = FILL_IN_DETAIL_HEADERS.map((header, i) => ({
   header,
   key: [

@@ -2,6 +2,7 @@ import archiver from 'archiver';
 import type { Readable } from 'node:stream';
 import { PassThrough } from 'node:stream';
 
+import { FILL_MODULE_LABEL_ZH } from '../exam/content-labels.js';
 import { dedupeZipEntryNames } from './dedupe-zip-entry-names.js';
 import type { FillInBatchAttachmentRow } from './load-batch-attachments.js';
 import {
@@ -38,7 +39,7 @@ export async function streamFillInAttachmentsZip(
 }
 
 export function safeFillInAttachmentsZipFilename(title: string): string {
-  const base = title.replace(/[\\/:*?"<>|]/g, '_').trim() || '填空题';
+  const base = title.replace(/[\\/:*?"<>|]/g, '_').trim() || FILL_MODULE_LABEL_ZH;
   return `${base}-附件.zip`;
 }
 

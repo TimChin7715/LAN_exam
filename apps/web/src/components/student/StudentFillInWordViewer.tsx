@@ -1,21 +1,10 @@
-import {
-  createElement,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type ReactNode,
-} from 'react';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
+import { ImagePlus } from 'lucide-react';
 
 import { FillInScreenshotAttach } from '@/components/student/FillInScreenshotAttach';
 import { Spinner } from '@/components/ui/spinner';
-import {
-  buildFillInQuestionPointsMap,
-  displayFillAnswer,
-  formatFillQuestionPoints,
-  parseFillInTitleQuestionNo,
-  resolveFillQuestionLeaderId,
-} from '@/lib/fillin';
+import { displayFillAnswer, resolveFillQuestionLeaderId } from '@/lib/fillin';
+import { splitPreviewHtmlByQuestionRaw } from '@/lib/fillin-preview-split';
 import { examQuestionAnchorId } from '@/lib/exam-question-nav';
 import { ApiError, studentApi } from '@/lib/student';
 import type {
@@ -45,19 +34,6 @@ type PreviewCacheEntry = {
   version: string;
 };
 
-type ParsedPreviewNode =
-  | string
-  | {
-      kind: 'element';
-      tag: string;
-      attrs: Record<string, string>;
-      children: ParsedPreviewNode[];
-    }
-  | {
-      kind: 'input';
-      attrs: Record<string, string>;
-    };
-
 /** 同场考试切 tab 不重复请求；配合 HTTP ETag / 图片 immutable 缓存。 */
 const previewByExam = new Map<string, PreviewCacheEntry>();
 
@@ -66,99 +42,33 @@ function fillRowKey(row: FillRow): string | null {
   return `${row.fillQuestionNo}::${row.fillBlankIndex}`;
 }
 
-function parsePreviewNode(node: ChildNode): ParsedPreviewNode | null {
-  if (node.nodeType === Node.TEXT_NODE) {
-    return node.textContent ?? '';
-  }
-  if (node.nodeType !== Node.ELEMENT_NODE) {
-    return null;
-  }
-
-  const el = node as HTMLElement;
-  const tag = el.tagName.toLowerCase();
-  if (tag === 'script' || tag === 'style') {
-    return null;
-  }
-
-  const attrs: Record<string, string> = {};
-  for (const attr of Array.from(el.attributes)) {
-    const name = attr.name.toLowerCase();
-    if (name.startsWith('on')) continue;
-    attrs[name] = attr.value;
-  }
-
-  if (tag === 'input' && el.classList.contains('fillin-inline-input')) {
-    return { kind: 'input', attrs };
-  }
-
-  return {
-    kind: 'element',
-    tag,
-    attrs,
-    children: Array.from(el.childNodes)
-      .map(parsePreviewNode)
-      .filter((child): child is ParsedPreviewNode => child !== null),
-  };
+function resolveInputRow(
+  el: HTMLInputElement,
+  fillRowsByKey: Map<string, FillRow>,
+  fillRows: FillRow[],
+  fallbackIndex: number,
+): FillRow | undefined {
+  const questionNo = el.getAttribute('data-fillin-question-no');
+  const blankIndex = el.getAttribute('data-fillin-blank-index');
+  const order = Number(el.getAttribute('data-fillin-order') ?? fallbackIndex);
+  return questionNo && blankIndex
+    ? fillRowsByKey.get(`${questionNo}::${blankIndex}`) ?? fillRows[order]
+    : fillRows[order];
 }
 
-function parseInlinePreviewHtml(html: string): ParsedPreviewNode[] | null {
-  if (!html.includes('fillin-inline-input')) return null;
-  const doc = new DOMParser().parseFromString(
-    `<div data-root="true">${html}</div>`,
-    'text/html',
+/** 仅随 html 变化重渲染，避免作答 state 更新时 React 重置 innerHTML 导致失焦。 */
+const FillInQuestionBody = memo(function FillInQuestionBody({
+  html,
+}: {
+  html: string;
+}) {
+  return (
+    <div
+      className="fillin-question-body"
+      dangerouslySetInnerHTML={{ __html: html }}
+    />
   );
-  const root = doc.body.querySelector('[data-root="true"]');
-  if (!root) return null;
-  return Array.from(root.childNodes)
-    .map(parsePreviewNode)
-    .filter((node): node is ParsedPreviewNode => node !== null);
-}
-
-function reactPropsFromAttrs(
-  attrs: Record<string, string>,
-): Record<string, string | number | boolean> {
-  const props: Record<string, string | number | boolean> = {};
-  for (const [name, value] of Object.entries(attrs)) {
-    if (name === 'class') {
-      props.className = value;
-      continue;
-    }
-    if (name === 'style') continue;
-    if (name === 'colspan' || name === 'rowspan') {
-      props[name === 'colspan' ? 'colSpan' : 'rowSpan'] = Number(value);
-      continue;
-    }
-    if (name === 'autocomplete') {
-      props.autoComplete = value;
-      continue;
-    }
-    if (name === 'tabindex') {
-      props.tabIndex = Number(value);
-      continue;
-    }
-    props[name] = value;
-  }
-  return props;
-}
-
-function extractTitleQuestionNo(node: ParsedPreviewNode): string | null {
-  if (typeof node === 'string' || node.kind === 'input') return null;
-  if (
-    node.tag === 'p' &&
-    (node.attrs.class ?? '').includes('fillin-inline-title')
-  ) {
-    const text = node.children
-      .filter((child): child is string => typeof child === 'string')
-      .join('')
-      .trim();
-    return parseFillInTitleQuestionNo(text);
-  }
-  for (const child of node.children) {
-    const qNo = extractTitleQuestionNo(child);
-    if (qNo) return qNo;
-  }
-  return null;
-}
+});
 
 export function StudentFillInWordViewer({
   examId,
@@ -173,9 +83,9 @@ export function StudentFillInWordViewer({
   const [html, setHtml] = useState<string | null>(cached?.html ?? null);
   const [loading, setLoading] = useState(!cached);
   const [error, setError] = useState<string | null>(null);
-  const parsedInlinePreviewRef = useRef<ParsedPreviewNode[] | null>(null);
-  const parsedInlinePreviewHtmlRef = useRef<string | null>(null);
-  const htmlFallbackRef = useRef<HTMLDivElement>(null);
+  const previewRootRef = useRef<HTMLDivElement>(null);
+  const onAnswerChangeRef = useRef(onAnswerChange);
+  const answersRef = useRef(answers);
 
   const fillRows = useMemo(
     () =>
@@ -194,33 +104,16 @@ export function StudentFillInWordViewer({
     return map;
   }, [fillRows]);
 
-  const pointsByQuestionNo = useMemo(
-    () => buildFillInQuestionPointsMap(fillRows),
-    [fillRows],
-  );
+  const fillRowsRef = useRef(fillRows);
+  const fillRowsByKeyRef = useRef(fillRowsByKey);
+  onAnswerChangeRef.current = onAnswerChange;
+  answersRef.current = answers;
+  fillRowsRef.current = fillRows;
+  fillRowsByKeyRef.current = fillRowsByKey;
 
-  const multiBlankByQuestion = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const row of fillRows) {
-      const key = row.fillQuestionNo ?? row.examQuestionId;
-      counts.set(key, (counts.get(key) ?? 0) + 1);
-    }
-    return counts;
-  }, [fillRows]);
-
-  const inlinePreviewNodes = useMemo(() => {
-    if (!html) {
-      parsedInlinePreviewHtmlRef.current = null;
-      parsedInlinePreviewRef.current = null;
-      return null;
-    }
-    if (parsedInlinePreviewHtmlRef.current === html) {
-      return parsedInlinePreviewRef.current;
-    }
-    const parsed = parseInlinePreviewHtml(html);
-    parsedInlinePreviewHtmlRef.current = html;
-    parsedInlinePreviewRef.current = parsed;
-    return parsed;
+  const htmlSegments = useMemo(() => {
+    if (!html) return null;
+    return splitPreviewHtmlByQuestionRaw(html);
   }, [html]);
 
   useEffect(() => {
@@ -237,7 +130,10 @@ export function StudentFillInWordViewer({
     setError(null);
     void (async () => {
       try {
-        const data = await studentApi.fetchFillInWordPreview(examId);
+        const data = await studentApi.fetchFillInWordPreview(
+          examId,
+          previewByExam.get(examId)?.version,
+        );
         if (cancelled) return;
         if ('notModified' in data && data.notModified) {
           const again = previewByExam.get(examId);
@@ -267,223 +163,82 @@ export function StudentFillInWordViewer({
   }, [examId]);
 
   useEffect(() => {
-    if (!html || inlinePreviewNodes || !htmlFallbackRef.current) return;
+    const root = previewRootRef.current;
+    if (!root || !htmlSegments) return;
 
-    const root = htmlFallbackRef.current;
-
-    for (const title of root.querySelectorAll('.fillin-inline-title')) {
-      const qNo = parseFillInTitleQuestionNo(title.textContent ?? '');
-      if (!qNo) continue;
-      const points = pointsByQuestionNo.get(qNo);
-      if (points == null) continue;
-      if (title.querySelector('.fillin-inline-points')) continue;
-      const span = document.createElement('span');
-      span.className = 'fillin-inline-points';
-      span.textContent = ` · ${formatFillQuestionPoints(points)} 分`;
-      title.appendChild(span);
-    }
-
-    const inputs = root.querySelectorAll('input.fillin-inline-input');
     let fallbackIndex = 0;
-    for (const input of inputs) {
+    for (const input of root.querySelectorAll('input.fillin-inline-input')) {
       const el = input as HTMLInputElement;
-      const questionNo = el.getAttribute('data-fillin-question-no');
-      const blankIndex = el.getAttribute('data-fillin-blank-index');
-      const order = Number(el.getAttribute('data-fillin-order') ?? fallbackIndex);
-      const row =
-        questionNo && blankIndex
-          ? fillRowsByKey.get(`${questionNo}::${blankIndex}`) ??
-            fillRows[order]
-          : fillRows[order];
+      const row = resolveInputRow(
+        el,
+        fillRowsByKeyRef.current,
+        fillRowsRef.current,
+        fallbackIndex,
+      );
       fallbackIndex += 1;
+
       if (row) {
         el.id = examQuestionAnchorId(row.examQuestionId);
         el.classList.add('scroll-mt-4');
-        const groupKey = row.fillQuestionNo ?? row.examQuestionId;
-        if ((multiBlankByQuestion.get(groupKey) ?? 0) > 1) {
-          el.setAttribute(
-            'aria-label',
-            `第 ${questionNo ?? '—'} 题第 ${blankIndex ?? '—'} 空（${formatFillQuestionPoints(row.points)} 分）`,
-          );
-        }
-      }
-    }
-  }, [
-    html,
-    inlinePreviewNodes,
-    fillRows,
-    fillRowsByKey,
-    pointsByQuestionNo,
-    multiBlankByQuestion,
-  ]);
-
-  function resolveInlineInputRow(
-    attrs: Record<string, string>,
-    fallbackIndex: number,
-  ): FillRow | undefined {
-    const questionNo = attrs['data-fillin-question-no'];
-    const blankIndex = attrs['data-fillin-blank-index'];
-    const order = Number(attrs['data-fillin-order'] ?? fallbackIndex);
-    return questionNo && blankIndex
-      ? fillRowsByKey.get(`${questionNo}::${blankIndex}`) ?? fillRows[order]
-      : fillRows[order];
-  }
-
-  function renderPreviewNode(
-    node: ParsedPreviewNode,
-    key: string,
-    inputIndex: { current: number },
-  ): ReactNode {
-    if (typeof node === 'string') return node;
-
-    if (node.kind === 'input') {
-      const index = inputIndex.current;
-      inputIndex.current += 1;
-      const row = resolveInlineInputRow(node.attrs, index);
-      const props = reactPropsFromAttrs(node.attrs);
-      if (!row) {
-        return createElement('input', {
-          ...props,
-          key,
-          disabled: true,
-          readOnly: true,
-        });
-      }
-
-      const groupKey = row.fillQuestionNo ?? row.examQuestionId;
-      const showBlankPoints = (multiBlankByQuestion.get(groupKey) ?? 0) > 1;
-      const questionNo = node.attrs['data-fillin-question-no'];
-      const blankIndex = node.attrs['data-fillin-blank-index'];
-      const ariaLabel =
-        showBlankPoints && questionNo && blankIndex
-          ? `第 ${questionNo} 题第 ${blankIndex} 空（${formatFillQuestionPoints(row.points)} 分）`
-          : props['aria-label'];
-
-      const inputEl = createElement('input', {
-        ...props,
-        key: `${row.examQuestionId}-input`,
-        id: examQuestionAnchorId(row.examQuestionId),
-        className: cn(
-          typeof props.className === 'string' ? props.className : undefined,
-          'scroll-mt-4',
-        ),
-        'aria-label': ariaLabel,
-        value: displayFillAnswer(answers[row.examQuestionId] ?? ''),
-        disabled: readOnly,
-        readOnly,
-        onChange: (event) =>
-          onAnswerChange(row.examQuestionId, event.currentTarget.value),
-      });
-
-      if (!showBlankPoints) {
-        return inputEl;
-      }
-
-      return createElement(
-        'span',
-        { key: row.examQuestionId, className: 'inline' },
-        createElement(
-          'span',
-          { className: 'fillin-inline-blank-points', key: 'pts' },
-          `${formatFillQuestionPoints(row.points)}分 `,
-        ),
-        inputEl,
-      );
-    }
-
-    if (
-      node.kind === 'element' &&
-      node.tag === 'p' &&
-      (node.attrs.class ?? '').includes('fillin-inline-title')
-    ) {
-      const titleText = node.children
-        .filter((child): child is string => typeof child === 'string')
-        .join('')
-        .trim();
-      const qNo = parseFillInTitleQuestionNo(titleText);
-      const totalPoints = qNo ? pointsByQuestionNo.get(qNo) : undefined;
-      const hasPointsSpan = node.children.some(
-        (child) =>
-          typeof child !== 'string' &&
-          child.kind === 'element' &&
-          child.tag === 'span' &&
-          (child.attrs.class ?? '').includes('fillin-inline-points'),
-      );
-      const props = reactPropsFromAttrs(node.attrs);
-      const children = node.children
-        .filter(
-          (child) =>
-            !(
-              typeof child !== 'string' &&
-              child.kind === 'element' &&
-              child.tag === 'span' &&
-              (child.attrs.class ?? '').includes('fillin-inline-points')
-            ),
-        )
-        .map((child, index) =>
-          renderPreviewNode(child, `${key}-${index}`, inputIndex),
-        );
-      return createElement(
-        'p',
-        { ...props, key },
-        ...children,
-        totalPoints != null && !hasPointsSpan
-          ? createElement(
-              'span',
-              { key: 'pts', className: 'fillin-inline-points' },
-              ` · ${formatFillQuestionPoints(totalPoints)} 分`,
-            )
-          : null,
-      );
-    }
-
-    if (
-      node.kind === 'element' &&
-      node.tag === 'section' &&
-      (node.attrs.class ?? '').includes('fillin-inline-question')
-    ) {
-      const qNo = extractTitleQuestionNo(node);
-      const leaderId = qNo ? resolveFillQuestionLeaderId(fillRows, qNo) : null;
-      const props = reactPropsFromAttrs(node.attrs);
-      const children = node.children.map((child, index) =>
-        renderPreviewNode(child, `${key}-${index}`, inputIndex),
-      );
-      if (leaderId) {
-        children.push(
-          createElement(
-            'div',
-            {
-              key: `screenshots-${leaderId}`,
-              className: 'fillin-inline-screenshots',
-            },
-            createElement(FillInScreenshotAttach, {
-              examId,
-              examQuestionId: leaderId,
-              screenshots: screenshotsByQuestion[leaderId] ?? [],
-              readOnly,
-              onScreenshotsChange,
-              variant: 'inline-card',
-            }),
-          ),
+        el.value = displayFillAnswer(
+          answersRef.current[row.examQuestionId] ?? '',
         );
       }
-      return createElement('section', { ...props, key }, ...children);
+
+      el.disabled = readOnly;
+      el.readOnly = readOnly;
     }
 
-    const props = reactPropsFromAttrs(node.attrs);
-    const children = node.children.map((child, index) =>
-      renderPreviewNode(child, `${key}-${index}`, inputIndex),
-    );
-    return createElement(node.tag, { ...props, key }, ...children);
-  }
+    if (readOnly) return;
 
-  function renderInlinePreview(): ReactNode {
-    if (!inlinePreviewNodes) return null;
-    const inputIndex = { current: 0 };
-    return inlinePreviewNodes.map((node, index) =>
-      renderPreviewNode(node, String(index), inputIndex),
-    );
-  }
+    const onInput = (event: Event) => {
+      const target = event.target;
+      if (
+        !(target instanceof HTMLInputElement) ||
+        !target.classList.contains('fillin-inline-input')
+      ) {
+        return;
+      }
+      const row = resolveInputRow(
+        target,
+        fillRowsByKeyRef.current,
+        fillRowsRef.current,
+        Number(target.getAttribute('data-fillin-order') ?? 0),
+      );
+      if (row) {
+        onAnswerChangeRef.current(row.examQuestionId, target.value);
+      }
+    };
+
+    root.addEventListener('input', onInput);
+    return () => root.removeEventListener('input', onInput);
+  }, [htmlSegments, readOnly]);
+
+  useEffect(() => {
+    const root = previewRootRef.current;
+    if (!root) return;
+
+    let fallbackIndex = 0;
+    for (const input of root.querySelectorAll('input.fillin-inline-input')) {
+      const el = input as HTMLInputElement;
+      const row = resolveInputRow(
+        el,
+        fillRowsByKeyRef.current,
+        fillRowsRef.current,
+        fallbackIndex,
+      );
+      fallbackIndex += 1;
+
+      el.disabled = readOnly;
+      el.readOnly = readOnly;
+      if (!row || el === document.activeElement) continue;
+
+      const nextValue = displayFillAnswer(answers[row.examQuestionId] ?? '');
+      if (el.value !== nextValue) {
+        el.value = nextValue;
+      }
+    }
+  }, [answers, readOnly]);
 
   return (
     <div>
@@ -496,17 +251,58 @@ export function StudentFillInWordViewer({
         {error ? (
           <p className="text-sm text-destructive">{error}</p>
         ) : null}
-        {!loading && !error && inlinePreviewNodes ? (
-          <div className="fillin-word-preview max-w-none text-2xl leading-relaxed text-foreground">
-            {renderInlinePreview()}
-          </div>
-        ) : null}
-        {!loading && !error && html && !inlinePreviewNodes ? (
+        {!loading && !error && htmlSegments ? (
           <div
-            ref={htmlFallbackRef}
-            className="fillin-word-preview max-w-none text-2xl leading-relaxed text-foreground [&_img]:max-w-full [&_li]:my-1 [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:mb-3 [&_table]:my-3 [&_table]:w-full [&_table]:border-collapse [&_td]:border [&_td]:border-border [&_td]:p-2 [&_th]:border [&_th]:border-border [&_th]:bg-muted [&_th]:p-2 [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5"
-            dangerouslySetInnerHTML={{ __html: html }}
-          />
+            ref={previewRootRef}
+            className="fillin-word-preview fillin-split-layout max-w-none text-xl leading-relaxed text-foreground [&_img]:max-w-full [&_li]:my-1 [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:mb-3 [&_table]:my-3 [&_table]:w-full [&_table]:border-collapse [&_td]:border [&_td]:border-border [&_td]:p-2 [&_th]:border [&_th]:border-border [&_th]:bg-muted [&_th]:p-2 [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5"
+          >
+            {htmlSegments.map((segment, segIdx) => {
+              const leaderId = segment.questionNo
+                ? resolveFillQuestionLeaderId(fillRows, segment.questionNo)
+                : null;
+              const isEmbeddedImage =
+                !segment.questionNo && /<img[\s>]/i.test(segment.html);
+
+              return (
+                <section
+                  key={`seg-${segIdx}-${segment.questionNo ?? 'pre'}`}
+                  className={cn(
+                    'fillin-question-block',
+                    !leaderId && 'fillin-question-block--no-shots',
+                    isEmbeddedImage && 'fillin-question-block--embedded-image',
+                  )}
+                >
+                  {segment.html ? (
+                    <div className="fillin-question-main">
+                      <FillInQuestionBody html={segment.html} />
+                    </div>
+                  ) : null}
+                  {leaderId ? (
+                    <aside
+                      className="fillin-question-screenshots"
+                      aria-label={`第 ${segment.questionNo} 题截图`}
+                    >
+                      <p className="mb-1 flex items-center gap-1 text-sm font-semibold text-foreground">
+                        <ImagePlus className="size-3.5 shrink-0 text-amber-700" aria-hidden />
+                        第 {segment.questionNo} 题截图
+                      </p>
+                      <p className="mb-2 text-xs text-muted-foreground">
+                        佐证，不计分
+                      </p>
+                      <FillInScreenshotAttach
+                        examId={examId}
+                        examQuestionId={leaderId}
+                        screenshots={screenshotsByQuestion[leaderId] ?? []}
+                        readOnly={readOnly}
+                        onScreenshotsChange={onScreenshotsChange}
+                        variant="sidebar"
+                      />
+                    </aside>
+                  ) : null}
+                </section>
+              );
+            })}
+          </div>
         ) : null}
       </div>
     </div>

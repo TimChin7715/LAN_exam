@@ -35,21 +35,19 @@ Phase A / B 已落地；真机双机验收仍需在目标环境执行。
 
 ### 管理台
 
-- 题库管理支持三类内容：
+- 题库管理支持两类内容：
   - 客观题：Excel 导入，支持单选 / 多选 / 判断。
-  - 填空题：Word 题目 + Excel 答题卡 + 可选附件；答题卡工作表名为 `答题卡`，列为“题号 / 答案 / 分值”。
-  - 操作题：Word 试卷 + Excel / CSV 附件；不自动计分。
+  - 操作题：仅 Word 导入 + 可选附件；空位格式为【标准答案】（分值），例如【北京|北平】（2分）；多个可接受答案用 `|` 分隔。
 - 名单导入字段固定为“姓名 / 单位 / 身份证号”。
-- 考试可组合 `OBJECTIVE` / `FILL` / `PRACTICAL` 三种内容模块。
+- 考试可组合 `OBJECTIVE` / `FILL` 两种内容模块。
 - 设置页支持：
   - `showSeatBoard`：控制学员登录页与考试详情是否显示座位表。
-  - “清除全部数据”：删除当前考官账号下的考试、题库、名单、填空题 / 操作题批次与相关上传文件；设置本身保留。
+  - “清除全部数据”：删除当前考官账号下的考试、题库、名单、操作题批次与相关上传文件；设置本身保留。
 - 考试详情支持：
   - 开始 / 结束考试
   - 查看随机分配后的座位表
-  - 导出成绩（成绩汇总 + 客观题答题明细 + 填空题明细）
-- 导出填空题截图（已交卷学员 ZIP；按学员分文件夹，文件名按答题卡题号命名为 `第一题01`、`第一题02`、`第二题01`…）
-  - 下载学员操作题答卷
+  - 导出成绩（成绩汇总 + 客观题答题明细 + 操作题明细）
+- 导出操作题截图（已交卷学员 ZIP；按学员分文件夹，文件名按答题卡题号命名为 `第一题01`、`第一题02`、`第二题01`…）
 
 ### 学员端
 
@@ -60,8 +58,8 @@ Phase A / B 已落地；真机双机验收仍需在目标环境执行。
   - `/exam/take`
   - `/exam/submitted`
   - `/exam/ended`
-- 客观题与填空题作答会自动保存（2 秒防抖 `PUT /api/student/exam/answers`）；另每约 60 秒（按身份证号抖动）通过 `POST /api/student/exam/sync-progress` 将当前作答全量 reconcile 至服务端（`examSyncGate` FIFO 排队），便于断网/换机续考；填空题每空可上传或粘贴截图（佐证，不参与自动评分，即时上传）；操作题可上传 `.doc` / `.docx` 作答文件。**手动交卷**：若有未作答客观/填空或尚未上传操作题，确认框会列出缺项，学员确认后仍可提交（未答按 0 分计）。
-- **到点自动交卷**：到达创建考试时设定的 `scheduledEndAt` 后，服务端定时任务（`lib/exam/deadline-scheduler.ts`）会对未交卷学员按 deadline 规则强制交卷（已保存作答计分，未答客观/填空按 0 分），并自动将考试设为 `ENDED`；学员作答页显示倒计时，到点也会主动调用交卷 API。操作题若无上传草稿则到点不交操作题卷。
+- 客观题与操作题作答会自动保存（2 秒防抖 `PUT /api/student/exam/answers`）；另每约 60 秒（按身份证号抖动）通过 `POST /api/student/exam/sync-progress` 将当前作答全量 reconcile 至服务端（`examSyncGate` FIFO 排队），便于断网/换机续考；操作题每空可上传或粘贴截图（佐证，不参与自动评分，即时上传）。**手动交卷**：若有未作答客观/操作题，确认框会列出缺项，学员确认后仍可提交（未答按 0 分计）。
+- **到点自动交卷**：到达创建考试时设定的 `scheduledEndAt` 后，服务端定时任务（`lib/exam/deadline-scheduler.ts`）会对未交卷学员按 deadline 规则强制交卷（已保存作答计分，未答客观/操作题按 0 分），并自动将考试设为 `ENDED`；学员作答页显示倒计时，到点也会主动调用交卷 API。
 - 考官点击「结束考试」时，同样会先对未交卷学员执行上述 deadline 交卷（`lib/exam/finalize-exam-submissions.ts`），再结束考试。
 - 考试结束后：
   - 已交卷学员进入 submitted / ended 只读视图
@@ -70,8 +68,7 @@ Phase A / B 已落地；真机双机验收仍需在目标环境执行。
 ### 座位表与评分
 
 - 座位在考试维度按 `random_shuffle_v1` 自动随机分配，首次加载座位表时若无分配记录会自动生成。
-- 客观题与填空题可自动评分；混合考试总分仅累计自动评分部分。
-- 操作题答卷仅存档与下载，不参与自动总分计算。
+- 客观题与操作题可自动评分；混合考试总分仅累计自动评分部分。
 
 ## 运行时与端口
 
@@ -132,10 +129,9 @@ Phase A / B 已落地；真机双机验收仍需在目标环境执行。
 - 开发与 CI 测试样例：`fixtures/import-test/`、`fixtures/export/`（不参与运行时）
 - 上传与衍生文件位于 `DATA_DIR`（默认 `data/`）
 - 当前重要存储前缀：
-  - `fill-in-batches/{batchId}`
-  - `practical-batches/{batchId}`
-  - `exam-work/{examId}`（含操作题答卷与填空题截图 `.../{rosterEntryId}/fill-in/{examQuestionId}/{screenshotId}.{png|jpg|webp}`）
-- 填空题截图：考中 `FillInScreenshotDraft`，交卷时 `lib/fillin/finalize-screenshots.ts` 固化到 `FillInScreenshot`（绑定 `Submission`）
+  - `fill-in-batches/{batchId}`（`source.*` 考官原卷、`paper.*` 学员卷、`preview/` HTML 与图片）
+  - `exam-work/{examId}`（含操作题截图 `.../{rosterEntryId}/fill-in/{examQuestionId}/{screenshotId}.{png|jpg|webp}`）
+- 操作题截图：考中 `FillInScreenshotDraft`，交卷时 `lib/fillin/finalize-screenshots.ts` 固化到 `FillInScreenshot`（绑定 `Submission`）
 
 ## 关键代码落点
 
@@ -148,7 +144,6 @@ apps/server/src/
   lib/env.ts
   lib/exam/
   lib/fillin/
-  lib/practical/
   lib/roster/
   lib/seat/
   lib/storage/
@@ -163,9 +158,9 @@ apps/server/src/
 重点约束：
 
 - 改 admin 路由时使用 `await resolveAdminTeacherId(request)`，不要直接依赖 `getSessionTeacherId`。
-- 成绩导出：`lib/exam/export-workbook.ts`（成绩汇总 + 客观题明细 + 填空题明细）。
+- 成绩导出：`lib/exam/export-workbook.ts`（成绩汇总 + 客观题明细 + 操作题明细）。
 - 导入模板下载：`lib/templates-dir.ts`；`routes/api/admin/*-template.ts` 从 `templates/` 读取。
-- 填空题截图：`lib/fillin/finalize-screenshots.ts`、`build-screenshots-zip.ts`、`screenshot-export-name.ts`；上传校验 `lib/upload/image-file.ts`（`MAX_FILLIN_SCREENSHOT_BYTES`，每空最多 5 张）；学员 API `routes/api/student/exam-fillin-screenshots.ts`；考官导出 `routes/api/admin/exams-export-fillin-screenshots.ts`。
+- 操作题截图：`lib/fillin/finalize-screenshots.ts`、`build-screenshots-zip.ts`、`screenshot-export-name.ts`；上传校验 `lib/upload/image-file.ts`（`MAX_FILLIN_SCREENSHOT_BYTES`，每空最多 5 张）；学员 API `routes/api/student/exam-fillin-screenshots.ts`；考官导出 `routes/api/admin/exams-export-fillin-screenshots.ts`。
 - 清除全部数据：`lib/admin/clear-teacher-data.ts` + `routes/api/admin/settings.ts`。
 - 考中进度同步：`lib/exam/persist-answer-drafts.ts`、`routes/api/student/exam-sync-progress.ts`（`examSyncGate`）；交互保存仍走 `exam-answers.ts`。
 - 到点/批量交卷：`lib/exam/submit.ts`（`mode: 'strict' | 'deadline'`）、`lib/exam/finalize-exam-submissions.ts`、`lib/exam/deadline-scheduler.ts`；`endExam` 前会批量收卷。
@@ -173,7 +168,6 @@ apps/server/src/
   - `routes/api/student/exam-status.ts`
   - `lib/exam/student-ended-summary.ts`
   - `lib/exam/submit.ts`
-  - `lib/exam/submit-practical.ts`（操作题交卷前置）
 
 ### 前端
 
@@ -185,7 +179,6 @@ apps/web/src/
   components/student/*
   lib/admin-settings.ts
   lib/fillin.ts
-  lib/practical.ts
   lib/roster.ts
   lib/student.ts
   pages/Admin*.tsx
@@ -195,10 +188,10 @@ apps/web/src/
 
 重点页面：
 
-- `AdminQuestions.tsx`：客观题 / 填空题 / 操作题三标签
+- `AdminQuestions.tsx`：客观题 / 操作题两标签
 - `AdminExams.tsx`：混合考试创建
-- `AdminExamDetail.tsx`：座位表、导出成绩、导出填空题截图 ZIP、下载操作题答卷
-- `FillInScreenshotAttach.tsx` / `StudentFillInWorkspace.tsx`：学员填空题截图上传与粘贴
+- `AdminExamDetail.tsx`：座位表、导出成绩、导出操作题截图 ZIP
+- `FillInScreenshotAttach.tsx` / `StudentFillInWorkspace.tsx`：学员操作题截图上传与粘贴
 - `AdminSettings.tsx`：座位表开关、清除全部数据
 - `StudentExamTake.tsx` / `StudentExamSubmitted.tsx` / `StudentExamEnded.tsx`
 
@@ -252,4 +245,4 @@ SQLite 迁移、多考官 RBAC、HTTPS、云端更新、考后自动备份（Pha
 
 - 默认 `ADMIN_AUTH_MODE=disabled` 与 `.env.example`、种子、entrypoint 对齐。
 - `VITE_ADMIN_AUTH_MODE` 已在 `.env.example` 中启用；前后端必须成对设置。
-- 文档应以当前代码面为准：三类题型、座位表、设置页、清除全部数据、学员 submitted / ended 流程、填空题截图上传与考后 ZIP 导出均已存在。
+- 文档应以当前代码面为准：客观题 + 操作题、座位表、设置页、清除全部数据、学员 submitted / ended 流程、操作题截图上传与考后 ZIP 导出均已存在。

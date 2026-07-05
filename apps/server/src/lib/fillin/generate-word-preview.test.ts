@@ -3,6 +3,7 @@ import { describe, it } from 'node:test';
 
 import {
   FILLIN_PREVIEW_ASSET_PREFIX,
+  buildFillInPreviewVersion,
   isValidFillInPreviewImageName,
   previewVersionFromWordBuffer,
   rewriteFillInPreviewAssetUrls,
@@ -25,6 +26,13 @@ describe('generate-word-preview', () => {
       previewVersionFromWordBuffer(buf),
       previewVersionFromWordBuffer(buf),
     );
+  });
+
+  it('buildFillInPreviewVersion includes pipeline suffix', () => {
+    const buf = Buffer.from('hello');
+    const version = buildFillInPreviewVersion(buf);
+    assert.match(version, /\.p\d+$/);
+    assert.ok(version.startsWith(previewVersionFromWordBuffer(buf)));
   });
 
   it('isValidFillInPreviewImageName rejects path traversal', () => {

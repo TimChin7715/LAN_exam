@@ -22,7 +22,6 @@ const createBodySchema = z
     contentModules: contentModulesSchema,
     questionBatchId: z.string().min(1).optional(),
     fillInBatchId: z.string().min(1).optional(),
-    practicalBatchId: z.string().min(1).optional(),
     rosterBatchId: z.string().min(1),
     scheduledStartAt: z.string().datetime(),
     scheduledEndAt: z.string().datetime(),
@@ -41,7 +40,6 @@ const patchBodySchema = z
     contentModules: contentModulesSchema.optional(),
     questionBatchId: z.string().min(1).nullable().optional(),
     fillInBatchId: z.string().min(1).nullable().optional(),
-    practicalBatchId: z.string().min(1).nullable().optional(),
     rosterBatchId: z.string().min(1).optional(),
     scheduledStartAt: z.string().datetime().optional(),
     scheduledEndAt: z.string().datetime().optional(),
@@ -52,7 +50,6 @@ const patchBodySchema = z
       data.contentModules !== undefined ||
       data.questionBatchId !== undefined ||
       data.fillInBatchId !== undefined ||
-      data.practicalBatchId !== undefined ||
       data.rosterBatchId !== undefined ||
       data.scheduledStartAt !== undefined ||
       data.scheduledEndAt !== undefined,
@@ -87,15 +84,11 @@ export async function registerAdminExamsCrudRoutes(
           createdAt: true,
           questionBatch: { select: { id: true, fileName: true } },
           fillInBatch: { select: { id: true, title: true } },
-          practicalBatch: {
-            select: { id: true, title: true, wordFileName: true },
-          },
           rosterBatch: { select: { id: true, fileName: true } },
           _count: {
             select: {
               submissions: true,
               questions: true,
-              practicalSubmissions: true,
             },
           },
         },
@@ -115,11 +108,9 @@ export async function registerAdminExamsCrudRoutes(
           createdAt: exam.createdAt,
           questionBatchFileName: exam.questionBatch?.fileName ?? null,
           fillInBatchTitle: exam.fillInBatch?.title ?? null,
-          practicalBatchTitle: exam.practicalBatch?.title ?? null,
           rosterBatchFileName: exam.rosterBatch.fileName,
           questionCount: exam._count.questions,
           submissionCount: exam._count.submissions,
-          practicalSubmissionCount: exam._count.practicalSubmissions,
         })),
       });
     },
@@ -143,7 +134,6 @@ export async function registerAdminExamsCrudRoutes(
         contentModules: parsed.data.contentModules,
         questionBatchId: parsed.data.questionBatchId,
         fillInBatchId: parsed.data.fillInBatchId,
-        practicalBatchId: parsed.data.practicalBatchId,
         rosterBatchId: parsed.data.rosterBatchId,
       });
       if (!batchCheck.ok) {
@@ -163,7 +153,6 @@ export async function registerAdminExamsCrudRoutes(
               teacherId,
               questionBatchId: parsed.data.questionBatchId ?? null,
               fillInBatchId: parsed.data.fillInBatchId ?? null,
-              practicalBatchId: parsed.data.practicalBatchId ?? null,
               rosterBatchId: parsed.data.rosterBatchId,
               scheduledStartAt: new Date(parsed.data.scheduledStartAt),
               scheduledEndAt: new Date(parsed.data.scheduledEndAt),
@@ -208,15 +197,6 @@ export async function registerAdminExamsCrudRoutes(
               createdAt: true,
             },
           },
-          practicalBatch: {
-            select: {
-              id: true,
-              title: true,
-              wordFileName: true,
-              excelFileName: true,
-              createdAt: true,
-            },
-          },
           rosterBatch: { select: { id: true, fileName: true, createdAt: true } },
           questions: {
             orderBy: { sortOrder: 'asc' },
@@ -237,7 +217,7 @@ export async function registerAdminExamsCrudRoutes(
             },
           },
           _count: {
-            select: { submissions: true, practicalSubmissions: true },
+            select: { submissions: true },
           },
         },
       });
@@ -276,7 +256,6 @@ export async function registerAdminExamsCrudRoutes(
           contentModules: true,
           questionBatchId: true,
           fillInBatchId: true,
-          practicalBatchId: true,
           rosterBatchId: true,
           scheduledStartAt: true,
           scheduledEndAt: true,
@@ -308,10 +287,6 @@ export async function registerAdminExamsCrudRoutes(
         parsed.data.fillInBatchId !== undefined
           ? parsed.data.fillInBatchId
           : existing.fillInBatchId;
-      const nextPracticalBatchId =
-        parsed.data.practicalBatchId !== undefined
-          ? parsed.data.practicalBatchId
-          : existing.practicalBatchId;
       const nextRosterBatchId =
         parsed.data.rosterBatchId ?? existing.rosterBatchId;
       const nextScheduledStartAt =
@@ -343,7 +318,6 @@ export async function registerAdminExamsCrudRoutes(
         contentModules: nextModules,
         questionBatchId: nextQuestionBatchId,
         fillInBatchId: nextFillInBatchId,
-        practicalBatchId: nextPracticalBatchId,
         rosterBatchId: nextRosterBatchId,
       });
       if (!batchCheck.ok) {
@@ -384,9 +358,6 @@ export async function registerAdminExamsCrudRoutes(
                 : {}),
               ...(parsed.data.fillInBatchId !== undefined
                 ? { fillInBatchId: parsed.data.fillInBatchId }
-                : {}),
-              ...(parsed.data.practicalBatchId !== undefined
-                ? { practicalBatchId: parsed.data.practicalBatchId }
                 : {}),
               ...(parsed.data.rosterBatchId !== undefined
                 ? { rosterBatchId: parsed.data.rosterBatchId }

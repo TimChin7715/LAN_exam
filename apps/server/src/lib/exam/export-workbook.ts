@@ -5,6 +5,7 @@ import {
   displayFillAnswer,
   formatFillAnswerKeysPreview,
 } from '../fillin/export-display.js';
+import { FILL_MODULE_LABEL_ZH } from './content-labels.js';
 import { prisma } from '../prisma.js';
 import { buildSummaryRowQuestionFields } from './export-summary.js';
 import { maskNationalId } from './mask-national-id.js';
@@ -79,7 +80,7 @@ function questionTypeLabelZh(type: QuestionType): string {
     case 'JUDGE':
       return '判断';
     case 'FILL':
-      return '填空';
+      return '操作';
     default:
       return type;
   }
@@ -111,7 +112,7 @@ function toSummaryExamQuestion(row: {
 }
 
 /**
- * Builds exam export: 成绩汇总 + 答题明细（客观）+ 填空题明细.
+ * Builds exam export: 成绩汇总 + 答题明细（客观）+ 操作题明细.
  * v1 scale note: ~2000 roster × ~200 questions is the practical upper bound.
  */
 export async function buildExamExportWorkbook(
@@ -218,7 +219,7 @@ export async function buildExamExportWorkbook(
   }));
   detailSheet.getRow(1).font = { bold: true };
 
-  const fillInSheet = workbook.addWorksheet('填空题明细');
+  const fillInSheet = workbook.addWorksheet('操作题明细');
   fillInSheet.columns = FILL_IN_DETAIL_HEADERS.map((header, i) => ({
     header,
     key: [

@@ -5,9 +5,9 @@ import { Button } from '@/components/ui/button';
 
 export function AdminBackToConsoleButton() {
   return (
-    <Button variant="outline" size="sm" asChild>
+    <Button variant="outline" className="h-11 text-base" asChild>
       <Link to="/admin">
-        <ArrowLeft className="size-4" aria-hidden />
+        <ArrowLeft className="size-5" aria-hidden />
         返回控制台
       </Link>
     </Button>

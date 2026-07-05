@@ -22,7 +22,6 @@ describe('exam-paper-cache', () => {
         contentModules: ['OBJECTIVE'],
         items: [],
         fillIn: null,
-        practicalMeta: null,
       },
       scoreableQuestions: [],
     });
@@ -41,7 +40,6 @@ describe('exam-paper-cache', () => {
         contentModules: ['OBJECTIVE'],
         items: [],
         fillIn: null,
-        practicalMeta: null,
       },
       scoreableQuestions: [],
     });
@@ -58,7 +56,6 @@ describe('exam-paper-cache', () => {
         contentModules: ['OBJECTIVE'],
         items: [],
         fillIn: null,
-        practicalMeta: null,
       },
       scoreableQuestions: [],
     });

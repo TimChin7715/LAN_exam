@@ -1,22 +1,18 @@
 import type { PrismaClient } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 
-import { generateFillInWordPreview } from './generate-word-preview.js';
+import { generateFillInWordPreview, readFillInPreviewBody } from './generate-word-preview.js';
 import {
-  buildFillInInlinePreviewHtml,
-  buildFillInBlanksFromAnswerSheet,
-  buildStudentAnswerSheetExcel,
-  countFillInBlankMarkers,
-  parseAnswerSheetRows,
-} from './parse-answer-sheet.js';
+  parseWordFillDocument,
+  previewHtmlLeaksFilledAnswers,
+} from './parse-word-fill.js';
+import { sanitizeStudentWord } from './sanitize-student-word.js';
 import type { RowError } from './types.js';
 import type { FillInAttachmentExt } from '../upload/archive-file.js';
-import { spreadsheetExt } from '../upload/spreadsheet-file.js';
 import type { WordUploadExt } from '../upload/word-file.js';
 import {
   fillInBatchAttachmentItemKey,
-  fillInBatchExcelKey,
-  fillInBatchStudentExcelKey,
+  fillInBatchSourceWordKey,
   fillInBatchWordKey,
   writeStorageFile,
 } from '../storage/index.js';
@@ -34,7 +30,6 @@ export type FillInImportResult =
       title: string;
       importedCount: number;
       wordFileName: string;
-      excelFileName: string;
       attachmentCount: number;
       attachmentFileNames: string[];
     }
@@ -43,51 +38,26 @@ export type FillInImportResult =
       errors: RowError[];
     };
 
-function validateInlineBlankMarkers(
-  blanks: ReturnType<typeof buildFillInBlanksFromAnswerSheet>,
-): RowError[] {
-  const groups = new Map<number, typeof blanks>();
-  for (const blank of blanks) {
-    const list = groups.get(blank.questionNo) ?? [];
-    list.push(blank);
-    groups.set(blank.questionNo, list);
-  }
-
-  const errors: RowError[] = [];
-  for (const [questionNo, group] of groups) {
-    const stem = group.find((blank) => blank.stem.trim())?.stem.trim() ?? '';
-    const markerCount = countFillInBlankMarkers(stem);
-    if (markerCount !== group.length) {
-      errors.push({
-        row: group[0]?.rowNumber ?? 0,
-        column: '题干',
-        message: `第 ${questionNo} 题有 ${group.length} 个空位答案，题干中也必须写 ${group.length} 个【】。`,
-      });
-    }
-  }
-  return errors;
-}
-
 export async function importFillInBatch(
   prisma: PrismaClient,
   input: {
     teacherId: string;
     batchId: string;
     title: string;
-    wordFileName?: string;
-    wordExt?: WordUploadExt;
-    wordBuffer?: Buffer;
-    excelFileName: string;
-    excelBuffer: Buffer;
+    wordFileName: string;
+    wordExt: WordUploadExt;
+    wordBuffer: Buffer;
     attachments?: FillInImportAttachmentInput[];
   },
 ): Promise<FillInImportResult> {
-  const { rows, errors: parseErrors } = await parseAnswerSheetRows(input.excelBuffer);
+  const { blanks, errors: parseErrors } = await parseWordFillDocument(
+    input.wordBuffer,
+    input.wordFileName,
+  );
   if (parseErrors.length > 0) {
     return { ok: false, errors: parseErrors };
   }
 
-  const blanks = buildFillInBlanksFromAnswerSheet(rows);
   if (blanks.length === 0) {
     return {
       ok: false,
@@ -95,58 +65,55 @@ export async function importFillInBatch(
         {
           row: 0,
           message:
-            '答题卡中没有可导入的空位。请确认：① 工作表名为「答题卡」；② 已删除【示例】/【说明】行；③ 每行填写题号、答案与分值。',
+            'Word 中没有可导入的空位。请确认每空使用【答案】（分值）格式，例如【北京|北平】（2分）；并删除【示例】/【说明】行。',
         },
       ],
     };
   }
 
-  const hasUploadedWord = Boolean(input.wordFileName && input.wordExt && input.wordBuffer);
-  if (!hasUploadedWord && blanks.every((blank) => !blank.stem.trim())) {
-    return {
-      ok: false,
-      errors: [
-        {
-          row: 0,
-          column: '题干',
-          message:
-            '未上传 Word 时，Excel 中至少需要填写一个真实题干，用于生成考试端试卷预览。',
-        },
-      ],
-    };
-  }
-  if (!hasUploadedWord) {
-    const markerErrors = validateInlineBlankMarkers(blanks);
-    if (markerErrors.length > 0) {
-      return { ok: false, errors: markerErrors };
+  const sourceWordKey = fillInBatchSourceWordKey(input.batchId, input.wordExt);
+  const paperBuffer = await sanitizeStudentWord(input.wordBuffer, input.wordExt);
+  const paperKey = fillInBatchWordKey(input.batchId, input.wordExt);
+
+  await writeStorageFile(sourceWordKey, input.wordBuffer);
+  await writeStorageFile(paperKey, paperBuffer);
+
+  const previewMeta = await generateFillInWordPreview(
+    input.batchId,
+    paperBuffer,
+    input.wordFileName,
+    blanks,
+  );
+
+  if (input.wordExt === 'docx') {
+    const previewBody = await readFillInPreviewBody(input.batchId);
+    const inputCount = (previewBody.match(/fillin-inline-input/g) ?? []).length;
+    if (inputCount !== blanks.length) {
+      return {
+        ok: false,
+        errors: [
+          {
+            row: 0,
+            message: `Word 预览中注入 ${inputCount} 个作答框，与导入的 ${blanks.length} 个空位不一致。请检查空位格式是否为【答案】（分值），并避免将空位拆到复杂表格结构中；若第 1 题被 Word 自动编号，请改用「第1题、」或重新导入未编辑过的试卷。`,
+          },
+        ],
+      };
+    }
+    if (previewHtmlLeaksFilledAnswers(previewBody)) {
+      return {
+        ok: false,
+        errors: [
+          {
+            row: 0,
+            message:
+              'Word 预览中仍显示标准答案。请勿在题目中插入无关图片或破坏题号格式；请重新下载模板填写后导入，或删除 Word 自动编号后再试。',
+          },
+        ],
+      };
     }
   }
 
-  const studentExcelBuffer = await buildStudentAnswerSheetExcel(blanks);
-  const generatedHtml = hasUploadedWord ? null : buildFillInInlinePreviewHtml(blanks);
-  const wordExt = hasUploadedWord ? input.wordExt! : 'html';
-  const wordFileName = hasUploadedWord
-    ? input.wordFileName!
-    : `${input.excelFileName.replace(/\.(xlsx?|xls)$/i, '').trim() || input.title}-题目.html`;
-  const wordBuffer = hasUploadedWord
-    ? input.wordBuffer!
-    : Buffer.from(generatedHtml!, 'utf8');
-  const excelExt = spreadsheetExt(input.excelFileName) ?? 'xlsx';
-  const wordKey = fillInBatchWordKey(input.batchId, wordExt);
-  const excelKey = fillInBatchExcelKey(
-    input.batchId,
-    excelExt === 'xls' ? 'xls' : 'xlsx',
-  );
-  const studentExcelKey = fillInBatchStudentExcelKey(input.batchId);
-
-  await writeStorageFile(wordKey, wordBuffer);
-  await generateFillInWordPreview(
-    input.batchId,
-    wordBuffer,
-    wordFileName,
-  );
-  await writeStorageFile(excelKey, input.excelBuffer);
-  await writeStorageFile(studentExcelKey, studentExcelBuffer);
+  void previewMeta;
 
   const attachments = input.attachments ?? [];
   const storedAttachments: {
@@ -169,21 +136,25 @@ export async function importFillInBatch(
     });
   }
 
+  const studentWordFileName = input.wordFileName;
+
   await prisma.$transaction(async (tx) => {
+    // Prisma client types refresh after `pnpm db:migrate` (20260703120000_fillin_word_only).
     await tx.fillInQuestionImportBatch.create({
       data: {
         id: input.batchId,
         teacherId: input.teacherId,
         title: input.title,
-        wordFileName,
-        wordStorageKey: wordKey,
-        excelFileName: input.excelFileName,
-        excelStorageKey: excelKey,
-        studentExcelStorageKey: studentExcelKey,
+        wordFileName: studentWordFileName,
+        wordStorageKey: paperKey,
+        sourceWordStorageKey: sourceWordKey,
+        excelFileName: null,
+        excelStorageKey: null,
+        studentExcelStorageKey: null,
         attachmentFileName: null,
         attachmentStorageKey: null,
         importedCount: blanks.length,
-      },
+      } as Parameters<typeof tx.fillInQuestionImportBatch.create>[0]['data'],
     });
 
     for (const att of storedAttachments) {
@@ -221,8 +192,7 @@ export async function importFillInBatch(
     batchId: input.batchId,
     title: input.title,
     importedCount: blanks.length,
-    wordFileName,
-    excelFileName: input.excelFileName,
+    wordFileName: studentWordFileName,
     attachmentCount: storedAttachments.length,
     attachmentFileNames: storedAttachments.map((a) => a.fileName),
   };

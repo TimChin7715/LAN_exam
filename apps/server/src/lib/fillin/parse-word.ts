@@ -4,7 +4,7 @@ import WordExtractor from 'word-extractor';
 import { wordUploadExt } from '../upload/word-file.js';
 import type { WordQuestionSegment } from './types.js';
 
-const QUESTION_SPLIT_RE = /(?:^|\n)\s*(\d+)\s*[\.、\)]\s*/g;
+const QUESTION_SPLIT_RE = /(?:^|\n)\s*(\d+)\.\s*/g;
 
 async function extractWordText(buffer: Buffer, filename?: string): Promise<string> {
   const ext = wordUploadExt(filename);
@@ -43,9 +43,7 @@ export async function parseWordQuestions(
     const cur = matches[i]!;
     const next = matches[i + 1];
     const headerEnd = normalized.indexOf('.', cur.index) + 1;
-    const altEnd = normalized.indexOf('、', cur.index) + 1;
-    const parenEnd = normalized.indexOf(')', cur.index) + 1;
-    const endMarker = Math.max(headerEnd, altEnd, parenEnd, cur.index + 1);
+    const endMarker = Math.max(headerEnd, cur.index + 1);
     const bodyStart =
       normalized[endMarker] === ' ' || normalized[endMarker] === '\n'
         ? endMarker + 1

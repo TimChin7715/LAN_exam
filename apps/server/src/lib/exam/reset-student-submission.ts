@@ -1,9 +1,6 @@
 import type { ExamContentModule } from '@prisma/client';
 
-import {
-  requiresPracticalBatch,
-  requiresQuestionSubmission,
-} from './content-mode.js';
+import { requiresQuestionSubmission } from './content-mode.js';
 import { RetakeExamError } from './types.js';
 import { prisma } from '../prisma.js';
 import { deleteStorageTree } from '../storage/index.js';
@@ -11,13 +8,8 @@ import { deleteStorageTree } from '../storage/index.js';
 function isStudentSubmitted(
   contentModules: ExamContentModule[],
   hasSubmission: boolean,
-  hasPracticalSubmission: boolean,
 ): boolean {
-  const questionsDone =
-    !requiresQuestionSubmission(contentModules) || hasSubmission;
-  const practicalDone =
-    !requiresPracticalBatch(contentModules) || hasPracticalSubmission;
-  return questionsDone && practicalDone;
+  return !requiresQuestionSubmission(contentModules) || hasSubmission;
 }
 
 export async function resetStudentExamSubmission(input: {
@@ -58,28 +50,14 @@ export async function resetStudentExamSubmission(input: {
     throw new RetakeExamError(404, 'ROSTER_ENTRY_NOT_FOUND', '考生不存在');
   }
 
-  const [submission, practicalSubmission] = await Promise.all([
-    requiresQuestionSubmission(exam.contentModules)
-      ? prisma.submission.findUnique({
-          where: { examId_rosterEntryId: { examId, rosterEntryId } },
-          select: { id: true },
-        })
-      : Promise.resolve(null),
-    requiresPracticalBatch(exam.contentModules)
-      ? prisma.practicalSubmission.findUnique({
-          where: { examId_rosterEntryId: { examId, rosterEntryId } },
-          select: { id: true },
-        })
-      : Promise.resolve(null),
-  ]);
+  const submission = requiresQuestionSubmission(exam.contentModules)
+    ? await prisma.submission.findUnique({
+        where: { examId_rosterEntryId: { examId, rosterEntryId } },
+        select: { id: true },
+      })
+    : null;
 
-  if (
-    !isStudentSubmitted(
-      exam.contentModules,
-      Boolean(submission),
-      Boolean(practicalSubmission),
-    )
-  ) {
+  if (!isStudentSubmitted(exam.contentModules, Boolean(submission))) {
     throw new RetakeExamError(
       409,
       'NOT_SUBMITTED',
@@ -91,16 +69,8 @@ export async function resetStudentExamSubmission(input: {
     if (submission) {
       await tx.submission.delete({ where: { id: submission.id } });
     }
-    if (practicalSubmission) {
-      await tx.practicalSubmission.delete({
-        where: { id: practicalSubmission.id },
-      });
-    }
     await tx.answerDraft.deleteMany({ where: { examId, rosterEntryId } });
     await tx.fillInScreenshotDraft.deleteMany({
-      where: { examId, rosterEntryId },
-    });
-    await tx.practicalAnswerDraft.deleteMany({
       where: { examId, rosterEntryId },
     });
   });

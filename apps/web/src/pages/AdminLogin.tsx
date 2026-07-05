@@ -12,8 +12,8 @@ import {
   CardContent,
   CardDescription,
   CardHeader,
-  CardTitle,
 } from '@/components/ui/card';
+import { adminSectionTitle } from '@/components/admin/admin-typography';
 import {
   Form,
   FormControl,
@@ -78,10 +78,10 @@ export default function AdminLogin() {
     <div className="flex min-h-svh items-center justify-center bg-background px-4 py-16">
       <Card className="w-full max-w-[400px]">
         <CardHeader className="space-y-2 pb-6">
-          <CardTitle>教师登录</CardTitle>
-          <CardDescription>局域网考试系统 · 管理端</CardDescription>
+          <h1 className={adminSectionTitle}>教师登录</h1>
+          <CardDescription className="text-base">局域网考试系统 · 管理端</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="text-base">
           <Form {...form}>
             <form
               className="space-y-4"

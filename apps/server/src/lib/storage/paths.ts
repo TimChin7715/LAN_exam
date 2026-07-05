@@ -8,41 +8,6 @@ export function getDataDir(): string {
   return path.resolve(process.cwd(), 'data');
 }
 
-export function practicalBatchWordKey(
-  batchId: string,
-  ext: 'doc' | 'docx' = 'docx',
-): string {
-  return `practical-batches/${batchId}/paper.${ext}`;
-}
-
-export function practicalBatchSpreadsheetKey(
-  batchId: string,
-  ext: 'xls' | 'xlsx' | 'csv',
-): string {
-  return `practical-batches/${batchId}/attachment.${ext}`;
-}
-
-/** @deprecated use practicalBatchSpreadsheetKey */
-export function practicalBatchExcelKey(batchId: string): string {
-  return practicalBatchSpreadsheetKey(batchId, 'xlsx');
-}
-
-export function examWorkPaperKey(
-  examId: string,
-  rosterEntryId: string,
-  ext: 'doc' | 'docx' = 'docx',
-): string {
-  return `exam-work/${examId}/${rosterEntryId}/paper.${ext}`;
-}
-
-export function examWorkAnswerKey(
-  examId: string,
-  rosterEntryId: string,
-  ext: 'doc' | 'docx' = 'docx',
-): string {
-  return `exam-work/${examId}/${rosterEntryId}/answer.${ext}`;
-}
-
 export type FillInScreenshotExt = 'png' | 'jpg' | 'webp';
 
 export function examWorkFillInScreenshotKey(
@@ -60,6 +25,14 @@ export function fillInBatchWordKey(
   ext: 'doc' | 'docx' | 'html' = 'docx',
 ): string {
   return `fill-in-batches/${batchId}/paper.${ext}`;
+}
+
+/** 考官原卷（含标准答案），不对外下发 */
+export function fillInBatchSourceWordKey(
+  batchId: string,
+  ext: 'doc' | 'docx' = 'docx',
+): string {
+  return `fill-in-batches/${batchId}/source.${ext}`;
 }
 
 export function fillInBatchPreviewMetaKey(batchId: string): string {

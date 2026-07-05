@@ -3,14 +3,21 @@ import { BookOpen } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
-import { AdminBackToConsoleButton } from '@/components/admin/AdminBackToConsoleButton';
+import { adminEmptyTitle, adminMeta } from '@/components/admin/admin-typography';
+import {
+  AdminDataTable,
+  AdminPageHeader,
+  AdminSectionCard,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/admin/AdminPagePrimitives';
 import { FillInBatchList } from '@/components/admin/fillin/FillInBatchList';
 import { FillInImportForm } from '@/components/admin/fillin/FillInImportForm';
 import { FillInImportResultSummary } from '@/components/admin/fillin/FillInImportResultSummary';
 import { ImportErrorTable } from '@/components/admin/qbank/ImportErrorTable';
-import { PracticalBatchList } from '@/components/admin/practical/PracticalBatchList';
-import { PracticalImportForm } from '@/components/admin/practical/PracticalImportForm';
-import { PracticalImportResultSummary } from '@/components/admin/practical/PracticalImportResultSummary';
 import { ImportDropzone } from '@/components/admin/qbank/ImportDropzone';
 import { ImportResultSummary } from '@/components/admin/qbank/ImportResultSummary';
 import {
@@ -26,17 +33,9 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Spinner } from '@/components/ui/spinner';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { getApiLoadErrorMessage } from '@/lib/api';
+import { cn } from '@/lib/utils';
 import {
   deleteQuestionBank,
   fetchQuestionBanks,
@@ -46,13 +45,6 @@ import {
   type QuestionBankListItem,
 } from '@/lib/qbank';
 import {
-  deletePracticalBatch,
-  fetchPracticalBatches,
-  PracticalBatchInUseError,
-  type PracticalBatchListItem,
-  type PracticalImportSuccess,
-} from '@/lib/practical';
-import {
   deleteFillInBatch,
   fetchFillInBatches,
   FillInBatchInUseError,
@@ -61,7 +53,7 @@ import {
   type FillInImportSuccess,
 } from '@/lib/fillin';
 
-type TabKey = 'objective' | 'fillin' | 'practical';
+type TabKey = 'objective' | 'fillin';
 
 function formatImportedAt(iso: string): string {
   const d = new Date(iso);
@@ -74,23 +66,12 @@ export default function AdminQuestions() {
   const [tab, setTab] = useState<TabKey>('objective');
   const listRef = useRef<HTMLDivElement>(null);
   const fillInListRef = useRef<HTMLDivElement>(null);
-  const practicalListRef = useRef<HTMLDivElement>(null);
   const [importSuccess, setImportSuccess] = useState<ImportSuccess | null>(null);
   const [importFailure, setImportFailure] = useState<ImportFailure | null>(null);
   const [banks, setBanks] = useState<QuestionBankListItem[]>([]);
   const [loadingBanks, setLoadingBanks] = useState(true);
   const [listError, setListError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [practicalBatches, setPracticalBatches] = useState<PracticalBatchListItem[]>(
-    [],
-  );
-  const [loadingPractical, setLoadingPractical] = useState(false);
-  const [practicalListError, setPracticalListError] = useState<string | null>(null);
-  const [deletingPracticalId, setDeletingPracticalId] = useState<string | null>(
-    null,
-  );
-  const [practicalImportSuccess, setPracticalImportSuccess] =
-    useState<PracticalImportSuccess | null>(null);
   const [fillInBatches, setFillInBatches] = useState<FillInBatchListItem[]>([]);
   const [loadingFillIn, setLoadingFillIn] = useState(false);
   const [fillInListError, setFillInListError] = useState<string | null>(null);
@@ -113,18 +94,6 @@ export default function AdminQuestions() {
     }
   }, []);
 
-  const loadPracticalBatches = useCallback(async () => {
-    setLoadingPractical(true);
-    setPracticalListError(null);
-    try {
-      setPracticalBatches(await fetchPracticalBatches());
-    } catch (err) {
-      setPracticalListError(getApiLoadErrorMessage(err));
-    } finally {
-      setLoadingPractical(false);
-    }
-  }, []);
-
   const loadFillInBatches = useCallback(async () => {
     setLoadingFillIn(true);
     setFillInListError(null);
@@ -140,8 +109,7 @@ export default function AdminQuestions() {
   useEffect(() => {
     void loadBanks();
     void loadFillInBatches();
-    void loadPracticalBatches();
-  }, [loadBanks, loadFillInBatches, loadPracticalBatches]);
+  }, [loadBanks, loadFillInBatches]);
 
   function handleImportSuccess(result: ImportSuccess) {
     setImportFailure(null);
@@ -164,7 +132,7 @@ export default function AdminQuestions() {
   function handleFillInImportSuccess(result: FillInImportSuccess) {
     setFillInImportFailure(null);
     setFillInImportSuccess(result);
-    toast.success(`已成功导入 ${result.importedCount} 道填空题。`);
+    toast.success(`已成功导入 ${result.importedCount} 道操作题。`);
     void loadFillInBatches();
     fillInListRef.current?.scrollIntoView({ behavior: 'smooth' });
   }
@@ -179,7 +147,7 @@ export default function AdminQuestions() {
     setDeletingFillInId(id);
     try {
       await deleteFillInBatch(id);
-      toast.success('填空题批次已删除。');
+      toast.success('操作题批次已删除。');
       void loadFillInBatches();
     } catch (err) {
       if (err instanceof FillInBatchInUseError) {
@@ -189,30 +157,6 @@ export default function AdminQuestions() {
       }
     } finally {
       setDeletingFillInId(null);
-    }
-  }
-
-  function handlePracticalImportSuccess(result: PracticalImportSuccess) {
-    setPracticalImportSuccess(result);
-    toast.success(`已成功导入操作题批次「${result.title}」。`);
-    void loadPracticalBatches();
-    practicalListRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }
-
-  async function handleDeletePractical(id: string) {
-    setDeletingPracticalId(id);
-    try {
-      await deletePracticalBatch(id);
-      toast.success('操作题批次已删除。');
-      void loadPracticalBatches();
-    } catch (err) {
-      if (err instanceof PracticalBatchInUseError) {
-        toast.error(err.message);
-      } else {
-        toast.error('删除失败，请稍后重试。');
-      }
-    } finally {
-      setDeletingPracticalId(null);
     }
   }
 
@@ -235,57 +179,32 @@ export default function AdminQuestions() {
 
   return (
     <div className="space-y-8">
-      <div className="space-y-2">
-        <AdminBackToConsoleButton />
-        <h1 className="text-xl font-semibold leading-tight text-foreground">
-          题库管理
-        </h1>
-        <div className="flex gap-2 pt-1">
-          <Button
-            type="button"
-            variant={tab === 'objective' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setTab('objective')}
-          >
-            客观题
-          </Button>
-          <Button
-            type="button"
-            variant={tab === 'fillin' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setTab('fillin')}
-          >
-            填空题
-          </Button>
-          <Button
-            type="button"
-            variant={tab === 'practical' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => {
-              if (tab !== 'practical') {
-                window.alert('当前功能正在开发中');
-              }
-              setTab('practical');
-            }}
-          >
-            操作题
-          </Button>
-        </div>
+      <AdminPageHeader title="题库管理" />
+      <div className="flex flex-wrap gap-3">
+        <Button
+          type="button"
+          variant={tab === 'objective' ? 'default' : 'outline'}
+          onClick={() => setTab('objective')}
+        >
+          客观题
+        </Button>
+        <Button
+          type="button"
+          variant={tab === 'fillin' ? 'default' : 'outline'}
+          onClick={() => setTab('fillin')}
+        >
+          操作题
+        </Button>
       </div>
 
       {tab === 'objective' ? (
         <>
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm font-semibold">导入客观题</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ImportDropzone
-                onSuccess={handleImportSuccess}
-                onFailure={handleImportFailure}
-              />
-            </CardContent>
-          </Card>
+          <AdminSectionCard title="导入客观题">
+            <ImportDropzone
+              onSuccess={handleImportSuccess}
+              onFailure={handleImportFailure}
+            />
+          </AdminSectionCard>
 
           {importSuccess ? (
             <ImportResultSummary
@@ -298,11 +217,8 @@ export default function AdminQuestions() {
             <ImportErrorTable errors={importFailure.errors} />
           ) : null}
 
-          <Card ref={listRef}>
-            <CardHeader>
-              <CardTitle className="text-sm font-semibold">已上传客观题库</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
+          <div ref={listRef}>
+            <AdminSectionCard title="已上传客观题库" contentClassName="space-y-4">
               {listError ? (
                 <Alert variant="destructive">
                   <AlertDescription className="flex flex-wrap items-center gap-3">
@@ -327,14 +243,14 @@ export default function AdminQuestions() {
               ) : banks.length === 0 ? (
                 <div className="flex flex-col items-center gap-3 py-12 text-center">
                   <BookOpen className="size-10 text-muted-foreground" aria-hidden />
-                  <h3 className="text-xl font-semibold text-foreground">暂无题库</h3>
-                  <p className="max-w-md text-base text-muted-foreground">
+                  <h3 className={adminEmptyTitle}>暂无题库</h3>
+                  <p className={cn('max-w-2xl', adminMeta)}>
                     请先下载模板并导入 Excel 文件，每次导入将生成一个题库。
                   </p>
                 </div>
               ) : (
                 <div className="overflow-x-auto">
-                  <Table>
+                  <AdminDataTable>
                     <TableHeader>
                       <TableRow>
                         <TableHead scope="col">文件名</TableHead>
@@ -399,25 +315,20 @@ export default function AdminQuestions() {
                         </TableRow>
                       ))}
                     </TableBody>
-                  </Table>
+                  </AdminDataTable>
                 </div>
               )}
-            </CardContent>
-          </Card>
+            </AdminSectionCard>
+          </div>
         </>
-      ) : tab === 'fillin' ? (
+      ) : (
         <>
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm font-semibold">导入填空题</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <FillInImportForm
-                onSuccess={handleFillInImportSuccess}
-                onFailure={handleFillInImportFailure}
-              />
-            </CardContent>
-          </Card>
+          <AdminSectionCard title="导入操作题">
+            <FillInImportForm
+              onSuccess={handleFillInImportSuccess}
+              onFailure={handleFillInImportFailure}
+            />
+          </AdminSectionCard>
 
           {fillInImportSuccess ? (
             <FillInImportResultSummary
@@ -430,11 +341,8 @@ export default function AdminQuestions() {
             <ImportErrorTable errors={fillInImportFailure.errors} />
           ) : null}
 
-          <Card ref={fillInListRef}>
-            <CardHeader>
-              <CardTitle className="text-sm font-semibold">已上传填空题库</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
+          <div ref={fillInListRef}>
+            <AdminSectionCard title="已上传操作题库" contentClassName="space-y-4">
               <FillInBatchList
                 batches={fillInBatches}
                 loading={loadingFillIn}
@@ -443,42 +351,8 @@ export default function AdminQuestions() {
                 onRetry={() => void loadFillInBatches()}
                 onDelete={(id) => void handleDeleteFillIn(id)}
               />
-            </CardContent>
-          </Card>
-        </>
-      ) : (
-        <>
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm font-semibold">导入操作题</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <PracticalImportForm onSuccess={handlePracticalImportSuccess} />
-            </CardContent>
-          </Card>
-
-          {practicalImportSuccess ? (
-            <PracticalImportResultSummary
-              result={practicalImportSuccess}
-              onDismiss={() => setPracticalImportSuccess(null)}
-            />
-          ) : null}
-
-          <Card ref={practicalListRef}>
-            <CardHeader>
-              <CardTitle className="text-sm font-semibold">已上传操作题库</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <PracticalBatchList
-                batches={practicalBatches}
-                loading={loadingPractical}
-                error={practicalListError}
-                deletingId={deletingPracticalId}
-                onRetry={() => void loadPracticalBatches()}
-                onDelete={(id) => void handleDeletePractical(id)}
-              />
-            </CardContent>
-          </Card>
+            </AdminSectionCard>
+          </div>
         </>
       )}
     </div>

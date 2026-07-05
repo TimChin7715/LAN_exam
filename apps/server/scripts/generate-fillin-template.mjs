@@ -1,5 +1,5 @@
 /**
- * Generates templates/填空题导入模板.xlsx
+ * Generates templates/操作题导入模板.xlsx
  * Run: pnpm exec tsx apps/server/scripts/generate-fillin-template.ts
  */
 console.error(

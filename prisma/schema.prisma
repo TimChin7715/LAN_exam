@@ -19,7 +19,6 @@ model Teacher {
   updatedAt              DateTime              @updatedAt
   questionImportBatches   QuestionImportBatch[]
   fillInImportBatches     FillInQuestionImportBatch[]
-  practicalImportBatches  PracticalQuestionImportBatch[]
   rosterImportBatches     RosterImportBatch[]
   exams                   Exam[]
 }
@@ -114,8 +113,6 @@ model RosterEntry {
   submissions            Submission[]
   answerDrafts           AnswerDraft[]
   fillInScreenshotDrafts FillInScreenshotDraft[]
-  practicalSubmissions PracticalSubmission[]
-  practicalAnswerDrafts  PracticalAnswerDraft[]
   examSeatAssignments    ExamSeatAssignment[]
 
   @@unique([batchId, fullName, nationalId])
@@ -132,7 +129,6 @@ enum ExamStatus {
 enum ExamContentModule {
   OBJECTIVE
   FILL
-  PRACTICAL
 }
 
 model FillInQuestionImportBatch {
@@ -142,9 +138,11 @@ model FillInQuestionImportBatch {
   title                  String
   wordFileName           String
   wordStorageKey         String
-  excelFileName          String
-  excelStorageKey        String
-  studentExcelStorageKey String
+  /** 考官原卷（含标准答案），不对外下发 */
+  sourceWordStorageKey   String?
+  excelFileName          String?
+  excelStorageKey        String?
+  studentExcelStorageKey String?
   /** @deprecated 仅旧数据；新导入写入 FillInBatchAttachment */
   attachmentFileName     String?
   /** @deprecated 仅旧数据；新导入写入 FillInBatchAttachment */
@@ -170,21 +168,6 @@ model FillInBatchAttachment {
   @@index([batchId])
 }
 
-model PracticalQuestionImportBatch {
-  id               String   @id @default(cuid())
-  teacherId        String
-  teacher          Teacher  @relation(fields: [teacherId], references: [id])
-  title            String
-  wordFileName     String
-  wordStorageKey   String
-  excelFileName    String
-  excelStorageKey  String
-  createdAt        DateTime @default(now())
-  exams            Exam[]
-
-  @@index([teacherId])
-}
-
 model Exam {
   id               String            @id @default(cuid())
   title            String
@@ -196,8 +179,6 @@ model Exam {
   questionBatch    QuestionImportBatch? @relation(fields: [questionBatchId], references: [id])
   fillInBatchId    String?
   fillInBatch      FillInQuestionImportBatch? @relation(fields: [fillInBatchId], references: [id])
-  practicalBatchId String?
-  practicalBatch   PracticalQuestionImportBatch? @relation(fields: [practicalBatchId], references: [id])
   rosterBatchId    String
   rosterBatch      RosterImportBatch @relation(fields: [rosterBatchId], references: [id])
   scheduledStartAt DateTime?
@@ -210,15 +191,12 @@ model Exam {
   submissions          Submission[]
   answerDrafts         AnswerDraft[]
   fillInScreenshotDrafts FillInScreenshotDraft[]
-  practicalSubmissions PracticalSubmission[]
-  practicalAnswerDrafts PracticalAnswerDraft[]
   seatAssignments        ExamSeatAssignment[]
 
   @@index([status])
   @@index([rosterBatchId])
   @@index([questionBatchId])
   @@index([fillInBatchId])
-  @@index([practicalBatchId])
 }
 
 model ExamQuestion {
@@ -309,34 +287,6 @@ model AnswerDraft {
   updatedAt      DateTime     @updatedAt
 
   @@unique([examId, rosterEntryId, examQuestionId])
-  @@index([examId, rosterEntryId])
-}
-
-model PracticalSubmission {
-  id              String      @id @default(cuid())
-  examId          String
-  exam            Exam        @relation(fields: [examId], references: [id], onDelete: Cascade)
-  rosterEntryId   String
-  rosterEntry     RosterEntry @relation(fields: [rosterEntryId], references: [id])
-  docxStorageKey  String
-  docxFileName    String
-  submittedAt     DateTime    @default(now())
-
-  @@unique([examId, rosterEntryId])
-  @@index([examId])
-}
-
-model PracticalAnswerDraft {
-  id             String      @id @default(cuid())
-  examId         String
-  exam           Exam        @relation(fields: [examId], references: [id], onDelete: Cascade)
-  rosterEntryId  String
-  rosterEntry    RosterEntry @relation(fields: [rosterEntryId], references: [id], onDelete: Cascade)
-  docxStorageKey String
-  docxFileName   String
-  updatedAt      DateTime    @updatedAt
-
-  @@unique([examId, rosterEntryId])
   @@index([examId, rosterEntryId])
 }
 

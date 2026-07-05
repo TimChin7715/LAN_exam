@@ -1,8 +1,11 @@
 import { createHash } from 'node:crypto';
 
+import JSZip from 'jszip';
 import mammoth from 'mammoth';
 import WordExtractor from 'word-extractor';
 
+import { injectWordPreviewInputs } from './inject-word-preview-inputs.js';
+import type { ParsedFillInBlank } from './types.js';
 import { detectWordFormat, wordUploadExt } from '../upload/word-file.js';
 import {
   deleteStorageTree,
@@ -18,9 +21,13 @@ import {
 /** Placeholder in stored HTML; rewritten per exam when served. */
 export const FILLIN_PREVIEW_ASSET_PREFIX = '@@FILLIN_ASSET@@/';
 
+/** Bump when preview HTML/image pipeline changes to invalidate stored previews. */
+export const FILLIN_PREVIEW_PIPELINE_VERSION = 6;
+
 export type FillInPreviewMeta = {
   version: string;
   generatedAt: string;
+  pipelineVersion?: number;
 };
 
 const generatingByBatch = new Map<string, Promise<FillInPreviewMeta>>();
@@ -35,6 +42,36 @@ function escapeHtml(text: string): string {
 
 export function previewVersionFromWordBuffer(buffer: Buffer): string {
   return createHash('sha256').update(buffer).digest('hex').slice(0, 16);
+}
+
+/** Version key for preview meta, ETag, and asset URLs (word hash + pipeline). */
+export function buildFillInPreviewVersion(wordBuffer: Buffer): string {
+  return `${previewVersionFromWordBuffer(wordBuffer)}.p${FILLIN_PREVIEW_PIPELINE_VERSION}`;
+}
+
+export function previewHtmlHasImages(html: string): boolean {
+  return /<img[\s>]/i.test(html) || html.includes(FILLIN_PREVIEW_ASSET_PREFIX);
+}
+
+export async function docxHasEmbeddedImages(buffer: Buffer): Promise<boolean> {
+  try {
+    const zip = await JSZip.loadAsync(buffer);
+    return Object.keys(zip.files).some(
+      (name) => name.startsWith('word/media/') && !name.endsWith('/'),
+    );
+  } catch {
+    return false;
+  }
+}
+
+function previewMetaMatchesWord(
+  meta: FillInPreviewMeta,
+  expectedVersion: string,
+): boolean {
+  return (
+    meta.version === expectedVersion &&
+    (meta.pipelineVersion ?? 0) === FILLIN_PREVIEW_PIPELINE_VERSION
+  );
 }
 
 function isHtmlPreviewFilename(filename: string | undefined): boolean {
@@ -74,6 +111,7 @@ export function rewriteFillInPreviewAssetUrls(
 async function buildDocxPreviewHtml(
   batchId: string,
   buffer: Buffer,
+  blanks?: ParsedFillInBlank[],
 ): Promise<string> {
   let imageIndex = 0;
   const { value } = await mammoth.convertToHtml(
@@ -101,17 +139,28 @@ async function buildDocxPreviewHtml(
   if (!html) {
     return '<p class="text-muted">试卷正文为空。</p>';
   }
+  if (blanks && blanks.length > 0) {
+    return injectWordPreviewInputs(html, blanks);
+  }
   return html;
 }
 
-async function buildDocPreviewHtml(buffer: Buffer): Promise<string> {
+async function buildDocPreviewHtml(
+  buffer: Buffer,
+  blanks?: ParsedFillInBlank[],
+): Promise<string> {
   const extractor = new WordExtractor();
   const doc = await extractor.extract(buffer);
   const text = doc.getBody().replace(/\r\n/g, '\n').trim();
   if (!text) {
     return '<p class="text-muted">试卷正文为空。</p>';
   }
-  return `<pre class="whitespace-pre-wrap font-sans text-sm leading-relaxed">${escapeHtml(text)}</pre>`;
+  const escaped = escapeHtml(text);
+  const preHtml = `<pre class="whitespace-pre-wrap font-sans text-sm leading-relaxed">${escaped}</pre>`;
+  if (blanks && blanks.length > 0) {
+    return injectWordPreviewInputs(preHtml, blanks);
+  }
+  return preHtml;
 }
 
 /** Store already-rendered HTML preview, used by Excel-only fill-in imports. */
@@ -120,7 +169,7 @@ export async function generateFillInHtmlPreview(
   html: string,
   sourceBuffer: Buffer = Buffer.from(html, 'utf8'),
 ): Promise<FillInPreviewMeta> {
-  const version = previewVersionFromWordBuffer(sourceBuffer);
+  const version = buildFillInPreviewVersion(sourceBuffer);
   const body = html.trim() || '<p class="text-muted">试卷正文为空。</p>';
 
   try {
@@ -132,6 +181,7 @@ export async function generateFillInHtmlPreview(
   const meta: FillInPreviewMeta = {
     version,
     generatedAt: new Date().toISOString(),
+    pipelineVersion: FILLIN_PREVIEW_PIPELINE_VERSION,
   };
 
   await writeStorageFile(
@@ -151,12 +201,16 @@ export async function generateFillInWordPreview(
   batchId: string,
   buffer: Buffer,
   filename?: string,
+  blanks?: ParsedFillInBlank[],
 ): Promise<FillInPreviewMeta> {
   if (isHtmlPreviewFilename(filename)) {
-    return generateFillInHtmlPreview(batchId, buffer.toString('utf8'), buffer);
+    const html = blanks?.length
+      ? injectWordPreviewInputs(buffer.toString('utf8'), blanks)
+      : buffer.toString('utf8');
+    return generateFillInHtmlPreview(batchId, html, buffer);
   }
 
-  const version = previewVersionFromWordBuffer(buffer);
+  const version = buildFillInPreviewVersion(buffer);
   const ext = detectWordFormat(buffer) ?? wordUploadExt(filename) ?? 'docx';
 
   try {
@@ -167,12 +221,13 @@ export async function generateFillInWordPreview(
 
   const html =
     ext === 'doc'
-      ? await buildDocPreviewHtml(buffer)
-      : await buildDocxPreviewHtml(batchId, buffer);
+      ? await buildDocPreviewHtml(buffer, blanks)
+      : await buildDocxPreviewHtml(batchId, buffer, blanks);
 
   const meta: FillInPreviewMeta = {
     version,
     generatedAt: new Date().toISOString(),
+    pipelineVersion: FILLIN_PREVIEW_PIPELINE_VERSION,
   };
 
   await writeStorageFile(
@@ -208,19 +263,40 @@ async function readStoredPreviewMeta(
 /** Ensure preview exists and matches current Word file; one generate per batch at a time. */
 export async function ensureFillInWordPreview(
   batchId: string,
-  wordStorageKey: string,
-  wordFileName: string,
+  options: {
+    /** 用于 mammoth 预览的学员卷（已抹答案）；无则回退 wordStorageKey */
+    previewWordStorageKey: string;
+    wordFileName: string;
+    blanks: ParsedFillInBlank[];
+  },
 ): Promise<FillInPreviewMeta> {
-  const wordBuffer = await readStorageFile(wordStorageKey);
-  const expectedVersion = previewVersionFromWordBuffer(wordBuffer);
+  const wordBuffer = await readStorageFile(options.previewWordStorageKey);
+  const expectedVersion = buildFillInPreviewVersion(wordBuffer);
+  const ext = detectWordFormat(wordBuffer) ?? wordUploadExt(options.wordFileName) ?? 'docx';
   const existing = await readStoredPreviewMeta(batchId);
-  if (existing?.version === expectedVersion) {
-    return existing;
+  if (existing && previewMetaMatchesWord(existing, expectedVersion)) {
+    const body = await readFillInPreviewBody(batchId);
+    if (body.includes('fillin-inline-input')) {
+      if (ext === 'docx') {
+        const hasMedia = await docxHasEmbeddedImages(wordBuffer);
+        const hasImgInPreview = previewHtmlHasImages(body);
+        if (!hasMedia || hasImgInPreview) {
+          return existing;
+        }
+      } else {
+        return existing;
+      }
+    }
   }
 
   let pending = generatingByBatch.get(batchId);
   if (!pending) {
-    pending = generateFillInWordPreview(batchId, wordBuffer, wordFileName);
+    pending = generateFillInWordPreview(
+      batchId,
+      wordBuffer,
+      options.wordFileName,
+      options.blanks,
+    );
     generatingByBatch.set(batchId, pending);
     pending.finally(() => {
       if (generatingByBatch.get(batchId) === pending) {

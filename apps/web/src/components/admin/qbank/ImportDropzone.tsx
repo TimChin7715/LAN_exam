@@ -1,6 +1,7 @@
 import { useCallback, useId, useRef, useState } from 'react';
-import { Download, Upload } from 'lucide-react';
+import { CheckCircle2, Download, Upload } from 'lucide-react';
 
+import { ImportSelectedFileDisplay } from '@/components/admin/shared/ImportSelectedFileDisplay';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import {
@@ -90,10 +91,11 @@ export function ImportDropzone({
       <Button
         type="button"
         variant="outline"
+        className="h-11 text-base"
         disabled={disabled || downloading}
         onClick={() => void handleDownload()}
       >
-        <Download className="size-4" aria-hidden />
+        <Download className="size-5" aria-hidden />
         {downloading ? '正在下载…' : '下载官方模板'}
       </Button>
 
@@ -121,25 +123,26 @@ export function ImportDropzone({
         }}
         onDragLeave={() => setDragOver(false)}
         onDrop={onDrop}
-        className={`flex min-h-40 cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed p-6 transition-colors ${
+        className={`flex min-h-52 cursor-pointer flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed p-8 transition-colors ${
           file
-            ? 'border-primary/50 bg-muted/20'
+            ? 'border-primary bg-primary/5'
             : dragOver
               ? 'border-primary bg-muted/30'
               : 'border-border'
         } ${importing ? 'pointer-events-none opacity-60' : ''}`}
       >
-        <Upload
-          className={`size-8 ${file ? 'text-primary' : 'text-muted-foreground'}`}
-          aria-hidden
-        />
-        <p className="text-base text-foreground">
-          {file ? '已上传文件' : '点击或拖拽上传 Excel 文件'}
-        </p>
         {file ? (
-          <p className="text-sm font-medium text-foreground">{file.name}</p>
+          <CheckCircle2 className="size-10 text-primary" aria-hidden />
+        ) : (
+          <Upload className="size-10 text-muted-foreground" aria-hidden />
+        )}
+        <p className="text-lg text-foreground">
+          {file ? '文件已选择' : '点击或拖拽上传 Excel 文件'}
+        </p>
+        {file ? <ImportSelectedFileDisplay file={file} /> : null}
+        {!file ? (
+          <p className="text-base text-muted-foreground">支持 .xls、.xlsx 或 .csv</p>
         ) : null}
-        <p className="text-sm text-muted-foreground">支持 .xls、.xlsx 或 .csv</p>
         {file ? (
           <Button
             type="button"
@@ -166,7 +169,7 @@ export function ImportDropzone({
       <div className="flex justify-end">
         <Button
           type="button"
-          className="min-h-11 w-full md:w-auto"
+          className="min-h-12 w-full text-base md:w-auto"
           disabled={!file || importing || disabled}
           onClick={() => void handleImport()}
         >

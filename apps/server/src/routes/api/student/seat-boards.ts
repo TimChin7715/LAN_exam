@@ -1,11 +1,10 @@
 import type { FastifyInstance } from 'fastify';
 
-import { getTeacherShowSeatBoard } from '../../../lib/admin-settings.js';
+import { listStudentSeatBoardExams } from '../../../lib/admin-settings.js';
 import {
   loadExamSeatBoard,
   type SeatBoardPayload,
 } from '../../../lib/seat/load-seat-board.js';
-import { listPublicSeatExams } from '../../../lib/seat/resolve-public-seat-exam.js';
 import { prisma } from '../../../lib/prisma.js';
 
 export async function registerStudentSeatBoardsRoutes(
@@ -22,7 +21,7 @@ export async function registerStudentSeatBoardsRoutes(
       },
     },
     async (_request, reply) => {
-      const exams = await listPublicSeatExams(prisma);
+      const exams = await listStudentSeatBoardExams(prisma);
 
       if (exams.length === 0) {
         return reply.send({ ok: true, board: null, boards: [] });
@@ -31,12 +30,6 @@ export async function registerStudentSeatBoardsRoutes(
       const boards: SeatBoardPayload[] = [];
 
       for (const exam of exams) {
-        const showSeatBoard = await getTeacherShowSeatBoard(
-          prisma,
-          exam.teacherId,
-        );
-        if (!showSeatBoard) continue;
-
         const board = await loadExamSeatBoard(prisma, exam, {
           includeDisplayStatus: true,
         });

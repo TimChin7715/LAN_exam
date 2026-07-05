@@ -1,16 +1,12 @@
 import type { PrismaClient } from '@prisma/client';
 
-import {
-  requiresFillInBatch,
-  requiresPracticalBatch,
-} from './content-mode.js';
+import { requiresFillInBatch } from './content-mode.js';
 import {
   getCachedExamPaperStatic,
   getCachedScoreableQuestions,
   setExamPaperCache,
   type ExamPaperStaticFillIn,
   type ExamPaperStaticPayload,
-  type ExamPaperStaticPracticalMeta,
   type ScoreableExamQuestion,
 } from './exam-paper-cache.js';
 import { resolveFillInAttachmentDownloadFilename } from '../fillin/build-attachments-zip.js';
@@ -19,14 +15,6 @@ import { prisma } from '../prisma.js';
 
 export type ExamPaperDrafts = {
   answerDrafts: Map<string, string>;
-  practical: {
-    batchTitle: string;
-    wordFileName: string;
-    excelFileName: string;
-    hasAnswerDraft: boolean;
-    answerFileName: string | null;
-    answerUpdatedAt: string | null;
-  } | null;
 };
 
 export type ExamPaperResponse = {
@@ -37,7 +25,6 @@ export type ExamPaperResponse = {
   items: Array<
     ExamPaperStaticPayload['items'][number] & { selectedKeys: string }
   >;
-  practical: ExamPaperDrafts['practical'];
   fillIn: ExamPaperStaticFillIn | null;
 };
 
@@ -56,13 +43,6 @@ async function loadStaticFromDb(
       fillInBatch: {
         select: {
           id: true,
-          title: true,
-          wordFileName: true,
-          excelFileName: true,
-        },
-      },
-      practicalBatch: {
-        select: {
           title: true,
           wordFileName: true,
           excelFileName: true,
@@ -123,15 +103,6 @@ async function loadStaticFromDb(
     };
   }
 
-  let practicalMeta: ExamPaperStaticPracticalMeta | null = null;
-  if (requiresPracticalBatch(exam.contentModules) && exam.practicalBatch) {
-    practicalMeta = {
-      batchTitle: exam.practicalBatch.title,
-      wordFileName: exam.practicalBatch.wordFileName,
-      excelFileName: exam.practicalBatch.excelFileName,
-    };
-  }
-
   const items = examQuestions.map((eq) => ({
     examQuestionId: eq.id,
     sortOrder: eq.sortOrder,
@@ -166,7 +137,6 @@ async function loadStaticFromDb(
     contentModules: exam.contentModules,
     items,
     fillIn,
-    practicalMeta,
   };
 
   return { staticPayload, scoreableQuestions };
@@ -198,7 +168,6 @@ export function getScoreableQuestionsForExam(
 export async function loadExamPaperDrafts(
   examId: string,
   rosterEntryId: string,
-  staticPayload: ExamPaperStaticPayload,
 ): Promise<ExamPaperDrafts> {
   const drafts = await prisma.answerDraft.findMany({
     where: { examId, rosterEntryId },
@@ -212,23 +181,7 @@ export async function loadExamPaperDrafts(
     drafts.map((d) => [d.examQuestionId, d.selectedKeys]),
   );
 
-  let practical: ExamPaperDrafts['practical'] = null;
-  if (staticPayload.practicalMeta) {
-    const practicalDraft = await prisma.practicalAnswerDraft.findUnique({
-      where: { examId_rosterEntryId: { examId, rosterEntryId } },
-      select: { docxFileName: true, updatedAt: true },
-    });
-    practical = {
-      batchTitle: staticPayload.practicalMeta.batchTitle,
-      wordFileName: staticPayload.practicalMeta.wordFileName,
-      excelFileName: staticPayload.practicalMeta.excelFileName,
-      hasAnswerDraft: Boolean(practicalDraft),
-      answerFileName: practicalDraft?.docxFileName ?? null,
-      answerUpdatedAt: practicalDraft?.updatedAt.toISOString() ?? null,
-    };
-  }
-
-  return { answerDrafts, practical };
+  return { answerDrafts };
 }
 
 export function mergePaperResponse(
@@ -246,7 +199,6 @@ export function mergePaperResponse(
       selectedKeys: drafts.answerDrafts.get(item.examQuestionId) ?? '',
     })),
     fillIn: staticPayload.fillIn,
-    practical: drafts.practical,
   };
 }
 
@@ -266,7 +218,7 @@ export async function buildExamPaperResponse(
   if (!staticPayload) {
     return null;
   }
-  const drafts = await loadExamPaperDrafts(examId, rosterEntryId, staticPayload);
+  const drafts = await loadExamPaperDrafts(examId, rosterEntryId);
   return mergePaperResponse(
     staticPayload,
     drafts,
