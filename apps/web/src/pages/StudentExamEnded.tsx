@@ -23,6 +23,8 @@ export default function StudentExamEnded() {
   const [title, setTitle] = useState<string | null>(null);
   const [endedAt, setEndedAt] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
+  const [totalScore, setTotalScore] = useState<number | null>(null);
+  const [showScoreAfterSubmit, setShowScoreAfterSubmit] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loggingOut, setLoggingOut] = useState(false);
 
@@ -53,6 +55,8 @@ export default function StudentExamEnded() {
           setTitle(status.title);
           setEndedAt(status.endedAt);
           setSubmitted(status.submitted);
+          setTotalScore(status.totalScore);
+          setShowScoreAfterSubmit(status.showScoreAfterSubmit);
         } else if (status.status === 'IN_PROGRESS') {
           try {
             await studentApi.examSubmission(status.examId);
@@ -148,6 +152,15 @@ export default function StudentExamEnded() {
               </AlertDescription>
             </Alert>
           )}
+
+          {showScoreAfterSubmit && submitted && totalScore !== null ? (
+            <div className="rounded-lg border border-primary/20 bg-primary/5 p-6 text-center">
+              <p className="mb-2 text-sm font-medium text-foreground">您的得分</p>
+              <p className="font-mono text-4xl font-bold tabular-nums text-primary">
+                {totalScore}
+              </p>
+            </div>
+          ) : null}
 
           <div className="flex flex-col gap-4">
             {submitted && resolvedExamId ? (

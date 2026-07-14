@@ -49,6 +49,7 @@ foreach ($stale in @(
 
 Push-Location $root
 $env:VITE_ADMIN_AUTH_MODE = 'disabled'
+Remove-Item Env:VITE_ADMIN_ALLOW_REMOTE -ErrorAction SilentlyContinue
 pnpm build
 if ($LASTEXITCODE -ne 0) { throw 'pnpm build failed' }
 Pop-Location
@@ -146,7 +147,11 @@ if (-not (Test-Path $seedCjs)) {
 foreach ($f in @('start.bat', 'stop.bat', 'open-admin.bat', 'install.bat', 'setup.bat')) {
     Copy-Item (Join-Path $templates $f) (Join-Path $OutDir $f) -Force
 }
-Copy-Item (Join-Path $templates '考场使用说明.txt') (Join-Path $OutDir '考场使用说明.txt') -Force
+$usageGuide = Get-ChildItem -LiteralPath $templates -File -Filter '*.txt' | Select-Object -First 1
+if (-not $usageGuide) {
+    throw "Missing exam room guide .txt in $templates"
+}
+Copy-Item -LiteralPath $usageGuide.FullName -Destination (Join-Path $OutDir $usageGuide.Name) -Force
 New-Item -ItemType Directory -Path (Join-Path $OutDir 'scripts') -Force | Out-Null
 Copy-Item (Join-Path $templates 'install-log.ps1') (Join-Path $OutDir 'scripts\install-log.ps1') -Force
 Copy-Item (Join-Path $templates 'install-db.ps1') (Join-Path $OutDir 'scripts\install-db.ps1') -Force

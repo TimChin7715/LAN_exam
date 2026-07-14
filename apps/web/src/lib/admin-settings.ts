@@ -4,6 +4,7 @@ export const CLEAR_ALL_DATA_CONFIRM_PHRASE = '清除全部数据';
 
 export type AdminSettings = {
   showSeatBoard: boolean;
+  showScoreAfterSubmit: boolean;
   appVersion?: string;
 };
 
@@ -18,10 +19,12 @@ export async function fetchAdminSettings(): Promise<AdminSettings> {
   const data = await apiFetch<{
     ok: true;
     showSeatBoard: boolean;
+    showScoreAfterSubmit: boolean;
     appVersion?: string;
   }>('/api/admin/settings');
   return {
     showSeatBoard: data.showSeatBoard,
+    showScoreAfterSubmit: data.showScoreAfterSubmit,
     appVersion: data.appVersion,
   };
 }
@@ -29,7 +32,7 @@ export async function fetchAdminSettings(): Promise<AdminSettings> {
 export async function updateAdminSettings(
   settings: AdminSettings,
 ): Promise<AdminSettings> {
-  const data = await apiFetch<{ ok: true; showSeatBoard: boolean }>(
+  const data = await apiFetch<{ ok: true; showSeatBoard: boolean; showScoreAfterSubmit: boolean }>(
     '/api/admin/settings',
     {
       method: 'PATCH',
@@ -37,7 +40,7 @@ export async function updateAdminSettings(
       body: JSON.stringify(settings),
     },
   );
-  return { showSeatBoard: data.showSeatBoard };
+  return { showSeatBoard: data.showSeatBoard, showScoreAfterSubmit: data.showScoreAfterSubmit };
 }
 
 export async function clearAllAdminData(): Promise<ClearAllDataResult> {

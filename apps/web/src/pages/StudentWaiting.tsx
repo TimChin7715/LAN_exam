@@ -1,4 +1,4 @@
-import { Loader2 } from 'lucide-react';
+import { Clock, Loader2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -11,6 +11,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { formatExamDateTime } from '@/lib/exam';
+import { formatExamRemaining } from '@/lib/exam-countdown';
 import {
   ApiError,
   computeEnterExamDelayMs,
@@ -27,6 +28,8 @@ export default function StudentWaiting() {
   const [waitingHint, setWaitingHint] = useState<string | null>(null);
   const [enteringExam, setEnteringExam] = useState(false);
   const [currentExamTitle, setCurrentExamTitle] = useState<string | null>(null);
+  const [scheduledStartAt, setScheduledStartAt] = useState<string | null>(null);
+  const [countdownMs, setCountdownMs] = useState<number | null>(null);
   const [chooseExams, setChooseExams] = useState<
     Array<{
       id: string;
@@ -81,6 +84,7 @@ export default function StudentWaiting() {
       navigateScheduledRef.current = true;
       setEnteringExam(true);
       setWaitingHint(null);
+      setScheduledStartAt(null);
       setChooseExams([]);
 
       const delayMs = computeEnterExamDelayMs(profile.nationalId);
@@ -98,6 +102,7 @@ export default function StudentWaiting() {
         if (status.status === 'choose_exam') {
           setChooseExams(status.exams);
           setCurrentExamTitle(null);
+          setScheduledStartAt(null);
           setWaitingHint(
             '当前有多场考试同时进行，请先选择您要参加的考试，开考后将自动进入答题页。',
           );
@@ -105,22 +110,26 @@ export default function StudentWaiting() {
           return;
         }
         setChooseExams([]);
+        setScheduledStartAt(null);
         if (status.status === 'IN_PROGRESS') {
           setCurrentExamTitle(status.title);
           scheduleEnterExam(status.examId);
         } else if (status.status === 'ENDED') {
           setCurrentExamTitle(status.title);
+          setScheduledStartAt(null);
           setWaitingHint(null);
           navigate(`/exam/ended?examId=${encodeURIComponent(status.examId)}`, {
             replace: true,
           });
         } else if (status.status === 'waiting') {
           setCurrentExamTitle(status.title);
+          setScheduledStartAt(status.scheduledStartAt);
           setWaitingHint(
             `「${status.title}」将于 ${formatExamDateTime(status.scheduledStartAt)} 开始，请稍候。`,
           );
         } else {
           setCurrentExamTitle(null);
+          setScheduledStartAt(null);
           setWaitingHint(null);
         }
       } catch (err) {
@@ -164,6 +173,20 @@ export default function StudentWaiting() {
     };
   }, [profile, loading, navigate]);
 
+  useEffect(() => {
+    if (!scheduledStartAt) {
+      setCountdownMs(null);
+      return;
+    }
+    const targetMs = new Date(scheduledStartAt).getTime();
+    const tick = () => {
+      setCountdownMs(targetMs - Date.now());
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [scheduledStartAt]);
+
   async function handleChooseExam(examId: string) {
     setSelectingExamId(examId);
     try {
@@ -183,6 +206,7 @@ export default function StudentWaiting() {
       }
       if (status.status === 'waiting') {
         setChooseExams([]);
+        setScheduledStartAt(status.scheduledStartAt);
         setWaitingHint(
           `「${status.title}」将于 ${formatExamDateTime(status.scheduledStartAt)} 开始，请稍候。`,
         );
@@ -270,12 +294,38 @@ export default function StudentWaiting() {
             </div>
           ) : null}
 
-          <p className="text-center text-base text-muted-foreground">
-            {enteringExam
-              ? '考试已开始，正在为您加载试卷，请稍候…'
-              : (waitingHint ??
-                '监考教师开始考试后，本页将在开考时间自动进入答题界面。')}
-          </p>
+          {enteringExam ? (
+            <p className="text-center text-base text-muted-foreground">
+              考试已开始，正在为您加载试卷，请稍候…
+            </p>
+          ) : countdownMs !== null && scheduledStartAt ? (
+            <div className="space-y-3 rounded-lg border border-primary/20 bg-primary/5 p-6 text-center">
+              <div className="flex items-center justify-center gap-2">
+                <Clock className="size-5 text-primary" />
+                <p className="text-sm font-medium text-foreground">
+                  距离考试开始还有
+                </p>
+              </div>
+              <p className="font-mono text-4xl font-bold tabular-nums leading-none text-primary sm:text-5xl">
+                {countdownMs > 0
+                  ? formatExamRemaining(countdownMs)
+                  : '即将开始'}
+              </p>
+              {currentExamTitle ? (
+                <p className="text-sm font-medium text-foreground">
+                  {currentExamTitle}
+                </p>
+              ) : null}
+              <p className="text-xs text-muted-foreground">
+                计划开考时间：{formatExamDateTime(scheduledStartAt)}
+              </p>
+            </div>
+          ) : (
+            <p className="text-center text-base text-muted-foreground">
+              {waitingHint ??
+                '监考教师开始考试后，本页将在开考时间自动进入答题界面。'}
+            </p>
+          )}
           <Button
             type="button"
             variant="outline"

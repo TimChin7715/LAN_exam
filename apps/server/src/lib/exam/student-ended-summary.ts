@@ -10,6 +10,7 @@ export type StudentEndedSummary = {
   endedAt: string | null;
   submitted: boolean;
   totalScore: number | null;
+  showScoreAfterSubmit: boolean;
 };
 
 export async function resolveStudentEndedSummary(
@@ -33,10 +34,16 @@ export async function resolveStudentEndedSummary(
       title: true,
       contentModules: true,
       endedAt: true,
+      teacherId: true,
     },
   });
 
   if (!exam) return null;
+
+  const teacher = await prisma.teacher.findUnique({
+    where: { id: exam.teacherId },
+    select: { showScoreAfterSubmit: true },
+  });
 
   const needsQuestions = requiresQuestionSubmission(exam.contentModules);
 
@@ -58,5 +65,6 @@ export async function resolveStudentEndedSummary(
     endedAt: exam.endedAt?.toISOString() ?? null,
     submitted,
     totalScore: objective?.totalScore ?? null,
+    showScoreAfterSubmit: teacher?.showScoreAfterSubmit ?? false,
   };
 }

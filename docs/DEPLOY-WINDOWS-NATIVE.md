@@ -6,10 +6,10 @@
 
 | 环境 | 是否联网 | 操作 |
 | --- | --- | --- |
-| 发版机构 / 开发机 | 可以 | `fetch-runtimes.ps1` 下载 Node、PostgreSQL、VC++ → `package.ps1` 生成 `LAN-Exam-win-v<版本>.zip` |
+| 发版机构 / 开发机 | 可以 | `fetch-runtimes.ps1` 下载 Node、PostgreSQL、VC++ → **裁剪非运行时组件** → `package.ps1` 生成 `LAN-Exam-win-v<版本>.zip` |
 | 考场管理机 | 不可以 | U 盘拷贝 zip → 解压 → **以管理员运行 `setup.bat`** → 托盘 / 桌面快捷方式打开管理台 |
 
-安装包**自包含**：Node、PostgreSQL 便携版、`vc_redist.x64.exe`、应用与迁移脚本。现场**禁止**引导考官访问微软官网或在线下载依赖。
+安装包**自包含**：Node、PostgreSQL 便携版、`vc_redist.x64.exe`、应用与迁移脚本。发版时会自动**裁剪 EDB Postgres 包中的 pgAdmin、文档、头文件等非运行时目录**，以及 Node 便携包自带的 `npm/node_modules`，以缩短考场解压时间。现场**禁止**引导考官访问微软官网或在线下载依赖。
 
 ## 发版构建（有网，考前完成）
 
@@ -24,7 +24,7 @@ cd E:\programs\LAN_exam
 
 产出：
 
-- `dist\LAN-Exam-win-v<版本>.zip`（例如 `LAN-Exam-win-v1.6.29.zip`，**考场推荐**）
+- `dist\LAN-Exam-win-v<版本>.zip`（例如 `LAN-Exam-win-v1.6.31.zip`，**考场推荐**；v1.6.31 起解压约 **0.7 GB / ~1.6 万文件**，较旧版约减半）
 - `dist\lan-exam-win\`（未压缩绿色目录，可本地调试或备份）
 - `dist\LAN-Exam-Setup-v<版本>.exe`（可选：加 `-WithInstaller` 时产出，Inno 压缩较慢）
 

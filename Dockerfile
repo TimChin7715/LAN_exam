@@ -17,7 +17,7 @@ FROM deps AS build
 WORKDIR /app
 COPY apps/web apps/web
 COPY apps/server apps/server
-ARG VITE_ADMIN_ALLOW_REMOTE=true
+ARG VITE_ADMIN_ALLOW_REMOTE=false
 ENV VITE_ADMIN_AUTH_MODE=disabled
 ENV VITE_ADMIN_ALLOW_REMOTE=${VITE_ADMIN_ALLOW_REMOTE}
 RUN pnpm exec prisma generate \
@@ -27,7 +27,7 @@ RUN pnpm exec prisma generate \
 FROM base AS production
 WORKDIR /app
 ENV ADMIN_AUTH_MODE=disabled
-ENV ADMIN_API_LOOPBACK_ONLY=false
+ENV ADMIN_API_LOOPBACK_ONLY=true
 ENV LOCAL_ADMIN_USERNAME=local_exam_admin
 ENV LISTEN_HOST=0.0.0.0
 ENV WEB_PORT=5180

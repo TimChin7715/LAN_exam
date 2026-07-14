@@ -26,6 +26,8 @@ export default function StudentExamSubmitted() {
   const [profile, setProfile] = useState<StudentProfile | null>(null);
   const [title, setTitle] = useState<string | null>(null);
   const [examInProgress, setExamInProgress] = useState(true);
+  const [totalScore, setTotalScore] = useState<number | null>(null);
+  const [showScoreAfterSubmit, setShowScoreAfterSubmit] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loggingOut, setLoggingOut] = useState(false);
 
@@ -44,7 +46,9 @@ export default function StudentExamSubmitted() {
         setProfile(me);
 
         try {
-          await studentApi.examSubmission(examId);
+          const submission = await studentApi.examSubmission(examId);
+          setTotalScore(submission.totalScore);
+          setShowScoreAfterSubmit(submission.showScoreAfterSubmit);
         } catch (err) {
           if (err instanceof ApiError && err.status === 404) {
             navigate(`/exam/take?examId=${encodeURIComponent(examId)}`, {
@@ -196,6 +200,15 @@ export default function StudentExamSubmitted() {
               ) : null}
             </AlertDescription>
           </Alert>
+
+          {showScoreAfterSubmit && totalScore !== null ? (
+            <div className="rounded-lg border border-primary/20 bg-primary/5 p-6 text-center">
+              <p className="mb-2 text-sm font-medium text-foreground">您的得分</p>
+              <p className="font-mono text-4xl font-bold tabular-nums text-primary">
+                {totalScore}
+              </p>
+            </div>
+          ) : null}
 
           <div className="flex flex-col gap-3">
             <Button

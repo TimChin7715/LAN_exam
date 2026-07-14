@@ -15,23 +15,26 @@ if (-not $OutDir) {
 $releaseVersion = & (Join-Path $PSScriptRoot 'get-release-version.ps1') -Root $root
 Write-Host "==> LAN Exam package v$releaseVersion started at $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
 if ($WithInstaller) {
-    Write-Host '    Stages: build-release -> fetch-runtimes -> tray -> verify -> zip -> Inno (Inno may take 15-30 min)'
+    Write-Host '    Stages: build-release -> fetch-runtimes -> trim-runtimes -> tray -> verify -> zip -> Inno (Inno may take 15-30 min)'
 }
 else {
-    Write-Host '    Stages: build-release -> fetch-runtimes -> tray -> verify -> zip'
+    Write-Host '    Stages: build-release -> fetch-runtimes -> trim-runtimes -> tray -> verify -> zip'
 }
 
 & (Join-Path $PSScriptRoot 'validate-install-scripts.ps1')
 & (Join-Path $PSScriptRoot 'cleanup-dist-artifacts.ps1') -Root $root -Version $releaseVersion
 
-Write-Host "==> [1/5] build-release $(Get-Date -Format HH:mm:ss)"
+Write-Host "==> [1/6] build-release $(Get-Date -Format HH:mm:ss)"
 & (Join-Path $PSScriptRoot 'build-release.ps1') -OutDir $OutDir
-Write-Host "==> [2/5] fetch-runtimes $(Get-Date -Format HH:mm:ss)"
+Write-Host "==> [2/6] fetch-runtimes $(Get-Date -Format HH:mm:ss)"
 & (Join-Path $PSScriptRoot 'fetch-runtimes.ps1') -OutDir $OutDir
-Write-Host "==> [3/5] build-tray $(Get-Date -Format HH:mm:ss)"
+Write-Host "==> [3/6] trim-runtimes $(Get-Date -Format HH:mm:ss)"
+& (Join-Path $PSScriptRoot 'trim-postgres-runtime.ps1') -OutDir $OutDir
+& (Join-Path $PSScriptRoot 'trim-node-runtime.ps1') -OutDir $OutDir
+Write-Host "==> [4/6] build-tray $(Get-Date -Format HH:mm:ss)"
 & (Join-Path $PSScriptRoot 'build-tray.ps1') -OutDir $OutDir -SkipIfMissingDotnet
 
-Write-Host "==> [4/5] verify-package $(Get-Date -Format HH:mm:ss)"
+Write-Host "==> [5/6] verify-package $(Get-Date -Format HH:mm:ss)"
 & (Join-Path $PSScriptRoot 'verify-package.ps1') -OutDir $OutDir
 
 if (-not $SkipZip) {
@@ -39,7 +42,7 @@ if (-not $SkipZip) {
     $zipName = "LAN-Exam-win-v$releaseVersion.zip"
     $zipPath = Join-Path $distDir $zipName
     $folderName = Split-Path $OutDir -Leaf
-    Write-Host "==> [5/5] zip archive $(Get-Date -Format HH:mm:ss)"
+    Write-Host "==> [6/6] zip archive $(Get-Date -Format HH:mm:ss)"
     if (Test-Path $zipPath) { Remove-Item -LiteralPath $zipPath -Force }
     Push-Location $distDir
     try {

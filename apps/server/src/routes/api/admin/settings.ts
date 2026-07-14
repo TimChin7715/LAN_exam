@@ -12,6 +12,7 @@ import { requireAdminSession } from '../../../plugins/admin-guard.js';
 
 const patchBodySchema = z.object({
   showSeatBoard: z.boolean(),
+  showScoreAfterSubmit: z.boolean(),
 });
 
 const clearAllDataBodySchema = z.object({
@@ -28,7 +29,7 @@ export async function registerAdminSettingsRoutes(
       const teacherId = await resolveAdminTeacherId(request);
       const teacher = await prisma.teacher.findUnique({
         where: { id: teacherId },
-        select: { showSeatBoard: true },
+        select: { showSeatBoard: true, showScoreAfterSubmit: true },
       });
 
       if (!teacher) {
@@ -41,6 +42,7 @@ export async function registerAdminSettingsRoutes(
       return reply.send({
         ok: true,
         showSeatBoard: teacher.showSeatBoard,
+        showScoreAfterSubmit: teacher.showScoreAfterSubmit,
         appVersion: getAppVersion(),
       });
     },
@@ -62,13 +64,17 @@ export async function registerAdminSettingsRoutes(
 
       const teacher = await prisma.teacher.update({
         where: { id: teacherId },
-        data: { showSeatBoard: parsed.data.showSeatBoard },
-        select: { showSeatBoard: true },
+        data: {
+          showSeatBoard: parsed.data.showSeatBoard,
+          showScoreAfterSubmit: parsed.data.showScoreAfterSubmit,
+        },
+        select: { showSeatBoard: true, showScoreAfterSubmit: true },
       });
 
       return reply.send({
         ok: true,
         showSeatBoard: teacher.showSeatBoard,
+        showScoreAfterSubmit: teacher.showScoreAfterSubmit,
       });
     },
   );

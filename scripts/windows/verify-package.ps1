@@ -12,6 +12,12 @@ if (-not $OutDir) {
 $OutDir = [System.IO.Path]::GetFullPath($OutDir)
 $app = Join-Path $OutDir 'app'
 $bundle = Join-Path $app 'server-bundle'
+$usageGuide = Get-ChildItem -LiteralPath $OutDir -File -Filter '*.txt' |
+    Where-Object { $_.Name -notlike 'README*' } |
+    Select-Object -First 1
+if (-not $usageGuide) {
+    throw "Missing exam room guide .txt in $OutDir"
+}
 
 $required = @(
     (Join-Path $OutDir 'VERSION'),
@@ -19,7 +25,7 @@ $required = @(
     (Join-Path $OutDir 'install.bat'),
     (Join-Path $OutDir 'setup.bat'),
     (Join-Path $OutDir 'scripts\setup.ps1'),
-    (Join-Path $OutDir '考场使用说明.txt'),
+    $usageGuide.FullName,
     (Join-Path $OutDir 'scripts\install-db.ps1'),
     (Join-Path $app 'web\dist\index.html'),
     (Join-Path $app 'prisma\schema.prisma'),
@@ -27,13 +33,49 @@ $required = @(
     (Join-Path $bundle 'node_modules\prisma\build\index.js'),
     (Join-Path $bundle 'node_modules\.prisma\client\query_engine-windows.dll.node'),
     (Join-Path $app 'prisma\seed.cjs'),
-    (Join-Path $OutDir 'runtime\postgres\share\timezone')
+    (Join-Path $OutDir 'runtime\postgres\share\timezone'),
+    (Join-Path $OutDir 'runtime\postgres\bin\initdb.exe'),
+    (Join-Path $OutDir 'runtime\postgres\bin\pg_ctl.exe'),
+    (Join-Path $OutDir 'runtime\postgres\bin\psql.exe'),
+    (Join-Path $OutDir 'runtime\node\node.exe')
 )
 foreach ($path in $required) {
     if (-not (Test-Path $path)) {
         throw "Missing required package file: $path"
     }
 }
+
+$pgRoot = Join-Path $OutDir 'runtime\postgres'
+$forbiddenUnderPostgres = @('doc', 'include', 'StackBuilder')
+foreach ($name in $forbiddenUnderPostgres) {
+    $path = Join-Path $pgRoot $name
+    if (Test-Path -LiteralPath $path) {
+        throw "Forbidden postgres runtime path still present: $path"
+    }
+}
+foreach ($pgAdminDir in Get-ChildItem -LiteralPath $pgRoot -Directory -ErrorAction SilentlyContinue |
+    Where-Object { $_.Name -like 'pgAdmin*' }) {
+    throw "Forbidden postgres runtime path still present: $($pgAdminDir.FullName)"
+}
+$localePath = Join-Path $pgRoot 'share\locale'
+if (Test-Path -LiteralPath $localePath) {
+    throw "Forbidden postgres runtime path still present: $localePath"
+}
+
+$bundledNodeModules = Join-Path $OutDir 'runtime\node\node_modules'
+if (Test-Path -LiteralPath $bundledNodeModules) {
+    throw "Bundled node runtime must not ship node_modules: $bundledNodeModules"
+}
+
+$bundledNodeExe = Join-Path $OutDir 'runtime\node\node.exe'
+$prevEapNode = $ErrorActionPreference
+$ErrorActionPreference = 'Continue'
+$nodeVersion = & $bundledNodeExe -e "console.log(process.version)" 2>&1
+if ($LASTEXITCODE -ne 0) {
+    throw "Bundled node.exe smoke test failed (exit $LASTEXITCODE): $nodeVersion"
+}
+$ErrorActionPreference = $prevEapNode
+Write-Host "[verify] bundled node.exe OK ($($nodeVersion.Trim()))"
 
 $repoTemplates = Join-Path $root 'templates'
 $packTemplates = Join-Path $OutDir 'templates'

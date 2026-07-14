@@ -1,5 +1,3 @@
-import { Checkbox } from '@/components/ui/checkbox';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { cn } from '@/lib/utils';
 
 type ObjectiveOption = {
@@ -35,6 +33,41 @@ function OptionTileContent({ opt }: { opt: ObjectiveOption }) {
   );
 }
 
+function activateWithKeyboard(
+  event: React.KeyboardEvent,
+  readOnly: boolean,
+  action: () => void,
+): void {
+  if (readOnly) return;
+  if (event.key === 'Enter' || event.key === ' ') {
+    event.preventDefault();
+    action();
+  }
+}
+
+function moveSingleSelection(
+  event: React.KeyboardEvent,
+  options: ObjectiveOption[],
+  currentKey: string,
+  readOnly: boolean,
+  onSelect: (key: string) => void,
+): void {
+  if (readOnly) return;
+  const deltas: Record<string, number> = {
+    ArrowLeft: -1,
+    ArrowUp: -1,
+    ArrowRight: 1,
+    ArrowDown: 1,
+  };
+  const delta = deltas[event.key];
+  if (delta === undefined) return;
+  event.preventDefault();
+  const index = options.findIndex((opt) => opt.key === currentKey);
+  if (index < 0) return;
+  const next = options[(index + delta + options.length) % options.length];
+  if (next) onSelect(next.key);
+}
+
 type ObjectiveOptionTilesProps = {
   examQuestionId: string;
   options: ObjectiveOption[];
@@ -46,7 +79,7 @@ type ObjectiveOptionTilesProps = {
 };
 
 export function ObjectiveOptionTiles({
-  examQuestionId,
+  examQuestionId: _examQuestionId,
   options,
   multiple,
   selectedKeys,
@@ -54,36 +87,35 @@ export function ObjectiveOptionTiles({
   onSelect,
   onToggle,
 }: ObjectiveOptionTilesProps) {
+  const safeOptions = options ?? [];
+
   if (multiple) {
     const selected = parseMultiKeys(selectedKeys);
 
     return (
-      <div
-        className="grid grid-cols-2 gap-4"
-        role="group"
-        aria-label="选项"
-      >
-        {options.map((opt) => {
-          const checked = selected.includes(opt.key);
-          const id = `${examQuestionId}-${opt.key}`;
+      <div className="grid grid-cols-2 gap-4" role="group" aria-label="选项">
+        {safeOptions.map((opt) => {
+          const checked = selected.includes(opt.key.toUpperCase());
 
           return (
-            <label
+            <div
               key={opt.key}
-              htmlFor={id}
+              role="checkbox"
+              aria-checked={checked}
+              tabIndex={readOnly ? -1 : 0}
               className={optionTileClass(checked, readOnly)}
+              onClick={() => {
+                if (readOnly) return;
+                onToggle(opt.key, !checked);
+              }}
+              onKeyDown={(event) =>
+                activateWithKeyboard(event, readOnly, () =>
+                  onToggle(opt.key, !checked),
+                )
+              }
             >
-              <Checkbox
-                id={id}
-                checked={checked}
-                disabled={readOnly}
-                className="sr-only"
-                onCheckedChange={(value) =>
-                  onToggle(opt.key, value === true)
-                }
-              />
               <OptionTileContent opt={opt} />
-            </label>
+            </div>
           );
         })}
       </div>
@@ -91,27 +123,37 @@ export function ObjectiveOptionTiles({
   }
 
   return (
-    <RadioGroup
-      value={selectedKeys}
-      onValueChange={onSelect}
-      disabled={readOnly}
+    <div
       className="grid grid-cols-2 gap-4"
+      role="radiogroup"
+      aria-label="选项"
     >
-      {options.map((opt) => {
+      {safeOptions.map((opt, index) => {
         const selected = selectedKeys === opt.key;
-        const id = `${examQuestionId}-${opt.key}`;
+        const focusIndex = selectedKeys
+          ? safeOptions.findIndex((row) => row.key === selectedKeys)
+          : 0;
 
         return (
-          <label
+          <div
             key={opt.key}
-            htmlFor={id}
+            role="radio"
+            aria-checked={selected}
+            tabIndex={readOnly ? -1 : index === focusIndex ? 0 : -1}
             className={optionTileClass(selected, readOnly)}
+            onClick={() => {
+              if (readOnly) return;
+              onSelect(opt.key);
+            }}
+            onKeyDown={(event) => {
+              moveSingleSelection(event, safeOptions, opt.key, readOnly, onSelect);
+              activateWithKeyboard(event, readOnly, () => onSelect(opt.key));
+            }}
           >
-            <RadioGroupItem id={id} value={opt.key} className="sr-only" />
             <OptionTileContent opt={opt} />
-          </label>
+          </div>
         );
       })}
-    </RadioGroup>
+    </div>
   );
 }

@@ -15,6 +15,7 @@ model Teacher {
   displayName            String
   mustChangePassword     Boolean               @default(true)
   showSeatBoard          Boolean               @default(true)
+  showScoreAfterSubmit   Boolean               @default(false)
   createdAt              DateTime              @default(now())
   updatedAt              DateTime              @updatedAt
   questionImportBatches   QuestionImportBatch[]

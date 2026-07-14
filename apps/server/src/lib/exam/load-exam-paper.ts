@@ -22,6 +22,8 @@ export type ExamPaperResponse = {
   title: string;
   contentModules: ExamPaperStaticPayload['contentModules'];
   scheduledEndAt: string | null;
+  /** 学员是否已交卷（考中只读回看） */
+  submitted: boolean;
   items: Array<
     ExamPaperStaticPayload['items'][number] & { selectedKeys: string }
   >;
@@ -188,12 +190,14 @@ export function mergePaperResponse(
   staticPayload: ExamPaperStaticPayload,
   drafts: ExamPaperDrafts,
   scheduledEndAt: string | null,
+  submitted: boolean,
 ): ExamPaperResponse {
   return {
     examId: staticPayload.examId,
     title: staticPayload.title,
     contentModules: staticPayload.contentModules,
     scheduledEndAt,
+    submitted,
     items: staticPayload.items.map((item) => ({
       ...item,
       selectedKeys: drafts.answerDrafts.get(item.examQuestionId) ?? '',
@@ -218,10 +222,17 @@ export async function buildExamPaperResponse(
   if (!staticPayload) {
     return null;
   }
-  const drafts = await loadExamPaperDrafts(examId, rosterEntryId);
+  const [drafts, submission] = await Promise.all([
+    loadExamPaperDrafts(examId, rosterEntryId),
+    prisma.submission.findUnique({
+      where: { examId_rosterEntryId: { examId, rosterEntryId } },
+      select: { id: true },
+    }),
+  ]);
   return mergePaperResponse(
     staticPayload,
     drafts,
     examRow.scheduledEndAt?.toISOString() ?? null,
+    Boolean(submission),
   );
 }

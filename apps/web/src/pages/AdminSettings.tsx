@@ -48,6 +48,7 @@ function formatClearSummary(deleted: {
 
 export default function AdminSettings() {
   const [showSeatBoard, setShowSeatBoard] = useState(true);
+  const [showScoreAfterSubmit, setShowScoreAfterSubmit] = useState(false);
   const [appVersion, setAppVersion] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -60,6 +61,7 @@ export default function AdminSettings() {
     try {
       const settings = await fetchAdminSettings();
       setShowSeatBoard(settings.showSeatBoard);
+      setShowScoreAfterSubmit(settings.showScoreAfterSubmit);
       setAppVersion(settings.appVersion ?? null);
     } catch (err) {
       toast.error(getApiLoadErrorMessage(err) || '无法加载设置。');
@@ -77,10 +79,25 @@ export default function AdminSettings() {
     setShowSeatBoard(checked);
     setSaving(true);
     try {
-      await updateAdminSettings({ showSeatBoard: checked });
+      await updateAdminSettings({ showSeatBoard: checked, showScoreAfterSubmit });
       toast.success(checked ? '已开启座位表展示。' : '已关闭座位表展示。');
     } catch (err) {
       setShowSeatBoard(previous);
+      toast.error(getApiLoadErrorMessage(err) || '保存设置失败。');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleShowScoreAfterSubmitChange(checked: boolean) {
+    const previous = showScoreAfterSubmit;
+    setShowScoreAfterSubmit(checked);
+    setSaving(true);
+    try {
+      await updateAdminSettings({ showSeatBoard, showScoreAfterSubmit: checked });
+      toast.success(checked ? '已开启成绩展示。' : '已关闭成绩展示。');
+    } catch (err) {
+      setShowScoreAfterSubmit(previous);
       toast.error(getApiLoadErrorMessage(err) || '保存设置失败。');
     } finally {
       setSaving(false);
@@ -144,6 +161,36 @@ export default function AdminSettings() {
               </Label>
               <p className={adminMeta}>
                 开启后，学员可在登录页查看当前考试的座位安排；考官可在考试详情中查看。
+              </p>
+            </div>
+          </div>
+        )}
+      </AdminSectionCard>
+
+      <AdminSectionCard title="成绩展示">
+        <p className={cn('mb-4', adminMeta)}>
+          关闭后，学员在交卷页和结束页均不显示得分。
+        </p>
+        {loading ? (
+          <div className="flex min-h-[3rem] items-center">
+            <Spinner />
+          </div>
+        ) : (
+          <div className="flex items-start gap-3">
+            <Checkbox
+              id="show-score"
+              checked={showScoreAfterSubmit}
+              disabled={saving}
+              onCheckedChange={(value) => {
+                void handleShowScoreAfterSubmitChange(value === true);
+              }}
+            />
+            <div className="space-y-1">
+              <Label htmlFor="show-score" className="cursor-pointer font-semibold">
+                交卷后显示得分
+              </Label>
+              <p className={adminMeta}>
+                开启后，学员提交答卷或考试结束后可在结果页查看得分。
               </p>
             </div>
           </div>

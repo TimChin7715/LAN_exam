@@ -1,5 +1,5 @@
 ; LAN Exam offline installer — compile on a build machine with Inno Setup 6.
-;   ISCC.exe /DSourceDir=E:\programs\LAN_exam\dist\lan-exam-win /DAppVersion=1.6.0 LAN-Exam.iss
+;   ISCC.exe /DSourceDir=E:\programs\LAN_exam\dist\lan-exam-win /DAppVersion=1.6.34 LAN-Exam.iss
 ; Version: edit repo root VERSION; package.ps1 passes /DAppVersion automatically.
 
 #ifndef SourceDir

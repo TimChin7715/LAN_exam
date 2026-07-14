@@ -49,7 +49,13 @@ export async function registerStudentExamSubmissionRoutes(
 
       const exam = await prisma.exam.findUnique({
         where: { id: examId },
-        select: { id: true, title: true, rosterBatchId: true, contentModules: true },
+        select: {
+          id: true,
+          title: true,
+          rosterBatchId: true,
+          contentModules: true,
+          teacher: { select: { showScoreAfterSubmit: true } },
+        },
       });
 
       if (!exam || entry.batchId !== exam.rosterBatchId) {
@@ -122,6 +128,7 @@ export async function registerStudentExamSubmissionRoutes(
         title: exam.title,
         contentModules: exam.contentModules,
         totalScore: submission?.totalScore ?? null,
+        showScoreAfterSubmit: exam.teacher.showScoreAfterSubmit,
         submittedAt,
         items: examQuestions.map((eq) => {
           const answer = answerByQuestionId.get(eq.id);

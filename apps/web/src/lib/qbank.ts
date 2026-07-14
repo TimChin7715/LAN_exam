@@ -104,7 +104,7 @@ export function formatAnswerKeys(answerKeys: string): string {
 
 /** 展示用题干：去掉导入/测试数据中误写入的内部枚举标记 */
 export function formatStemForDisplay(stem: string): string {
-  return stem
+  return (stem ?? '')
     .trim()
     .replace(/[（(]\s*ALL_OR_NOTHING\s*[）)]/g, '')
     .replace(/\s{2,}/g, ' ')

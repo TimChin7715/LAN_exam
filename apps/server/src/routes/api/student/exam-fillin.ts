@@ -144,10 +144,26 @@ export async function registerStudentExamFillInRoutes(
         throw err;
       }
 
-      const { html, version } = await loadFillInWordPreviewHtml(prisma, {
-        batch: exam.fillInBatch,
-        examId,
-      });
+      let html: string;
+      let version: string;
+      try {
+        ({ html, version } = await loadFillInWordPreviewHtml(prisma, {
+          batch: exam.fillInBatch,
+          examId,
+        }));
+      } catch (err) {
+        const code =
+          err && typeof err === 'object' && 'code' in err
+            ? String((err as NodeJS.ErrnoException).code)
+            : '';
+        if (code === 'ENOENT') {
+          return reply.status(404).send({
+            code: 'FILLIN_PAPER_NOT_FOUND',
+            message: '操作题试卷文件缺失，请联系考官重新导入操作题批次。',
+          });
+        }
+        throw err;
+      }
 
       const etag = `"${version}"`;
       const ifNoneMatch = request.headers['if-none-match'];

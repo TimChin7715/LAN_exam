@@ -79,6 +79,7 @@ export type StudentExamStatus =
       endedAt: string | null;
       submitted: boolean;
       totalScore: number | null;
+      showScoreAfterSubmit: boolean;
     };
 
 export const STUDENT_EXAM_ENDED_CODE = 'EXAM_ENDED';
@@ -118,6 +119,8 @@ export type ExamPaperResponse = {
   title: string;
   contentModules: ExamContentModule[];
   scheduledEndAt: string | null;
+  /** 学员是否已交卷（考中只读回看） */
+  submitted: boolean;
   items: ExamPaperItem[];
   fillIn: FillInPaperMeta | null;
 };
@@ -295,6 +298,7 @@ export const studentApi = {
       title: string;
       contentModules: ExamContentModule[];
       totalScore: number | null;
+      showScoreAfterSubmit: boolean;
       submittedAt: string;
       items: ExamSubmissionItem[];
     }>(`/api/student/exam/submission?examId=${encodeURIComponent(examId)}`, {

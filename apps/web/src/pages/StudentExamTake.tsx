@@ -1,3 +1,4 @@
+import { Download } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -90,6 +91,7 @@ export default function StudentExamTake() {
   ]);
   const [items, setItems] = useState<(ExamPaperItem | ExamSubmissionItem)[]>([]);
   const [fillIn, setFillIn] = useState<FillInPaperMeta | null>(null);
+  const [downloadingAttachment, setDownloadingAttachment] = useState(false);
   const [answers, setAnswers] = useState<AnswerState>({});
   const [loading, setLoading] = useState(true);
   const [readOnly, setReadOnly] = useState(false);
@@ -117,6 +119,8 @@ export default function StudentExamTake() {
   const isMountedRef = useRef(true);
   const paperRetryToastShownRef = useRef(false);
   const autoSubmitInFlightRef = useRef(false);
+  const loadGenerationRef = useRef(0);
+  const examLoadedRef = useRef(false);
   const mainScrollRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
@@ -151,33 +155,19 @@ export default function StudentExamTake() {
   const loadExam = useCallback(async () => {
     if (!examId) {
       resetPendingSaveState();
+      examLoadedRef.current = false;
       setLoading(false);
       return;
     }
 
-    setLoading(true);
+    const generation = ++loadGenerationRef.current;
+    const showLoadingUi = !examLoadedRef.current;
+    if (showLoadingUi) {
+      setLoading(true);
+    }
+
     try {
       await studentApi.selectExam(examId);
-
-      try {
-        const submission = await studentApi.examSubmission(examId);
-        resetPendingSaveState();
-        setExamTitle(submission.title);
-        setContentModules(submission.contentModules);
-        setFillIn(null);
-        setItems(submission.items);
-        setAnswers(
-          Object.fromEntries(
-            submission.items.map((item) => [item.examQuestionId, item.selectedKeys]),
-          ),
-        );
-        setReadOnly(true);
-        return;
-      } catch (err) {
-        if (!(err instanceof ApiError) || err.status !== 404) {
-          throw err;
-        }
-      }
 
       const paper = await studentApi.examPaper(examId, {
         onRetry: () => {
@@ -187,20 +177,83 @@ export default function StudentExamTake() {
           }
         },
       });
+      if (generation !== loadGenerationRef.current) {
+        return;
+      }
       paperRetryToastShownRef.current = false;
-      resetPendingSaveState();
-      setExamTitle(paper.title);
-      setContentModules(paper.contentModules);
-      setItems(paper.items);
-      setFillIn(paper.fillIn);
-      setScheduledEndAt(paper.scheduledEndAt);
-      setAnswers(
-        Object.fromEntries(
-          paper.items.map((item) => [item.examQuestionId, item.selectedKeys ?? '']),
-        ),
-      );
-      setReadOnly(false);
+
+      if (paper.submitted) {
+        const submission = await studentApi.examSubmission(examId);
+        if (generation !== loadGenerationRef.current) {
+          return;
+        }
+        resetPendingSaveState();
+        setExamTitle(submission.title);
+        setContentModules(submission.contentModules);
+        setFillIn(null);
+        setItems(submission.items);
+        setAnswers(
+          Object.fromEntries(
+            submission.items.map((item) => [
+              item.examQuestionId,
+              item.selectedKeys,
+            ]),
+          ),
+        );
+        setReadOnly(true);
+        examLoadedRef.current = true;
+        return;
+      }
+
+      if (!showLoadingUi) {
+        // 考中后台刷新：保留学员刚选但未落库的作答
+        setExamTitle(paper.title);
+        setContentModules(paper.contentModules);
+        setItems(paper.items);
+        setFillIn(paper.fillIn);
+        setScheduledEndAt(paper.scheduledEndAt);
+        setAnswers((prev) => {
+          const serverAnswers = Object.fromEntries(
+            paper.items.map((item) => [
+              item.examQuestionId,
+              item.selectedKeys ?? '',
+            ]),
+          );
+          const merged = { ...serverAnswers };
+          for (const [qid, val] of Object.entries(dirtyAnswersRef.current)) {
+            merged[qid] = val;
+          }
+          for (const [qid, val] of Object.entries(prev)) {
+            if (dirtyAnswersRef.current[qid] !== undefined) continue;
+            if (val.trim().length > 0 && serverAnswers[qid] !== val) {
+              merged[qid] = val;
+            }
+          }
+          return merged;
+        });
+        setReadOnly(false);
+      } else {
+        resetPendingSaveState();
+        setExamTitle(paper.title);
+        setContentModules(paper.contentModules);
+        setItems(paper.items);
+        setFillIn(paper.fillIn);
+        setScheduledEndAt(paper.scheduledEndAt);
+        setAnswers(
+          Object.fromEntries(
+            paper.items.map((item) => [
+              item.examQuestionId,
+              item.selectedKeys ?? '',
+            ]),
+          ),
+        );
+        setReadOnly(false);
+      }
+      examLoadedRef.current = true;
     } catch (err) {
+      if (generation !== loadGenerationRef.current) {
+        return;
+      }
       if (err instanceof ApiError && err.code === STUDENT_EXAM_ENDED_CODE) {
         goToExamEnded();
         return;
@@ -211,13 +264,19 @@ export default function StudentExamTake() {
         toast.error('无法加载试卷。');
       }
     } finally {
-      setLoading(false);
+      if (generation === loadGenerationRef.current && showLoadingUi) {
+        setLoading(false);
+      }
     }
   }, [examId, goToExamEnded, resetPendingSaveState]);
 
+  const loadExamRef = useRef(loadExam);
+  loadExamRef.current = loadExam;
+
   useEffect(() => {
-    void loadExam();
-  }, [loadExam]);
+    examLoadedRef.current = false;
+    void loadExamRef.current();
+  }, [examId]);
 
   const persistDirtyAnswers = useCallback(async () => {
     if (readOnly || !examId) return;
@@ -260,6 +319,8 @@ export default function StudentExamTake() {
         }
         if (err instanceof ApiError) {
           toast.error(err.message || '保存答案失败。');
+        } else if (err instanceof TypeError) {
+          toast.error('无法连接考试服务器，请检查与管理机的网络连接。');
         }
         throw err;
       } finally {
@@ -349,6 +410,8 @@ export default function StudentExamTake() {
         }
         if (err instanceof ApiError && err.code === SERVER_BUSY_CODE) {
           toast.error(err.message || '进度同步排队已满，将稍后重试。');
+        } else if (err instanceof TypeError) {
+          toast.error('无法连接考试服务器，进度同步将稍后重试。');
         }
       } finally {
         if (isMountedRef.current) {
@@ -559,10 +622,11 @@ export default function StudentExamTake() {
   }
 
   function toggleMulti(examQuestionId: string, key: string, checked: boolean) {
+    const normalizedKey = key.toUpperCase();
     const current = parseMultiKeys(answers[examQuestionId] ?? '');
     const next = checked
-      ? [...current, key]
-      : current.filter((item) => item !== key);
+      ? [...current, normalizedKey]
+      : current.filter((item) => item !== normalizedKey);
     updateAnswer(examQuestionId, joinMultiKeys(next));
   }
 
@@ -592,6 +656,21 @@ export default function StudentExamTake() {
     } finally {
       setLoggingOut(false);
       navigate('/exam/login', { replace: true });
+    }
+  }
+
+  async function handleDownloadAttachment() {
+    if (!fillIn?.hasAttachments) return;
+    setDownloadingAttachment(true);
+    try {
+      await studentApi.downloadFillInAttachmentsZip(
+        examId,
+        fillIn.attachmentZipFileName ?? '操作题附件.zip',
+      );
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : '下载附件失败');
+    } finally {
+      setDownloadingAttachment(false);
     }
   }
 
@@ -717,19 +796,9 @@ export default function StudentExamTake() {
   );
 
   useEffect(() => {
-    if (!useSplitLayout) return;
-
-    const html = document.documentElement;
-    const { overflow: prevHtmlOverflow } = html.style;
-    const { overflow: prevBodyOverflow } = document.body.style;
-    html.style.overflow = 'hidden';
-    document.body.style.overflow = 'hidden';
-
-    return () => {
-      html.style.overflow = prevHtmlOverflow;
-      document.body.style.overflow = prevBodyOverflow;
-    };
-  }, [useSplitLayout]);
+    if (loading) return;
+    mainScrollRef.current?.scrollTo({ top: 0 });
+  }, [examId, loading]);
 
   if (!examId) {
     return (
@@ -743,6 +812,21 @@ export default function StudentExamTake() {
     return (
       <div className="flex min-h-svh items-center justify-center">
         <Spinner />
+      </div>
+    );
+  }
+
+  if (needsQuestionItems(contentModules) && items.length === 0) {
+    return (
+      <div className="flex min-h-svh items-center justify-center px-4">
+        <Alert variant="destructive" className="max-w-md">
+          <AlertDescription className="space-y-3">
+            <p>试卷未能加载，请检查与管理机的网络连接后重试。</p>
+            <Button type="button" variant="outline" onClick={() => void loadExam()}>
+              重新加载
+            </Button>
+          </AlertDescription>
+        </Alert>
       </div>
     );
   }
@@ -793,14 +877,33 @@ export default function StudentExamTake() {
             {examTitle ?? '考试中'}
           </p>
         </div>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={() => setLogoutOpen(true)}
-        >
-          退出登录
-        </Button>
+        <div className="flex items-center gap-1.5">
+            <span className="text-nowrap text-sm text-muted-foreground">资料：</span>
+            {fillIn?.hasAttachments ? (
+              <Button
+                type="button"
+                variant="default"
+                size="sm"
+                disabled={downloadingAttachment}
+                onClick={() => void handleDownloadAttachment()}
+              >
+                {downloadingAttachment ? (
+                  <Spinner className="size-4" />
+                ) : (
+                  <Download className="size-4" aria-hidden />
+                )}
+                下载附件（ZIP）
+              </Button>
+            ) : null}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setLogoutOpen(true)}
+            >
+              退出登录
+            </Button>
+          </div>
       </div>
     ) : null;
 

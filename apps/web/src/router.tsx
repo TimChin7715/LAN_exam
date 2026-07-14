@@ -17,6 +17,7 @@ import AdminExams from '@/pages/AdminExams';
 import AdminExamDetail from '@/pages/AdminExamDetail';
 import AdminSettings from '@/pages/AdminSettings';
 import { StudentRoute } from '@/components/auth/StudentRoute';
+import { StudentExamErrorBoundary } from '@/components/student/StudentExamErrorBoundary';
 import StudentExamEnded from '@/pages/StudentExamEnded';
 import StudentExamSubmitted from '@/pages/StudentExamSubmitted';
 import StudentExamTake from '@/pages/StudentExamTake';
@@ -48,9 +49,9 @@ export function AppRouter() {
         <Route path="/exam" element={<StudentRoute />}>
           <Route path="login" element={<StudentLogin />} />
           <Route path="waiting" element={<StudentWaiting />} />
-          <Route path="take" element={<StudentExamTake />} />
-          <Route path="submitted" element={<StudentExamSubmitted />} />
-          <Route path="ended" element={<StudentExamEnded />} />
+          <Route path="take" element={<StudentExamErrorBoundary><StudentExamTake /></StudentExamErrorBoundary>} />
+          <Route path="submitted" element={<StudentExamErrorBoundary><StudentExamSubmitted /></StudentExamErrorBoundary>} />
+          <Route path="ended" element={<StudentExamErrorBoundary><StudentExamEnded /></StudentExamErrorBoundary>} />
         </Route>
 
         <Route path="/admin" element={<AdminRoute />}>

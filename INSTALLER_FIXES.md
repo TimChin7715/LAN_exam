@@ -1,6 +1,6 @@
 # Windows 安装包修复记录
 
-> 版本跨度：v1.6.6 → v1.6.29
+> 版本跨度：v1.6.6 → v1.6.31
 > 涉及提交：`062890f` ~ 当前工作区
 
 ---
@@ -471,3 +471,55 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "C:\LAN-Exam\scripts\install
 2. Student URL must be `http://<LAN_IP>:5180/exam/login` (not `/admin`).
 3. Verify `logs\install.log` contains `install completed` and `verify-install passed`.
 4. Check `http://127.0.0.1:5180/health` returns version `1.6.29`.
+
+---
+
+## 19. v1.6.31: trim Postgres/Node runtime (faster extract)
+
+**Release artifact**: `dist\LAN-Exam-win-v1.6.31.zip`
+
+### This release updates
+
+- Bump `VERSION` to `1.6.31`.
+- New `scripts/windows/trim-postgres-runtime.ps1`: remove bundled **pgAdmin 4**, `doc/`, `include/`, `StackBuilder/`, `share/locale/` from EDB Postgres zip (keep `bin/`, `lib/`, `share/timezone`, etc.).
+- New `scripts/windows/trim-node-runtime.ps1`: keep only `node.exe` + required `.dll`; drop portable Node's `node_modules` and npm CLI.
+- `package.ps1` pipeline: `fetch-runtimes` -> **trim-runtimes** -> `build-tray` -> `verify-package`.
+- `verify-package.ps1`: assert forbidden runtime dirs absent; smoke-test bundled `node.exe`.
+
+### Expected package size (approx.)
+
+| | v1.6.30 | v1.6.31 |
+| --- | --- | --- |
+| Extracted files | ~38k | **~16k** |
+| Extracted size | ~1.35 GB | **~0.7 GB** |
+| Zip size | ~950 MB | **~450–550 MB** |
+
+### Deployment reminders
+
+1. Extract with **7-Zip** or `tar -xf` when possible (faster than Explorer for many small files).
+2. Run `setup.bat` as Administrator on first use.
+3. Verify `logs\install.log` contains `Postgres ready`, `install completed`, `verify-install passed`.
+4. Check `http://127.0.0.1:5180/health` returns version `1.6.31`.
+
+---
+
+## 20. v1.6.34: student exam white-screen fix + paper load
+
+**Release artifact**: `dist\LAN-Exam-Setup-v1.6.34.exe`
+
+### This release updates
+
+- Bump `VERSION` to `1.6.34`.
+- **Fix**: mixed exam take page blank main area after selecting objective options (custom accessible option tiles; no hidden Radix focus scroll in fixed layout).
+- **Fix**: exam paper API exposes `submitted` so take page skips misleading submission 404 probe.
+- **Fix**: fill-in Word preview 304-without-cache and empty HTML fallback UI.
+- **Fix**: `StudentExamErrorBoundary` on take/submitted/ended routes.
+- Server: fill-in preview `ENOENT` returns clear 404.
+
+### Deployment reminders
+
+1. Run Setup as Administrator (or extract green zip and `setup.bat` as Admin on first use).
+2. Student URL: `http://<LAN_IP>:5180/exam/login`.
+3. Verify `logs\install.log` contains `install completed` and `verify-install passed`.
+4. Check `http://127.0.0.1:5180/health` returns version `1.6.34`.
+5. Smoke test: open mixed exam, select single/multi options — main content must stay visible (not white screen).

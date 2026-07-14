@@ -21,6 +21,7 @@
 | 文档 | 适合谁看 | 用途 |
 | --- | --- | --- |
 | [README.md](./README.md) | 新读者 / 新工程 | 产品能力、开发入口、文档索引 |
+| [docs/PRODUCT-MANUAL.md](./docs/PRODUCT-MANUAL.md) | 考官 / 考务人员 | 产品介绍、应用场景、使用指南、操作流程、注意事项与 Q&A |
 | [AGENTS.md](./AGENTS.md) | 维护者 / AI 协作者 | 产品约束、认证模型、关键代码落点 |
 | [docs/DEPLOY-WINDOWS-NATIVE.md](./docs/DEPLOY-WINDOWS-NATIVE.md) | 考场实施 / 运维 | Windows 离线安装、考前考后操作 |
 | [docs/DEPLOY.md](./docs/DEPLOY.md) | 开发运维 / 验收环境 | Docker Compose、反向代理、上传与运维约束 |

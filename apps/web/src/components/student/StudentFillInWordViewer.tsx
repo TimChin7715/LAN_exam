@@ -1,7 +1,8 @@
-import { memo, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ImagePlus } from 'lucide-react';
 
 import { FillInScreenshotAttach } from '@/components/student/FillInScreenshotAttach';
+import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import { displayFillAnswer, resolveFillQuestionLeaderId } from '@/lib/fillin';
 import { splitPreviewHtmlByQuestionRaw } from '@/lib/fillin-preview-split';
@@ -36,6 +37,37 @@ type PreviewCacheEntry = {
 
 /** 同场考试切 tab 不重复请求；配合 HTTP ETag / 图片 immutable 缓存。 */
 const previewByExam = new Map<string, PreviewCacheEntry>();
+
+function applyPreviewPayload(
+  examId: string,
+  html: string,
+  version: string,
+): string | null {
+  const trimmed = html.trim();
+  if (!trimmed) {
+    return '操作题试卷内容为空，请联系考官重新导入。';
+  }
+  previewByExam.set(examId, { html: trimmed, version });
+  return null;
+}
+
+async function fetchPreviewHtml(
+  examId: string,
+  etag?: string,
+): Promise<
+  | { kind: 'full'; html: string; version: string }
+  | { kind: 'notModified' }
+> {
+  const data = await studentApi.fetchFillInWordPreview(examId, etag);
+  if ('notModified' in data && data.notModified) {
+    return { kind: 'notModified' };
+  }
+  return {
+    kind: 'full',
+    html: data.html,
+    version: data.version,
+  };
+}
 
 function fillRowKey(row: FillRow): string | null {
   if (!row.fillQuestionNo || !row.fillBlankIndex) return null;
@@ -83,6 +115,7 @@ export function StudentFillInWordViewer({
   const [html, setHtml] = useState<string | null>(cached?.html ?? null);
   const [loading, setLoading] = useState(!cached);
   const [error, setError] = useState<string | null>(null);
+  const [reloadNonce, setReloadNonce] = useState(0);
   const previewRootRef = useRef<HTMLDivElement>(null);
   const onAnswerChangeRef = useRef(onAnswerChange);
   const answersRef = useRef(answers);
@@ -116,9 +149,16 @@ export function StudentFillInWordViewer({
     return splitPreviewHtmlByQuestionRaw(html);
   }, [html]);
 
+  const handleRetryLoad = useCallback(() => {
+    previewByExam.delete(examId);
+    setHtml(null);
+    setError(null);
+    setReloadNonce((n) => n + 1);
+  }, [examId]);
+
   useEffect(() => {
     const entry = previewByExam.get(examId);
-    if (entry) {
+    if (entry?.html) {
       setHtml(entry.html);
       setLoading(false);
       setError(null);
@@ -130,28 +170,44 @@ export function StudentFillInWordViewer({
     setError(null);
     void (async () => {
       try {
-        const data = await studentApi.fetchFillInWordPreview(
+        let result = await fetchPreviewHtml(
           examId,
           previewByExam.get(examId)?.version,
         );
         if (cancelled) return;
-        if ('notModified' in data && data.notModified) {
-          const again = previewByExam.get(examId);
-          if (again) {
-            setHtml(again.html);
+
+        if (result.kind === 'notModified') {
+          const cachedEntry = previewByExam.get(examId);
+          if (cachedEntry?.html) {
+            setHtml(cachedEntry.html);
+            return;
           }
+          result = await fetchPreviewHtml(examId);
+          if (cancelled) return;
+        }
+
+        if (result.kind === 'notModified') {
+          setError('操作题试卷加载失败，请重试。');
           return;
         }
-        previewByExam.set(examId, {
-          html: data.html,
-          version: data.version,
-        });
-        setHtml(data.html);
+
+        const emptyError = applyPreviewPayload(
+          examId,
+          result.html,
+          result.version,
+        );
+        if (emptyError) {
+          setError(emptyError);
+          setHtml(null);
+          return;
+        }
+        setHtml(previewByExam.get(examId)!.html);
       } catch (err) {
         if (!cancelled) {
           setError(
             err instanceof ApiError ? err.message : '无法加载试卷预览',
           );
+          setHtml(null);
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -160,7 +216,7 @@ export function StudentFillInWordViewer({
     return () => {
       cancelled = true;
     };
-  }, [examId]);
+  }, [examId, reloadNonce]);
 
   useEffect(() => {
     const root = previewRootRef.current;
@@ -249,7 +305,20 @@ export function StudentFillInWordViewer({
           </div>
         ) : null}
         {error ? (
-          <p className="text-sm text-destructive">{error}</p>
+          <div className="space-y-3 text-sm text-destructive">
+            <p>{error}</p>
+            <Button type="button" variant="outline" size="sm" onClick={handleRetryLoad}>
+              重新加载
+            </Button>
+          </div>
+        ) : null}
+        {!loading && !error && !htmlSegments ? (
+          <div className="space-y-3 text-sm text-muted-foreground">
+            <p>操作题试卷未能显示，请重试。</p>
+            <Button type="button" variant="outline" size="sm" onClick={handleRetryLoad}>
+              重新加载
+            </Button>
+          </div>
         ) : null}
         {!loading && !error && htmlSegments ? (
           <div
